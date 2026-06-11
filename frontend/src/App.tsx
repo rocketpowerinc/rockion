@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Sidebar from "./components/Sidebar";
 import Editor from "./components/Editor";
 import Backlinks from "./components/Backlinks";
@@ -18,6 +18,36 @@ export default function App() {
   const [note, setNote] = useState<Note | null>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    const saved =
+      typeof localStorage !== "undefined" ? localStorage.getItem("rockion-theme") : null;
+    if (saved === "light" || saved === "dark") return saved;
+    return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    try {
+      localStorage.setItem("rockion-theme", theme);
+    } catch {
+      /* localStorage unavailable */
+    }
+  }, [theme]);
+
+  const toggleTheme = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
+
+  // Flatten the tree into a list of pages for the "link to page" picker.
+  const pages = useMemo(() => {
+    const out: { path: string; title: string }[] = [];
+    const walk = (nodes: TreeNode[]) => {
+      for (const n of nodes) {
+        if (n.isDir) walk(n.children ?? []);
+        else out.push({ path: n.path, title: n.name });
+      }
+    };
+    walk(Array.isArray(tree) ? tree : []);
+    return out;
+  }, [tree]);
 
   const refreshTree = useCallback(async () => {
     try {
@@ -87,6 +117,13 @@ export default function App() {
   if (!vault) {
     return (
       <div className="welcome">
+        <button
+          className="icon-btn theme-toggle-floating"
+          onClick={toggleTheme}
+          title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+        >
+          {theme === "dark" ? "☀️" : "🌙"}
+        </button>
         <h1>Rockion</h1>
         <p>A local-first markdown workspace. Your notes stay plain files on disk.</p>
         <button className="primary" onClick={openVault}>
@@ -102,13 +139,15 @@ export default function App() {
         vaultName={vault.name}
         tree={tree}
         error={error}
+        theme={theme}
+        onToggleTheme={toggleTheme}
         activePath={note?.path ?? null}
         onOpen={openNote}
         onNewNote={newNote}
         onOpenVault={openVault}
       />
       <main className="main">
-        <Editor note={note} onDirtySaved={refreshTree} />
+        <Editor note={note} pages={pages} onDirtySaved={refreshTree} onOpenLink={openNote} />
         <Backlinks path={note?.path ?? null} onOpen={openNote} />
       </main>
       <QuickSwitcher

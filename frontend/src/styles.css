@@ -11,8 +11,20 @@
     sans-serif;
 }
 
+/* Explicit dark theme (set via the toggle). */
+:root[data-theme="dark"] {
+  --bg: #191919;
+  --bg-sidebar: #202020;
+  --border: #2f2f2f;
+  --text: #e6e6e3;
+  --text-muted: #8f8f8c;
+  --hover: #2a2a2a;
+  --selected: #20303f;
+}
+
+/* Fall back to the OS preference until JS sets an explicit theme. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) {
     --bg: #191919;
     --bg-sidebar: #202020;
     --border: #2f2f2f;
@@ -118,6 +130,17 @@ button.primary,
 .icon-btn:hover {
   background: var(--hover);
 }
+.sidebar-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.theme-toggle-floating {
+  position: fixed;
+  top: 14px;
+  right: 16px;
+  font-size: 16px;
+}
 
 /* ---- Tree ---- */
 .tree {
@@ -196,7 +219,8 @@ button.primary,
 .editor-empty {
   max-width: 740px;
   margin: 0 auto;
-  padding: 64px 28px 160px;
+  /* Wider left padding gives the drag handles a gutter to live in. */
+  padding: 64px 56px 160px;
 }
 .editor-empty {
   color: var(--text-muted);
@@ -273,6 +297,219 @@ button.primary,
   float: left;
   height: 0;
   pointer-events: none;
+}
+
+/* ---- Notion-style blocks ---- */
+/* Each top-level node behaves like a block: subtle hover, room for the handle. */
+.rk-prose > * {
+  position: relative;
+  border-radius: 4px;
+  padding: 1px 4px;
+  margin-left: -4px;
+  margin-right: -4px;
+  transition: background-color 120ms ease;
+}
+.rk-prose > *:hover {
+  background-color: color-mix(in srgb, var(--hover) 55%, transparent);
+}
+
+/* The global drag handle that follows the hovered block. */
+.drag-handle {
+  position: absolute;
+  width: 22px;
+  height: 24px;
+  border-radius: 5px;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cg fill='%2399999c'%3E%3Ccircle cx='5' cy='4' r='1.4'/%3E%3Ccircle cx='11' cy='4' r='1.4'/%3E%3Ccircle cx='5' cy='8' r='1.4'/%3E%3Ccircle cx='11' cy='8' r='1.4'/%3E%3Ccircle cx='5' cy='12' r='1.4'/%3E%3Ccircle cx='11' cy='12' r='1.4'/%3E%3C/g%3E%3C/svg%3E");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 16px;
+  cursor: grab;
+  opacity: 0.5;
+  transition: opacity 120ms ease, background-color 120ms ease;
+  z-index: 40;
+}
+.drag-handle:hover {
+  background-color: var(--hover);
+  opacity: 1;
+}
+.drag-handle:active {
+  cursor: grabbing;
+}
+.drag-handle.hide {
+  display: none;
+  pointer-events: none;
+}
+
+/* Notion-style "+" add-block button (left gutter). */
+.add-block-button {
+  position: fixed;
+  width: 22px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 41;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.add-block-button:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+@media (max-width: 600px) {
+  .add-block-button {
+    display: none !important;
+  }
+}
+/* Hide handles on very narrow windows where there's no gutter. */
+@media (max-width: 600px) {
+  .drag-handle {
+    display: none;
+  }
+}
+
+/* ---- Callouts (Notion-style) ---- */
+.rk-prose .callout {
+  position: relative;
+  margin: 0.7em 0;
+  padding: 12px 16px 12px 46px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--hover);
+}
+.rk-prose .callout::before {
+  content: "📌";
+  position: absolute;
+  left: 14px;
+  top: 11px;
+  font-size: 18px;
+  line-height: 1.5;
+}
+.rk-prose .callout > :first-child {
+  margin-top: 0;
+}
+.rk-prose .callout > :last-child {
+  margin-bottom: 0;
+}
+.rk-prose .callout-content > :first-child {
+  margin-top: 0;
+}
+.rk-prose .callout-content > :last-child {
+  margin-bottom: 0;
+}
+/* Transparent click target sitting over the icon — cycles the callout style. */
+.rk-prose .callout-hit {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  z-index: 1;
+  transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+.rk-prose .callout-hit:hover {
+  background: rgba(127, 127, 127, 0.18);
+  box-shadow: 0 0 0 1px rgba(127, 127, 127, 0.25);
+}
+.rk-prose .callout[data-callout="note"],
+.rk-prose .callout[data-callout="info"] {
+  border-color: #9cc3f0;
+  background: rgba(35, 131, 226, 0.08);
+}
+.rk-prose .callout[data-callout="note"]::before {
+  content: "📝";
+}
+.rk-prose .callout[data-callout="info"]::before {
+  content: "ℹ️";
+}
+.rk-prose .callout[data-callout="tip"] {
+  border-color: #9bdcab;
+  background: rgba(46, 160, 67, 0.09);
+}
+.rk-prose .callout[data-callout="tip"]::before {
+  content: "💡";
+}
+.rk-prose .callout[data-callout="warning"] {
+  border-color: #f0d28c;
+  background: rgba(210, 153, 34, 0.11);
+}
+.rk-prose .callout[data-callout="warning"]::before {
+  content: "⚠️";
+}
+.rk-prose .callout[data-callout="important"] {
+  border-color: #cdaaf0;
+  background: rgba(130, 80, 223, 0.08);
+}
+.rk-prose .callout[data-callout="important"]::before {
+  content: "❗";
+}
+.rk-prose .callout[data-callout="caution"],
+.rk-prose .callout[data-callout="danger"] {
+  border-color: #f0a8a8;
+  background: rgba(192, 57, 43, 0.08);
+}
+.rk-prose .callout[data-callout="caution"]::before,
+.rk-prose .callout[data-callout="danger"]::before {
+  content: "🛑";
+}
+
+/* ---- Cyberpunk gradient callouts ---- */
+/* Three neon panels with a gradient border AND a gradient sheen across the
+   fill, readable on both the light and dark app themes. */
+.rk-prose .callout[data-callout="green"],
+.rk-prose .callout[data-callout="red"],
+.rk-prose .callout[data-callout="yellow"] {
+  border: 1.5px solid transparent;
+  border-radius: 8px;
+  color: #eef4ff;
+}
+.rk-prose .callout[data-callout="green"] a,
+.rk-prose .callout[data-callout="red"] a,
+.rk-prose .callout[data-callout="yellow"] a {
+  color: #7fdcff;
+}
+.rk-prose .callout[data-callout="green"]::before,
+.rk-prose .callout[data-callout="red"]::before,
+.rk-prose .callout[data-callout="yellow"]::before {
+  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.45));
+}
+
+.rk-prose .callout[data-callout="green"] {
+  background: linear-gradient(135deg, rgba(57, 255, 20, 0.30), rgba(0, 229, 160, 0.12) 55%, rgba(7, 16, 12, 0.96)) padding-box,
+    linear-gradient(135deg, #39ff14, #00e5a0) border-box;
+  box-shadow: 0 0 18px rgba(57, 255, 20, 0.30), inset 0 0 26px rgba(0, 229, 160, 0.08);
+}
+.rk-prose .callout[data-callout="green"]::before {
+  content: "🟢";
+}
+
+.rk-prose .callout[data-callout="red"] {
+  background: linear-gradient(135deg, rgba(255, 45, 85, 0.32), rgba(255, 107, 61, 0.12) 55%, rgba(18, 7, 9, 0.96)) padding-box,
+    linear-gradient(135deg, #ff2d55, #ff6b3d) border-box;
+  box-shadow: 0 0 18px rgba(255, 45, 85, 0.32), inset 0 0 26px rgba(255, 107, 61, 0.08);
+}
+.rk-prose .callout[data-callout="red"]::before {
+  content: "🔴";
+}
+
+.rk-prose .callout[data-callout="yellow"] {
+  background: linear-gradient(135deg, rgba(255, 230, 0, 0.30), rgba(255, 174, 0, 0.12) 55%, rgba(18, 14, 4, 0.96)) padding-box,
+    linear-gradient(135deg, #ffe600, #ffae00) border-box;
+  box-shadow: 0 0 18px rgba(255, 200, 0, 0.30), inset 0 0 26px rgba(255, 174, 0, 0.08);
+}
+.rk-prose .callout[data-callout="yellow"]::before {
+  content: "🟡";
 }
 
 /* ---- Slash menu ---- */

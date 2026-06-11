@@ -5,6 +5,8 @@ interface Props {
   vaultName: string;
   tree: TreeNode[];
   error?: string | null;
+  theme: "light" | "dark";
+  onToggleTheme: () => void;
   activePath: string | null;
   onOpen: (path: string) => void;
   onNewNote: (dir: string) => void;
@@ -15,6 +17,8 @@ export default function Sidebar({
   vaultName,
   tree,
   error,
+  theme,
+  onToggleTheme,
   activePath,
   onOpen,
   onNewNote,
@@ -27,9 +31,18 @@ export default function Sidebar({
         <button className="vault-name" onClick={onOpenVault} title="Open another vault">
           {vaultName || "Open vault…"}
         </button>
-        <button className="icon-btn" title="New note" onClick={() => onNewNote("")}>
-          +
-        </button>
+        <div className="sidebar-head-actions">
+          <button
+            className="icon-btn"
+            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            onClick={onToggleTheme}
+          >
+            {theme === "dark" ? "☀️" : "🌙"}
+          </button>
+          <button className="icon-btn" title="New note" onClick={() => onNewNote("")}>
+            +
+          </button>
+        </div>
       </div>
       <nav className="tree">
         {error && <div className="tree-empty tree-error">{error}</div>}

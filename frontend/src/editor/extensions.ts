@@ -9,8 +9,11 @@ import TableCell from "@tiptap/extension-table-cell";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import { Markdown } from "tiptap-markdown";
+import DragHandle from "tiptap-extension-global-drag-handle";
 
 import { SlashCommand } from "./SlashCommand";
+import { Callout } from "./Callout";
+import { AddBlockButton } from "./AddBlockButton";
 
 // The full set of TipTap extensions that make up the Rockion editor.
 export const editorExtensions = [
@@ -22,6 +25,7 @@ export const editorExtensions = [
   }),
   TaskList,
   TaskItem.configure({ nested: true }),
+  Callout,
   Table.configure({ resizable: true }),
   TableRow,
   TableHeader,
@@ -38,4 +42,13 @@ export const editorExtensions = [
     transformPastedText: true,
   }),
   SlashCommand,
+  // Notion-style per-block hover handle: grab any block to drag-reorder it.
+  // Operates on the in-memory doc only — files stay plain Markdown on save.
+  DragHandle.configure({
+    dragHandleWidth: 22,
+    scrollTreshold: 100,
+    // Treat callouts as draggable blocks so a nested callout can be dragged out.
+    customNodes: ["callout"],
+  }),
+  AddBlockButton,
 ];

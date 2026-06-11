@@ -2,6 +2,7 @@ import {
   forwardRef,
   useEffect,
   useImperativeHandle,
+  useRef,
   useState,
 } from "react";
 import type { SlashItem } from "./slashItems";
@@ -17,8 +18,14 @@ interface Props {
 
 export const SlashMenu = forwardRef<SlashMenuRef, Props>((props, ref) => {
   const [selected, setSelected] = useState(0);
+  const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   useEffect(() => setSelected(0), [props.items]);
+
+  // Keep the highlighted item visible as the selection moves.
+  useEffect(() => {
+    itemRefs.current[selected]?.scrollIntoView({ block: "nearest" });
+  }, [selected]);
 
   const pick = (index: number) => {
     const item = props.items[index];
@@ -50,6 +57,7 @@ export const SlashMenu = forwardRef<SlashMenuRef, Props>((props, ref) => {
       {props.items.map((item, i) => (
         <button
           key={item.title}
+          ref={(el) => (itemRefs.current[i] = el)}
           className={`slash-item ${i === selected ? "is-selected" : ""}`}
           onMouseEnter={() => setSelected(i)}
           onClick={() => pick(i)}

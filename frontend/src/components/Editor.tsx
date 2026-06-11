@@ -1,18 +1,27 @@
-import { useEffect, useRef } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { editorExtensions } from "../editor/extensions";
 import { api, type Note } from "../api";
+import PagePicker, { type PageRef } from "./PagePicker";
 
 interface Props {
   note: Note | null;
+  pages?: PageRef[];
   onDirtySaved?: () => void;
+  onOpenLink?: (path: string) => void;
 }
 
 const AUTOSAVE_MS = 600;
 
-export default function Editor({ note, onDirtySaved }: Props) {
+export default function Editor({ note, pages, onDirtySaved, onOpenLink }: Props) {
   const saveTimer = useRef<number | null>(null);
   const currentPath = useRef<string | null>(null);
+  const [linkPickerOpen, setLinkPickerOpen] = useState(false);
 
   const editor = useEditor({
     extensions: editorExtensions,
@@ -78,6 +87,61 @@ export default function Editor({ note, onDirtySaved }: Props) {
     }
   }, [editor, note?.path]);
 
+  // Open the page picker when the "/Link to page" command fires.
+  useEffect(() => {
+    const open = () => setLinkPickerOpen(true);
+    window.addEventListener("rockion:link-page", open);
+    return () => window.removeEventListener("rockion:link-page", open);
+  }, []);
+
+  // Insert a markdown link to the chosen note at the cursor.
+  function insertPageLink(page: PageRef) {
+    setLinkPickerOpen(false);
+    if (!editor) return;
+    editor
+      .chain()
+      .focus()
+      .insertContent([
+        { type: "text", text: page.title, marks: [{ type: "link", attrs: { href: page.path } }] },
+        { type: "text", text: " " },
+      ])
+      .run();
+  }
+
+  // Clicking the empty area below the content starts a new block there.
+  function handleWrapClick(e: ReactMouseEvent<HTMLDivElement>) {
+    if (!editor) return;
+
+    // Internal links (to other notes) open that note instead of navigating.
+    const anchor = (e.target as HTMLElement)?.closest?.("a");
+    if (anchor) {
+      const href = anchor.getAttribute("href") || "";
+      if (href && !/^(https?:|mailto:|tel:|#)/i.test(href)) {
+        e.preventDefault();
+        onOpenLink?.(decodeURIComponent(href));
+      }
+      return;
+    }
+
+    if (e.target !== e.currentTarget) return; // ignore clicks on actual content
+    const pmRect = editor.view.dom.getBoundingClientRect();
+    if (e.clientY < pmRect.bottom) return; // only when clicking *below* content
+
+    const last = editor.state.doc.lastChild;
+    const isEmptyParagraph =
+      !!last && last.type.name === "paragraph" && last.content.size === 0;
+    if (isEmptyParagraph) {
+      editor.chain().focus("end").run();
+    } else {
+      editor
+        .chain()
+        .focus()
+        .insertContentAt(editor.state.doc.content.size, { type: "paragraph" })
+        .focus("end")
+        .run();
+    }
+  }
+
   if (!note) {
     return (
       <div className="editor-empty">
@@ -87,8 +151,16 @@ export default function Editor({ note, onDirtySaved }: Props) {
   }
 
   return (
-    <div className="editor-wrap">
-      <EditorContent editor={editor} />
-    </div>
+    <>
+      <div className="editor-wrap" onClick={handleWrapClick}>
+        <EditorContent editor={editor} />
+      </div>
+      <PagePicker
+        open={linkPickerOpen}
+        pages={pages ?? []}
+        onPick={insertPageLink}
+        onClose={() => setLinkPickerOpen(false)}
+      />
+    </>
   );
 }

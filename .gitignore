@@ -1,0 +1,15 @@
+# Go
+/build/bin/
+*.exe
+
+# Wails generated bindings + frontend build output
+/frontend/dist/
+/frontend/wailsjs/
+/frontend/node_modules/
+
+# Vault index (per-vault, never committed)
+.rockion/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "rockion",
+  "outputfilename": "rockion",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "Rocket"
+  },
+  "info": {
+    "productName": "Rockion",
+    "productVersion": "0.1.0",
+    "companyName": "Rockion",
+    "copyright": "Copyright © 2026 Rocket",
+    "comments": "A local-first markdown editor — Notion's UI, Obsidian's files."
+  }
+}

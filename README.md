@@ -37,19 +37,22 @@ Single Go binary (Wails) wrapping a React + TipTap editor.
 
 ## Download
 
-Grab a prebuilt binary from the [Releases](https://github.com/rocket/rockion/releases) page:
+Grab a prebuilt binary from the [Releases](https://github.com/rocketpowerinc/rockion/releases) page:
 
-- **Windows** — `rockion-windows-amd64-installer.exe` (installer, recommended) or `rockion-windows-amd64.exe` (portable, run directly)
-- **macOS** — `rockion-macos-universal.zip` (unzip → `Rockion.app`)
-- **Linux** — `rockion-linux-amd64.tar.gz` (extract → run `rockion`; needs `libwebkit2gtk-4.0`)
+- **Windows x64** - `rockion-windows-amd64-installer.exe` or portable `.exe`
+- **Windows ARM64** - `rockion-windows-arm64-installer.exe` or portable `.exe`
+- **macOS Intel** - `rockion-macos-amd64.zip`
+- **macOS Apple Silicon** - `rockion-macos-arm64.zip`
+- **Linux x64** - `rockion-linux-amd64.tar.gz`
+- **Linux ARM64** - `rockion-linux-arm64.tar.gz`
 
 See the [CHANGELOG](./CHANGELOG.md) for what's in each release.
 
 ## Prerequisites
 
 - **Go** 1.26.4
-- **Node** 18+ (Node 22 recommended)
-- **Wails CLI v2**: `go install github.com/wailsapp/wails/v2/cmd/wails@latest`
+- **Node** 20.19+ or 22.12+
+- **Wails CLI v2.12.0**: `go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0`
 - Platform deps for Wails (WebView2 on Windows, WebKit on Linux). Run `wails doctor` to check.
 
 ## Develop
@@ -75,41 +78,22 @@ wails build
 
 ## Cutting a release
 
-Local builds only produce a binary for the machine you're on — Wails can't
-cross-compile to macOS/Linux from Windows. So there are two paths:
-
-**Test locally (Windows .exe, right now):**
+Run the Windows release coordinator:
 
 ```powershell
-cd C:\Users\rocket\Github-pwr\rockion
-wails build -clean -trimpath
-# → build/bin/rockion.exe
+.\dev\windows-create-release.ps1
 ```
 
-To also build the Windows **installer** locally, add `-nsis` (requires
-[NSIS](https://nsis.sourceforge.io/) on PATH — `choco install nsis`):
+It updates version metadata and the changelog, runs the full Go/frontend/security
+suite, creates the release commit and tag, builds a local Windows smoke artifact,
+then pushes the tag. GitHub Actions builds native Windows x64/ARM64, macOS
+Intel/Apple Silicon, and Linux x64/ARM64 packages with SHA-256 checksums.
 
-```powershell
-wails build -clean -trimpath -nsis
-# → build/bin/rockion-amd64-installer.exe
-```
+The resulting GitHub release is a draft. Review its six platform artifacts before
+publishing it. See [dev/README.md](./dev/README.md) for local-only and no-wait options.
 
-The app icon comes from `build/appicon.png` — replace that file (1024×1024 PNG)
-to rebrand; Wails regenerates the `.ico`/`.icns` on the next build.
-
-**Publish all three platforms (via CI):** push a version tag and GitHub Actions
-(`.github/workflows/release.yml`) builds Windows, macOS, and Linux and attaches them
-to a draft GitHub Release.
-
-```bash
-git add -A
-git commit -m "Release v0.1.0"
-git tag v0.1.0
-git push origin main --tags
-```
-
-Then open the repo's Releases page, review the auto-generated draft, and publish.
-Bump `productVersion` in `wails.json` and add a `CHANGELOG.md` entry for each release.
+The app icon comes from `build/appicon.png`; Wails regenerates platform icon formats
+during native builds.
 
 ## How it works
 

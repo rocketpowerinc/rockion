@@ -47,4 +47,4 @@ First release. A working local-first markdown editor: Notion-style UI over plain
 - No wikilink autocomplete, graph view, or drag-to-reorder yet (see the roadmap in README).
 - Large bundle size warning at build time (TipTap); cosmetic only.
 
-[0.1.0]: https://github.com/rocket/rockion/releases/tag/v0.1.0
+[0.1.0]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.0

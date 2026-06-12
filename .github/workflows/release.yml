@@ -36,6 +36,9 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
+      - name: Audit dependencies
+        working-directory: frontend
+        run: npm audit --audit-level=moderate
       - name: Build frontend
         working-directory: frontend
         run: npm run build
@@ -58,26 +61,58 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: windows
-            os: windows-latest
+          - name: windows-x64
+            os: windows-2025
             platform: windows/amd64
-            extra: "-nsis"
-            artifact: rockion-windows
+            arch: amd64
+            output: rockion-windows-amd64.exe
+            build_args: "-nsis"
+            artifact: rockion-windows-amd64
             files: |
               build/bin/rockion-windows-amd64.exe
               build/bin/rockion-windows-amd64-installer.exe
-          - name: macos
-            os: macos-latest
-            platform: darwin/universal
-            extra: ""
-            artifact: rockion-macos
-            files: build/bin/rockion-macos-universal.zip
-          - name: linux
+          - name: windows-arm64
+            os: windows-11-arm
+            platform: windows/arm64
+            arch: arm64
+            output: rockion-windows-arm64.exe
+            build_args: "-nsis"
+            artifact: rockion-windows-arm64
+            files: |
+              build/bin/rockion-windows-arm64.exe
+              build/bin/rockion-windows-arm64-installer.exe
+          - name: macos-intel
+            os: macos-15-intel
+            platform: darwin/amd64
+            arch: amd64
+            output: rockion
+            build_args: ""
+            artifact: rockion-macos-amd64
+            files: build/bin/rockion-macos-amd64.zip
+          - name: macos-apple-silicon
+            os: macos-15
+            platform: darwin/arm64
+            arch: arm64
+            output: rockion
+            build_args: ""
+            artifact: rockion-macos-arm64
+            files: build/bin/rockion-macos-arm64.zip
+          - name: linux-x64
             os: ubuntu-22.04
             platform: linux/amd64
-            extra: ""
-            artifact: rockion-linux
+            arch: amd64
+            output: rockion-linux-amd64
+            build_args: ""
+            artifact: rockion-linux-amd64
             files: build/bin/rockion-linux-amd64.tar.gz
+          - name: linux-arm64
+            os: ubuntu-22.04-arm
+            platform: linux/arm64
+            arch: arm64
+            output: rockion-linux-arm64
+            build_args: ""
+            artifact: rockion-linux-arm64
+            files: build/bin/rockion-linux-arm64.tar.gz
 
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -93,30 +128,38 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - name: Install Linux build dependencies
-        if: matrix.name == 'linux'
+        if: startsWith(matrix.name, 'linux-')
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libgtk-3-dev libwebkit2gtk-4.0-dev
+      - name: Install Windows packaging dependencies
+        if: startsWith(matrix.name, 'windows-')
+        shell: pwsh
+        run: choco install nsis -y --no-progress
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
       - name: Build
-        run: wails build -platform ${{ matrix.platform }} -clean -trimpath ${{ matrix.extra }}
-      - name: Package Windows artifacts
-        if: matrix.name == 'windows'
-        shell: cmd
+        run: wails build -platform ${{ matrix.platform }} -clean -trimpath -o ${{ matrix.output }} ${{ matrix.build_args }}
+      - name: Normalize Windows installer name
+        if: startsWith(matrix.name, 'windows-')
+        shell: pwsh
         run: |
-          copy build\bin\rockion.exe build\bin\rockion-windows-amd64.exe
-          copy build\bin\rockion-amd64-installer.exe build\bin\rockion-windows-amd64-installer.exe
+          $installer = Get-ChildItem build/bin -Filter '*installer.exe' | Select-Object -First 1
+          if (-not $installer) {
+            throw 'Wails did not produce an NSIS installer.'
+          }
+          $target = "build/bin/rockion-windows-${{ matrix.arch }}-installer.exe"
+          Move-Item -LiteralPath $installer.FullName -Destination $target -Force
       - name: Package macOS app
-        if: matrix.name == 'macos'
+        if: startsWith(matrix.name, 'macos-')
         run: |
           cd build/bin
-          ditto -c -k --keepParent rockion.app rockion-macos-universal.zip
+          ditto -c -k --keepParent rockion.app ${{ matrix.artifact }}.zip
       - name: Package Linux binary
-        if: matrix.name == 'linux'
+        if: startsWith(matrix.name, 'linux-')
         run: |
           cd build/bin
-          tar -czf rockion-linux-amd64.tar.gz rockion
+          tar -czf ${{ matrix.output }}.tar.gz ${{ matrix.output }}
       - name: Upload release artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

@@ -7,27 +7,31 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
-    rollupOptions: {
+    rolldownOptions: {
       output: {
-        manualChunks(id) {
-          if (!id.includes("node_modules")) return;
-          if (
-            id.includes("prosemirror") ||
-            id.includes("@tiptap/pm")
-          ) {
-            return "prosemirror";
-          }
-          if (
-            id.includes("@tiptap") ||
-            id.includes("tiptap-markdown") ||
-            id.includes("global-drag-handle")
-          ) {
-            return "editor";
-          }
-          if (id.includes("highlight.js") || id.includes("lowlight")) {
-            return "syntax";
-          }
-          if (id.includes("react")) return "react";
+        codeSplitting: {
+          groups: [
+            {
+              name: "prosemirror",
+              test: /node_modules[\\/](?:prosemirror-|@tiptap[\\/]pm)/,
+              priority: 40,
+            },
+            {
+              name: "editor",
+              test: /node_modules[\\/](?:@tiptap|tiptap-markdown|tiptap-extension-global-drag-handle)/,
+              priority: 30,
+            },
+            {
+              name: "syntax",
+              test: /node_modules[\\/](?:highlight\.js|lowlight)/,
+              priority: 20,
+            },
+            {
+              name: "react",
+              test: /node_modules[\\/](?:react|react-dom|scheduler)/,
+              priority: 10,
+            },
+          ],
         },
       },
     },

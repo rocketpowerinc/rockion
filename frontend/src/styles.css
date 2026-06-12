@@ -262,6 +262,141 @@ button.primary,
   padding: 12px 14px;
   overflow-x: auto;
 }
+
+/* ---- Code block with hover toolbar + syntax highlighting ---- */
+.rk-prose .code-block {
+  position: relative;
+  margin: 0.6em 0;
+}
+.rk-prose .code-block pre {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 32px 14px 12px; /* room at top for the toolbar */
+}
+.rk-prose .code-block code {
+  background: none;
+  padding: 0;
+  font-size: 13px;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+.code-toolbar {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  z-index: 5;
+}
+.rk-prose .code-block:hover .code-toolbar,
+.code-toolbar:focus-within {
+  opacity: 1;
+}
+.code-lang,
+.code-btn {
+  height: 24px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 5px;
+  padding: 0 7px;
+  cursor: pointer;
+}
+.code-lang {
+  padding-right: 2px;
+}
+.code-btn:hover,
+.code-lang:hover {
+  background: var(--hover);
+}
+
+/* highlight.js token colors — light */
+.rk-prose .hljs-comment,
+.rk-prose .hljs-quote {
+  color: #6a737d;
+  font-style: italic;
+}
+.rk-prose .hljs-keyword,
+.rk-prose .hljs-selector-tag,
+.rk-prose .hljs-built_in,
+.rk-prose .hljs-name,
+.rk-prose .hljs-tag {
+  color: #d73a49;
+}
+.rk-prose .hljs-string,
+.rk-prose .hljs-section,
+.rk-prose .hljs-attribute,
+.rk-prose .hljs-literal,
+.rk-prose .hljs-template-variable,
+.rk-prose .hljs-type,
+.rk-prose .hljs-addition {
+  color: #22863a;
+}
+.rk-prose .hljs-number,
+.rk-prose .hljs-symbol,
+.rk-prose .hljs-bullet,
+.rk-prose .hljs-link,
+.rk-prose .hljs-meta,
+.rk-prose .hljs-selector-id,
+.rk-prose .hljs-selector-class {
+  color: #005cc5;
+}
+.rk-prose .hljs-variable,
+.rk-prose .hljs-params {
+  color: #e36209;
+}
+.rk-prose .hljs-title,
+.rk-prose .hljs-title.function_ {
+  color: #6f42c1;
+}
+.rk-prose .hljs-emphasis {
+  font-style: italic;
+}
+.rk-prose .hljs-strong {
+  font-weight: 600;
+}
+
+/* highlight.js token colors — dark */
+:root[data-theme="dark"] .rk-prose .hljs-comment,
+:root[data-theme="dark"] .rk-prose .hljs-quote {
+  color: #8b949e;
+}
+:root[data-theme="dark"] .rk-prose .hljs-keyword,
+:root[data-theme="dark"] .rk-prose .hljs-selector-tag,
+:root[data-theme="dark"] .rk-prose .hljs-built_in,
+:root[data-theme="dark"] .rk-prose .hljs-name,
+:root[data-theme="dark"] .rk-prose .hljs-tag {
+  color: #ff7b72;
+}
+:root[data-theme="dark"] .rk-prose .hljs-string,
+:root[data-theme="dark"] .rk-prose .hljs-section,
+:root[data-theme="dark"] .rk-prose .hljs-attribute,
+:root[data-theme="dark"] .rk-prose .hljs-literal,
+:root[data-theme="dark"] .rk-prose .hljs-type,
+:root[data-theme="dark"] .rk-prose .hljs-addition {
+  color: #a5d6ff;
+}
+:root[data-theme="dark"] .rk-prose .hljs-number,
+:root[data-theme="dark"] .rk-prose .hljs-symbol,
+:root[data-theme="dark"] .rk-prose .hljs-bullet,
+:root[data-theme="dark"] .rk-prose .hljs-link,
+:root[data-theme="dark"] .rk-prose .hljs-meta,
+:root[data-theme="dark"] .rk-prose .hljs-selector-id,
+:root[data-theme="dark"] .rk-prose .hljs-selector-class {
+  color: #79c0ff;
+}
+:root[data-theme="dark"] .rk-prose .hljs-variable,
+:root[data-theme="dark"] .rk-prose .hljs-params {
+  color: #ffa657;
+}
+:root[data-theme="dark"] .rk-prose .hljs-title,
+:root[data-theme="dark"] .rk-prose .hljs-title.function_ {
+  color: #d2a8ff;
+}
 .rk-prose code {
   background: var(--hover);
   border-radius: 4px;

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -193,6 +194,25 @@ func (a *App) SaveImage(name string, data []byte) (string, error) {
 		return "", err
 	}
 	return a.vault.SaveImage(name, data)
+}
+
+// SaveFile prompts for a save location and writes content there. Returns the
+// chosen path, or "" if the user cancelled. Backs the code block download button.
+func (a *App) SaveFile(defaultName, content string) (string, error) {
+	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		DefaultFilename: defaultName,
+		Title:           "Save script",
+	})
+	if err != nil {
+		return "", err
+	}
+	if path == "" {
+		return "", nil // cancelled
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		return "", err
+	}
+	return path, nil
 }
 
 // --- File watching: reflect external edits (Obsidian, git, etc.) ---

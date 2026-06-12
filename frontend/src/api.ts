@@ -44,6 +44,8 @@ export const api = {
   backlinks: (path: string): Promise<SearchHit[]> => App.Backlinks(path),
   // SaveImage takes a Go []byte; Wails marshals a number[] / base64. We pass an array.
   saveImage: (name: string, data: number[]): Promise<string> => App.SaveImage(name, data),
+  // SaveFile opens a native save dialog and writes content; returns chosen path ("" if cancelled).
+  saveFile: (name: string, content: string): Promise<string> => App.SaveFile(name, content),
 };
 
 export const onVaultChanged = (cb: (path: string) => void) =>

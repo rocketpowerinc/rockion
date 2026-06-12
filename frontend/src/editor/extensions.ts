@@ -13,12 +13,14 @@ import DragHandle from "tiptap-extension-global-drag-handle";
 
 import { SlashCommand } from "./SlashCommand";
 import { Callout } from "./Callout";
+import { CodeBlock } from "./CodeBlock";
 import { AddBlockButton } from "./AddBlockButton";
 
 // The full set of TipTap extensions that make up the Rockion editor.
 export const editorExtensions = [
   StarterKit.configure({
-    // We use the dedicated HorizontalRule from StarterKit; nothing to disable.
+    // Replaced by the syntax-highlighting CodeBlock below.
+    codeBlock: false,
   }),
   Placeholder.configure({
     placeholder: "Type '/' for commands…",
@@ -26,6 +28,7 @@ export const editorExtensions = [
   TaskList,
   TaskItem.configure({ nested: true }),
   Callout,
+  CodeBlock,
   Table.configure({ resizable: true }),
   TableRow,
   TableHeader,

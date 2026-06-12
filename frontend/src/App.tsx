@@ -99,6 +99,41 @@ export default function App() {
     }
   }, [flushEditor, refreshTree]);
 
+  const checkForUpdate = useCallback(async () => {
+    try {
+      const update = await api.checkForUpdates();
+      if (!update.updateAvailable) {
+        window.alert(`Rockion ${update.currentVersion} is up to date.`);
+        return;
+      }
+      if (!update.canAutoUpdate) {
+        if (
+          window.confirm(
+            `Rockion ${update.latestVersion} is available. Open the download page?`
+          )
+        ) {
+          api.openExternal(update.releaseUrl);
+        }
+        return;
+      }
+      if (
+        !window.confirm(
+          `Rockion ${update.latestVersion} is available. Download, verify, and install it now? Rockion will close during the update.`
+        )
+      ) {
+        return;
+      }
+      if (!(await flushEditor())) {
+        throw new Error("Rockion could not save pending editor changes.");
+      }
+      await api.installUpdate();
+    } catch (reason) {
+      const message = `Update check failed: ${String(reason)}`;
+      setError(message);
+      window.alert(message);
+    }
+  }, [flushEditor]);
+
   const openNote = useCallback(async (path: string) => {
     if (note?.path === path) return;
     if (!(await flushEditor())) return;
@@ -199,6 +234,7 @@ export default function App() {
         onOpen={openNote}
         onNewNote={newNote}
         onOpenVault={openVault}
+        onCheckForUpdate={checkForUpdate}
       />
       <main className="main">
         <Editor

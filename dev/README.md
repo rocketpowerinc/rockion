@@ -51,5 +51,5 @@ Useful options:
 .\dev\windows-create-release.ps1 -Version 0.2.0 -NoWait
 ```
 
-The GitHub release is created as a draft. Review the generated artifacts and
-checksums before publishing it.
+After all target builds and checksum generation pass, GitHub publishes the
+release and its generated artifacts automatically.

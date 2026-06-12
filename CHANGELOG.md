@@ -5,6 +5,9 @@ All notable changes to Rockion are documented here. This project adheres to
 
 ## [Unreleased]
 
+### Added
+- Added a Rockion icon menu with secure update checks and verified Windows installer/portable updates.
+
 ## [0.1.4] - 2026-06-12
 
 ## [0.1.3] - 2026-06-12

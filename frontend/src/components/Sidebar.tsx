@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { TreeNode } from "../api";
 
 interface Props {
@@ -11,6 +11,7 @@ interface Props {
   onOpen: (path: string) => void;
   onNewNote: (dir: string) => void;
   onOpenVault: () => void;
+  onCheckForUpdate: () => Promise<void>;
 }
 
 export default function Sidebar({
@@ -23,14 +24,71 @@ export default function Sidebar({
   onOpen,
   onNewNote,
   onOpenVault,
+  onCheckForUpdate,
 }: Props) {
   const items = Array.isArray(tree) ? tree : [];
+  const [appMenuOpen, setAppMenuOpen] = useState(false);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const appMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!appMenuOpen) return;
+    const closeMenu = (event: MouseEvent) => {
+      if (!appMenuRef.current?.contains(event.target as Node)) {
+        setAppMenuOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setAppMenuOpen(false);
+    };
+    window.addEventListener("mousedown", closeMenu);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("mousedown", closeMenu);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [appMenuOpen]);
+
+  async function checkForUpdate() {
+    setCheckingUpdate(true);
+    try {
+      await onCheckForUpdate();
+      setAppMenuOpen(false);
+    } finally {
+      setCheckingUpdate(false);
+    }
+  }
+
   return (
     <aside className="sidebar">
       <div className="sidebar-head">
-        <button className="vault-name" onClick={onOpenVault} title="Open another vault">
-          {vaultName || "Open vault…"}
-        </button>
+        <div className="sidebar-identity">
+          <div className="app-menu-wrap" ref={appMenuRef}>
+            <button
+              className="rockion-menu-button"
+              onClick={() => setAppMenuOpen((open) => !open)}
+              title="Rockion menu"
+              aria-haspopup="menu"
+              aria-expanded={appMenuOpen}
+            >
+              <img src="/Rockion-Hero.png" alt="Rockion" />
+            </button>
+            {appMenuOpen && (
+              <div className="app-menu" role="menu">
+                <button
+                  role="menuitem"
+                  disabled={checkingUpdate}
+                  onClick={() => void checkForUpdate()}
+                >
+                  {checkingUpdate ? "Checking for Update…" : "Check for Update"}
+                </button>
+              </div>
+            )}
+          </div>
+          <button className="vault-name" onClick={onOpenVault} title="Open another vault">
+            {vaultName || "Open vault…"}
+          </button>
+        </div>
         <div className="sidebar-head-actions">
           <button
             className="icon-btn"

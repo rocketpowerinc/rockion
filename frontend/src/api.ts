@@ -34,6 +34,21 @@ export interface SearchHit {
   snippet?: string;
 }
 
+export interface UpdateInfo {
+  currentVersion: string;
+  latestVersion: string;
+  updateAvailable: boolean;
+  canAutoUpdate: boolean;
+  platform: string;
+  architecture: string;
+  installMode: string;
+  assetName: string;
+  releaseUrl: string;
+  releaseNotes: string;
+  publishedAt: string;
+  message: string;
+}
+
 export const api = {
   pickVault: (): Promise<VaultInfo> => App.PickVault(),
   openVault: (path: string): Promise<VaultInfo> => App.OpenVault(path),
@@ -52,6 +67,8 @@ export const api = {
   saveFile: (name: string, content: string): Promise<string> => App.SaveFile(name, content),
   // SetNoteIcon stores an emoji icon for a note ("" clears it).
   setNoteIcon: (path: string, icon: string): Promise<void> => App.SetNoteIcon(path, icon),
+  checkForUpdates: (): Promise<UpdateInfo> => App.CheckForUpdates(),
+  installUpdate: (): Promise<UpdateInfo> => App.InstallUpdate(),
   openExternal: (url: string): void => BrowserOpenURL(url),
   confirmClose: (): Promise<void> => App.ConfirmClose(),
 };

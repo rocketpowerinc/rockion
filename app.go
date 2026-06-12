@@ -38,6 +38,7 @@ type App struct {
 
 	closeMu    sync.Mutex
 	allowClose bool
+	updateMu   sync.Mutex
 }
 
 func NewApp() *App { return &App{} }

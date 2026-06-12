@@ -110,8 +110,75 @@ button.primary,
   position: sticky;
   top: 0;
   background: var(--bg-sidebar);
+  z-index: 10;
+}
+.sidebar-identity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+}
+.app-menu-wrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+.rockion-menu-button {
+  display: block;
+  width: 28px;
+  height: 28px;
+  padding: 2px;
+  overflow: hidden;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+}
+.rockion-menu-button:hover,
+.rockion-menu-button[aria-expanded="true"] {
+  background: var(--hover);
+}
+.rockion-menu-button img {
+  display: block;
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  object-fit: cover;
+}
+.app-menu {
+  position: absolute;
+  top: 34px;
+  left: 0;
+  z-index: 30;
+  width: 190px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+}
+.app-menu button {
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 5px;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  font-size: 13px;
+  cursor: pointer;
+}
+.app-menu button:hover:not(:disabled) {
+  background: var(--hover);
+}
+.app-menu button:disabled {
+  color: var(--text-muted);
+  cursor: wait;
 }
 .vault-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   background: none;
   border: none;
   font-weight: 600;

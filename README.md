@@ -48,6 +48,10 @@ Grab a prebuilt binary from the [Releases](https://github.com/rocketpowerinc/roc
 
 See the [CHANGELOG](./CHANGELOG.md) for what's in each release.
 
+Click the Rockion icon in the top-left corner and choose **Check for Update** to
+check the newest published release. Windows installer and portable builds can
+download, verify, and apply the matching update directly.
+
 ## Prerequisites
 
 - **Go** 1.26.4

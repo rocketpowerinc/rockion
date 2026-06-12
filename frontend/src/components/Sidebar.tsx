@@ -6,11 +6,11 @@ interface Props {
   tree: TreeNode[];
   error?: string | null;
   theme: "light" | "dark";
-  onToggleTheme: () => void;
   activePath: string | null;
   onOpen: (path: string) => void;
   onNewNote: (dir: string) => void;
   onOpenVault: () => void;
+  onToggleTheme: () => void;
   onCheckForUpdate: () => Promise<void>;
 }
 
@@ -19,41 +19,41 @@ export default function Sidebar({
   tree,
   error,
   theme,
-  onToggleTheme,
   activePath,
   onOpen,
   onNewNote,
   onOpenVault,
+  onToggleTheme,
   onCheckForUpdate,
 }: Props) {
   const items = Array.isArray(tree) ? tree : [];
-  const [appMenuOpen, setAppMenuOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
-  const appMenuRef = useRef<HTMLDivElement>(null);
+  const settingsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!appMenuOpen) return;
-    const closeMenu = (event: MouseEvent) => {
-      if (!appMenuRef.current?.contains(event.target as Node)) {
-        setAppMenuOpen(false);
+    if (!settingsOpen) return;
+    const closeOutside = (event: MouseEvent) => {
+      if (!settingsRef.current?.contains(event.target as Node)) {
+        setSettingsOpen(false);
       }
     };
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setAppMenuOpen(false);
+      if (event.key === "Escape") setSettingsOpen(false);
     };
-    window.addEventListener("mousedown", closeMenu);
+    window.addEventListener("mousedown", closeOutside);
     window.addEventListener("keydown", closeOnEscape);
     return () => {
-      window.removeEventListener("mousedown", closeMenu);
+      window.removeEventListener("mousedown", closeOutside);
       window.removeEventListener("keydown", closeOnEscape);
     };
-  }, [appMenuOpen]);
+  }, [settingsOpen]);
 
   async function checkForUpdate() {
     setCheckingUpdate(true);
     try {
       await onCheckForUpdate();
-      setAppMenuOpen(false);
+      setSettingsOpen(false);
     } finally {
       setCheckingUpdate(false);
     }
@@ -62,41 +62,10 @@ export default function Sidebar({
   return (
     <aside className="sidebar">
       <div className="sidebar-head">
-        <div className="sidebar-identity">
-          <div className="app-menu-wrap" ref={appMenuRef}>
-            <button
-              className="rockion-menu-button"
-              onClick={() => setAppMenuOpen((open) => !open)}
-              title="Rockion menu"
-              aria-haspopup="menu"
-              aria-expanded={appMenuOpen}
-            >
-              <img src="/Rockion-Hero.png" alt="Rockion" />
-            </button>
-            {appMenuOpen && (
-              <div className="app-menu" role="menu">
-                <button
-                  role="menuitem"
-                  disabled={checkingUpdate}
-                  onClick={() => void checkForUpdate()}
-                >
-                  {checkingUpdate ? "Checking for Update…" : "Check for Update"}
-                </button>
-              </div>
-            )}
-          </div>
-          <button className="vault-name" onClick={onOpenVault} title="Open another vault">
-            {vaultName || "Open vault…"}
-          </button>
-        </div>
+        <button className="vault-name" onClick={onOpenVault} title="Open another vault">
+          {vaultName || "Open vault…"}
+        </button>
         <div className="sidebar-head-actions">
-          <button
-            className="icon-btn"
-            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-            onClick={onToggleTheme}
-          >
-            {theme === "dark" ? "☀️" : "🌙"}
-          </button>
           <button className="icon-btn" title="New note" onClick={() => onNewNote("")}>
             +
           </button>
@@ -117,6 +86,59 @@ export default function Sidebar({
           />
         ))}
       </nav>
+      <div className="sidebar-footer" ref={settingsRef}>
+        {settingsOpen && (
+          <div className="settings-menu" role="menu">
+            <button
+              role="menuitem"
+              disabled={checkingUpdate}
+              onClick={() => void checkForUpdate()}
+            >
+              <span>Check for Updates</span>
+              {checkingUpdate && <span className="settings-menu-hint">Checking…</span>}
+            </button>
+            <button
+              role="menuitem"
+              onClick={() => {
+                setSettingsOpen(false);
+                onOpenVault();
+              }}
+            >
+              <span>Open a New Vault</span>
+            </button>
+            <button
+              role="menuitem"
+              onClick={() => {
+                onToggleTheme();
+                setSettingsOpen(false);
+              }}
+            >
+              <span>Theme</span>
+              <span className="settings-menu-hint">
+                {theme === "dark" ? "Switch to light" : "Switch to dark"}
+              </span>
+            </button>
+          </div>
+        )}
+        <button
+          className="settings-button"
+          title="Settings"
+          aria-label="Settings"
+          aria-haspopup="menu"
+          aria-expanded={settingsOpen}
+          onClick={() => setSettingsOpen((open) => !open)}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Zm8.2 4.8-1.7-1a7 7 0 0 0 0-.6l1.7-1a1 1 0 0 0 .4-1.3l-1.5-2.6a1 1 0 0 0-1.3-.4l-1.7 1a7 7 0 0 0-.6-.4V5a1 1 0 0 0-1-1h-3a1 1 0 0 0-1 1v2a7 7 0 0 0-.6.4l-1.7-1a1 1 0 0 0-1.3.4L3.4 9.4a1 1 0 0 0 .4 1.3l1.7 1a7 7 0 0 0 0 .6l-1.7 1a1 1 0 0 0-.4 1.3l1.5 2.6a1 1 0 0 0 1.3.4l1.7-1 .6.4v2a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-2l.6-.4 1.7 1a1 1 0 0 0 1.3-.4l1.5-2.6a1 1 0 0 0-.4-1.3Z"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+      </div>
     </aside>
   );
 }

@@ -31,6 +31,7 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
+    api.setWindowTheme(theme);
     try {
       localStorage.setItem("rockion-theme", theme);
     } catch {
@@ -38,7 +39,10 @@ export default function App() {
     }
   }, [theme]);
 
-  const toggleTheme = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
+  const toggleTheme = useCallback(
+    () => setTheme((current) => (current === "dark" ? "light" : "dark")),
+    []
+  );
 
   const flushEditor = useCallback(async () => {
     return (await editorRef.current?.flushSave()) ?? true;
@@ -205,13 +209,6 @@ export default function App() {
   if (!vault) {
     return (
       <div className="welcome">
-        <button
-          className="icon-btn theme-toggle-floating"
-          onClick={toggleTheme}
-          title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-        >
-          {theme === "dark" ? "☀️" : "🌙"}
-        </button>
         <img className="hero-img" src="/Rockion-Hero.png" alt="Rockion" />
         <h1>Rockion</h1>
         <p>A local-first markdown workspace. Your notes stay plain files on disk.</p>
@@ -229,11 +226,11 @@ export default function App() {
         tree={tree}
         error={error}
         theme={theme}
-        onToggleTheme={toggleTheme}
         activePath={note?.path ?? null}
         onOpen={openNote}
         onNewNote={newNote}
         onOpenVault={openVault}
+        onToggleTheme={toggleTheme}
         onCheckForUpdate={checkForUpdate}
       />
       <main className="main">

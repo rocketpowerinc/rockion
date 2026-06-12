@@ -3,7 +3,12 @@
 // The files under ./wailsjs are generated automatically by `wails dev` / `wails build`
 // (and `wails generate module`). They will not exist until you run Wails once.
 import * as App from "../wailsjs/go/main/App";
-import { BrowserOpenURL, EventsOn } from "../wailsjs/runtime/runtime";
+import {
+  BrowserOpenURL,
+  EventsOn,
+  WindowSetDarkTheme,
+  WindowSetLightTheme,
+} from "../wailsjs/runtime/runtime";
 
 export interface VaultInfo {
   path: string;
@@ -70,6 +75,8 @@ export const api = {
   checkForUpdates: (): Promise<UpdateInfo> => App.CheckForUpdates(),
   installUpdate: (): Promise<UpdateInfo> => App.InstallUpdate(),
   openExternal: (url: string): void => BrowserOpenURL(url),
+  setWindowTheme: (theme: "light" | "dark"): void =>
+    theme === "dark" ? WindowSetDarkTheme() : WindowSetLightTheme(),
   confirmClose: (): Promise<void> => App.ConfirmClose(),
 };
 

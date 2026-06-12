@@ -99,8 +99,10 @@ button.primary,
 .sidebar {
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border);
-  overflow-y: auto;
-  padding-bottom: 24px;
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
 }
 .sidebar-head {
   display: flex;
@@ -112,73 +114,7 @@ button.primary,
   background: var(--bg-sidebar);
   z-index: 10;
 }
-.sidebar-identity {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 5px;
-}
-.app-menu-wrap {
-  position: relative;
-  flex: 0 0 auto;
-}
-.rockion-menu-button {
-  display: block;
-  width: 28px;
-  height: 28px;
-  padding: 2px;
-  overflow: hidden;
-  border: none;
-  border-radius: 6px;
-  background: none;
-  cursor: pointer;
-}
-.rockion-menu-button:hover,
-.rockion-menu-button[aria-expanded="true"] {
-  background: var(--hover);
-}
-.rockion-menu-button img {
-  display: block;
-  width: 24px;
-  height: 24px;
-  border-radius: 5px;
-  object-fit: cover;
-}
-.app-menu {
-  position: absolute;
-  top: 34px;
-  left: 0;
-  z-index: 30;
-  width: 190px;
-  padding: 5px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
-}
-.app-menu button {
-  width: 100%;
-  padding: 8px 10px;
-  border: none;
-  border-radius: 5px;
-  background: none;
-  color: var(--text);
-  text-align: left;
-  font-size: 13px;
-  cursor: pointer;
-}
-.app-menu button:hover:not(:disabled) {
-  background: var(--hover);
-}
-.app-menu button:disabled {
-  color: var(--text-muted);
-  cursor: wait;
-}
 .vault-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   background: none;
   border: none;
   font-weight: 600;
@@ -209,16 +145,80 @@ button.primary,
   align-items: center;
   gap: 2px;
 }
-.theme-toggle-floating {
-  position: fixed;
-  top: 14px;
-  right: 16px;
-  font-size: 16px;
-}
-
 /* ---- Tree ---- */
 .tree {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 12px;
   font-size: 14px;
+}
+.sidebar-footer {
+  position: relative;
+  flex: 0 0 auto;
+  padding: 8px 10px 10px;
+  border-top: 1px solid var(--border);
+}
+.settings-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.settings-button:hover,
+.settings-button[aria-expanded="true"] {
+  background: var(--hover);
+  color: var(--text);
+}
+.settings-button svg {
+  width: 18px;
+  height: 18px;
+}
+.settings-menu {
+  position: absolute;
+  bottom: 46px;
+  left: 10px;
+  z-index: 50;
+  width: 230px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.26);
+}
+.settings-menu button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  font-size: 13px;
+  cursor: pointer;
+}
+.settings-menu button:hover:not(:disabled) {
+  background: var(--hover);
+}
+.settings-menu button:disabled {
+  color: var(--text-muted);
+  cursor: wait;
+}
+.settings-menu-hint {
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
 }
 .tree-row {
   padding: 4px 8px;

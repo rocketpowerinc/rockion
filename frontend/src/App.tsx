@@ -11,6 +11,7 @@ import {
   type TreeNode,
   type VaultInfo,
 } from "./api";
+import { setPageIcons } from "./editor/pageIcons";
 
 export default function App() {
   const [vault, setVault] = useState<VaultInfo | null>(null);
@@ -38,16 +39,23 @@ export default function App() {
 
   // Flatten the tree into a list of pages for the "link to page" picker.
   const pages = useMemo(() => {
-    const out: { path: string; title: string }[] = [];
+    const out: { path: string; title: string; icon?: string }[] = [];
     const walk = (nodes: TreeNode[]) => {
       for (const n of nodes) {
         if (n.isDir) walk(n.children ?? []);
-        else out.push({ path: n.path, title: n.name });
+        else out.push({ path: n.path, title: n.name, icon: n.icon });
       }
     };
     walk(Array.isArray(tree) ? tree : []);
     return out;
   }, [tree]);
+
+  // Keep the page-link icon registry in sync so link icons resolve live.
+  useEffect(() => {
+    const map: Record<string, string> = {};
+    for (const p of pages) map[p.path] = p.icon || "";
+    setPageIcons(map);
+  }, [pages]);
 
   const refreshTree = useCallback(async () => {
     try {
@@ -60,6 +68,16 @@ export default function App() {
       setTree([]);
     }
   }, []);
+
+  // Set/clear a page's emoji icon.
+  const setIcon = useCallback(
+    async (path: string, icon: string) => {
+      await api.setNoteIcon(path, icon);
+      await refreshTree();
+      setNote((n) => (n && n.path === path ? { ...n, icon: icon || undefined } : n));
+    },
+    [refreshTree]
+  );
 
   const openVault = useCallback(async () => {
     try {
@@ -148,7 +166,13 @@ export default function App() {
         onOpenVault={openVault}
       />
       <main className="main">
-        <Editor note={note} pages={pages} onDirtySaved={refreshTree} onOpenLink={openNote} />
+        <Editor
+          note={note}
+          pages={pages}
+          onDirtySaved={refreshTree}
+          onOpenLink={openNote}
+          onSetIcon={setIcon}
+        />
         <Backlinks path={note?.path ?? null} onOpen={openNote} />
       </main>
       <QuickSwitcher

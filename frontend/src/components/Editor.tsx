@@ -8,20 +8,23 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import { editorExtensions } from "../editor/extensions";
 import { api, type Note } from "../api";
 import PagePicker, { type PageRef } from "./PagePicker";
+import EmojiPicker from "./EmojiPicker";
 
 interface Props {
   note: Note | null;
   pages?: PageRef[];
   onDirtySaved?: () => void;
   onOpenLink?: (path: string) => void;
+  onSetIcon?: (path: string, icon: string) => void;
 }
 
 const AUTOSAVE_MS = 600;
 
-export default function Editor({ note, pages, onDirtySaved, onOpenLink }: Props) {
+export default function Editor({ note, pages, onDirtySaved, onOpenLink, onSetIcon }: Props) {
   const saveTimer = useRef<number | null>(null);
   const currentPath = useRef<string | null>(null);
   const [linkPickerOpen, setLinkPickerOpen] = useState(false);
+  const [iconPickerOpen, setIconPickerOpen] = useState(false);
 
   const editor = useEditor({
     extensions: editorExtensions,
@@ -90,11 +93,20 @@ export default function Editor({ note, pages, onDirtySaved, onOpenLink }: Props)
   // Open the page picker when the "/Link to page" command fires.
   useEffect(() => {
     const open = () => setLinkPickerOpen(true);
+    const openPage = (e: Event) => {
+      const href = (e as CustomEvent).detail as string;
+      if (href) onOpenLink?.(decodeURIComponent(href));
+    };
     window.addEventListener("rockion:link-page", open);
-    return () => window.removeEventListener("rockion:link-page", open);
-  }, []);
+    window.addEventListener("rockion:open-page", openPage);
+    return () => {
+      window.removeEventListener("rockion:link-page", open);
+      window.removeEventListener("rockion:open-page", openPage);
+    };
+  }, [onOpenLink]);
 
-  // Insert a markdown link to the chosen note at the cursor.
+  // Insert a plain markdown link to the chosen note. The page's icon + arrow
+  // badge are rendered live by the PageLinkDecorations extension (not baked in).
   function insertPageLink(page: PageRef) {
     setLinkPickerOpen(false);
     if (!editor) return;
@@ -152,6 +164,28 @@ export default function Editor({ note, pages, onDirtySaved, onOpenLink }: Props)
 
   return (
     <>
+      <div className="page-header">
+        <button
+          className="page-icon"
+          title="Change page icon"
+          onClick={() => setIconPickerOpen((o) => !o)}
+        >
+          {note.icon && note.icon.startsWith("data:") ? (
+            <img className="page-icon-img" src={note.icon} alt="" />
+          ) : (
+            note.icon || "📄"
+          )}
+        </button>
+        {iconPickerOpen && (
+          <EmojiPicker
+            onClose={() => setIconPickerOpen(false)}
+            onPick={(emoji) => {
+              setIconPickerOpen(false);
+              onSetIcon?.(note.path, emoji);
+            }}
+          />
+        )}
+      </div>
       <div className="editor-wrap" onClick={handleWrapClick}>
         <EditorContent editor={editor} />
       </div>

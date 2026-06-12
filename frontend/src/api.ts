@@ -14,12 +14,14 @@ export interface TreeNode {
   name: string;
   path: string;
   isDir: boolean;
+  icon?: string;
   children?: TreeNode[];
 }
 
 export interface Note {
   path: string;
   title: string;
+  icon?: string;
   markdown: string;
   frontmatter?: Record<string, unknown>;
   modifiedAt: number;
@@ -46,6 +48,8 @@ export const api = {
   saveImage: (name: string, data: number[]): Promise<string> => App.SaveImage(name, data),
   // SaveFile opens a native save dialog and writes content; returns chosen path ("" if cancelled).
   saveFile: (name: string, content: string): Promise<string> => App.SaveFile(name, content),
+  // SetNoteIcon stores an emoji icon for a note ("" clears it).
+  setNoteIcon: (path: string, icon: string): Promise<void> => App.SetNoteIcon(path, icon),
 };
 
 export const onVaultChanged = (cb: (path: string) => void) =>

@@ -107,6 +107,11 @@ function TreeItem({
       style={{ paddingLeft: 8 + depth * 14 + 14 }}
       onClick={() => onOpen(node.path)}
     >
+      {node.icon && node.icon.startsWith("data:") ? (
+        <img className="tree-icon-img" src={node.icon} alt="" />
+      ) : (
+        <span className="tree-icon">{node.icon || "📄"}</span>
+      )}
       {node.name}
     </div>
   );

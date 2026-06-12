@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 export interface PageRef {
   path: string;
   title: string;
+  icon?: string;
 }
 
 interface Props {
@@ -78,7 +79,16 @@ export default function PagePicker({ open, pages, onPick, onClose }: Props) {
               onMouseEnter={() => setSelected(i)}
               onClick={() => choose(i)}
             >
-              <div className="switcher-title">{p.title}</div>
+              <div className="switcher-title">
+                {p.icon && p.icon.startsWith("data:") ? (
+                  <img className="pp-icon-img" src={p.icon} alt="" />
+                ) : p.icon ? (
+                  p.icon + " "
+                ) : (
+                  ""
+                )}
+                {p.title}
+              </div>
               <div className="switcher-path">{p.path}</div>
             </button>
           ))}

@@ -196,6 +196,14 @@ func (a *App) SaveImage(name string, data []byte) (string, error) {
 	return a.vault.SaveImage(name, data)
 }
 
+// SetNoteIcon sets (or clears, if icon == "") the emoji icon for a note.
+func (a *App) SetNoteIcon(path, icon string) error {
+	if err := a.requireVault(); err != nil {
+		return err
+	}
+	return a.vault.SetIcon(path, icon)
+}
+
 // SaveFile prompts for a save location and writes content there. Returns the
 // chosen path, or "" if the user cancelled. Backs the code block download button.
 func (a *App) SaveFile(defaultName, content string) (string, error) {

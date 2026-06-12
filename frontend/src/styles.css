@@ -178,6 +178,89 @@ button.primary,
   width: 14px;
   color: var(--text-muted);
 }
+.tree-icon {
+  display: inline-block;
+  width: 18px;
+  margin-right: 4px;
+  text-align: center;
+  font-size: 13px;
+}
+
+/* ---- Page header (icon) ---- */
+.page-header {
+  position: relative;
+  max-width: 740px;
+  margin: 0 auto;
+  padding: 44px 56px 0;
+}
+.page-header + .editor-wrap {
+  padding-top: 10px;
+}
+.page-icon {
+  font-size: 46px;
+  line-height: 1;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 10px;
+}
+.page-icon:hover {
+  background: var(--hover);
+}
+.emoji-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+.emoji-popover {
+  position: absolute;
+  top: 104px;
+  left: 56px;
+  z-index: 61;
+  width: 288px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  padding: 8px;
+}
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 2px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.emoji-cell {
+  font-size: 18px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 4px;
+}
+.emoji-cell:hover {
+  background: var(--hover);
+}
+.emoji-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.emoji-action {
+  flex: 1;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.emoji-action:hover {
+  background: var(--hover);
+}
 .tree-empty {
   padding: 10px 14px;
   font-size: 13px;
@@ -413,6 +496,83 @@ button.primary,
 .rk-prose img {
   max-width: 100%;
   border-radius: 6px;
+}
+/* Links read as normal text (not blue), no underline, pointer cursor. */
+.rk-prose a {
+  color: var(--text);
+  cursor: pointer;
+  text-decoration: none;
+}
+/* Internal page links: tinted hover, paired with the icon + arrow badge widget. */
+.rk-prose a.page-link {
+  border-radius: 4px;
+  padding: 0 2px;
+  text-decoration: none;
+}
+.rk-prose a.page-link:hover {
+  background: var(--hover);
+}
+.page-link-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-right: 4px;
+  vertical-align: -4px;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+.page-link-icon .pli-img {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+/* the little ↗ "links to a page" badge on the icon's corner */
+.page-link-icon::after {
+  content: "↗";
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  font-size: 8px;
+  line-height: 1;
+  width: 11px;
+  height: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--bg);
+  color: var(--text-muted);
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+/* image page icons */
+.tree-icon-img {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  object-fit: cover;
+  vertical-align: -3px;
+  margin-right: 4px;
+}
+.page-icon-img {
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  object-fit: cover;
+  display: block;
+}
+.pp-icon-img {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  object-fit: cover;
+  vertical-align: -3px;
+  margin-right: 6px;
 }
 .rk-prose table {
   border-collapse: collapse;

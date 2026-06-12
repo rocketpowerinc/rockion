@@ -15,6 +15,7 @@ import { SlashCommand } from "./SlashCommand";
 import { Callout } from "./Callout";
 import { CodeBlock } from "./CodeBlock";
 import { AddBlockButton } from "./AddBlockButton";
+import { PageLinkDecorations } from "./PageLinkDecorations";
 
 // The full set of TipTap extensions that make up the Rockion editor.
 export const editorExtensions = [
@@ -54,4 +55,5 @@ export const editorExtensions = [
     customNodes: ["callout"],
   }),
   AddBlockButton,
+  PageLinkDecorations,
 ];

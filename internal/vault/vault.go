@@ -56,7 +56,7 @@ const maxTreeDepth = 32
 
 // Tree builds the sidebar tree of folders and .md files.
 func (v *Vault) Tree() ([]model.TreeNode, error) {
-	return v.readDir(v.Root, 0)
+	return v.readDir(v.Root, 0, v.Icons())
 }
 
 func isMarkdown(name string) bool {
@@ -64,7 +64,7 @@ func isMarkdown(name string) bool {
 	return ext == ".md" || ext == ".markdown" || ext == ".mdx"
 }
 
-func (v *Vault) readDir(dir string, depth int) ([]model.TreeNode, error) {
+func (v *Vault) readDir(dir string, depth int, icons map[string]string) ([]model.TreeNode, error) {
 	// Always non-nil so it serializes to [] rather than null.
 	nodes := []model.TreeNode{}
 	if depth > maxTreeDepth {
@@ -83,14 +83,19 @@ func (v *Vault) readDir(dir string, depth int) ([]model.TreeNode, error) {
 		rel = filepath.ToSlash(rel)
 		// Only recurse into real directories, never into symlinks (loop guard).
 		if e.IsDir() && e.Type()&os.ModeSymlink == 0 {
-			children, err := v.readDir(full, depth+1)
+			children, err := v.readDir(full, depth+1, icons)
 			if err != nil {
 				// Skip unreadable subfolders instead of failing the whole tree.
 				continue
 			}
 			nodes = append(nodes, model.TreeNode{Name: e.Name(), Path: rel, IsDir: true, Children: children})
 		} else if !e.IsDir() && isMarkdown(e.Name()) {
-			nodes = append(nodes, model.TreeNode{Name: strings.TrimSuffix(e.Name(), filepath.Ext(e.Name())), Path: rel, IsDir: false})
+			nodes = append(nodes, model.TreeNode{
+				Name:  strings.TrimSuffix(e.Name(), filepath.Ext(e.Name())),
+				Path:  rel,
+				IsDir: false,
+				Icon:  icons[rel],
+			})
 		}
 	}
 	// Folders first, then alphabetical.
@@ -115,9 +120,11 @@ func (v *Vault) Read(rel string) (model.Note, error) {
 	}
 	info, _ := os.Stat(full)
 	fm, body := splitFrontmatter(string(raw))
+	relSlash := filepath.ToSlash(rel)
 	return model.Note{
-		Path:        filepath.ToSlash(rel),
+		Path:        relSlash,
 		Title:       titleFor(rel, fm, body),
+		Icon:        v.Icons()[relSlash],
 		Markdown:    body,
 		Frontmatter: fm,
 		ModifiedAt:  info.ModTime().Unix(),

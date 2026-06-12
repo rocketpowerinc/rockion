@@ -98,6 +98,8 @@ foreach ($requiredText in @(
     'macos-15-intel',
     'ubuntu-22.04-arm',
     'choco install nsis',
+    'makensis.exe',
+    'GITHUB_PATH',
     'Prepare embedded frontend directory',
     'wails generate module -nocolour',
     'FORCE_JAVASCRIPT_ACTIONS_TO_NODE24',

@@ -100,6 +100,7 @@ foreach ($requiredText in @(
     'choco install nsis',
     'makensis.exe',
     'GITHUB_PATH',
+    'draft: false',
     'Prepare embedded frontend directory',
     'wails generate module -nocolour',
     'FORCE_JAVASCRIPT_ACTIONS_TO_NODE24',
@@ -108,6 +109,9 @@ foreach ($requiredText in @(
     if (-not $workflow.Contains($requiredText)) {
         Add-Failure "Release workflow is missing required configuration: $requiredText"
     }
+}
+if ($workflow.Contains('draft: true')) {
+    Add-Failure 'Release workflow must publish completed releases, not drafts.'
 }
 if ($Failures.Count -eq 0) {
     Write-OK 'All six release targets and checksums are configured.'

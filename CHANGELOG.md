@@ -12,6 +12,7 @@ All notable changes to Rockion are documented here. This project adheres to
 ## [0.1.2] - 2026-06-12
 
 ### Fixed
+- Publish successful release builds immediately instead of leaving them as drafts.
 - Generate ignored Wails JavaScript bindings before CI frontend builds.
 - Keep the embedded frontend directory valid in pristine checkouts before binding generation.
 - Export the Chocolatey NSIS install directory for Windows release packaging.

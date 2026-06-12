@@ -89,8 +89,9 @@ suite, creates the release commit and tag, builds a local Windows smoke artifact
 then pushes the tag. GitHub Actions builds native Windows x64/ARM64, macOS
 Intel/Apple Silicon, and Linux x64/ARM64 packages with SHA-256 checksums.
 
-The resulting GitHub release is a draft. Review its six platform artifacts before
-publishing it. See [dev/README.md](./dev/README.md) for local-only and no-wait options.
+After all six platform builds and checksum generation succeed, the resulting
+GitHub release is published automatically. See [dev/README.md](./dev/README.md)
+for local-only and no-wait options.
 
 The app icon comes from `build/appicon.png`; Wails regenerates platform icon formats
 during native builds.

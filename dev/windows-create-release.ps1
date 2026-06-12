@@ -282,5 +282,5 @@ Invoke-Native "Watching release workflow run $RunId..." {
 }
 
 Write-Host
-Write-Host "Release build completed. Review the draft at:" -ForegroundColor Green
+Write-Host "Release build and publication completed:" -ForegroundColor Green
 Write-Host "https://github.com/$Repository/releases/tag/$Tag" -ForegroundColor Cyan

@@ -3,7 +3,8 @@
 *.exe
 
 # Wails generated bindings + frontend build output
-/frontend/dist/
+/frontend/dist/*
+!/frontend/dist/.gitkeep
 /frontend/wailsjs/
 /frontend/node_modules/
 

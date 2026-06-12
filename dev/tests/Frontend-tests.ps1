@@ -46,6 +46,12 @@ try {
 
     Push-Location $RepoRoot
     try {
+        $DistDir = Join-Path $RepoRoot 'frontend\dist'
+        New-Item -ItemType Directory -Path $DistDir -Force | Out-Null
+        $Placeholder = Join-Path $DistDir '.gitkeep'
+        if (-not (Test-Path -LiteralPath $Placeholder)) {
+            New-Item -ItemType File -Path $Placeholder -Force | Out-Null
+        }
         Invoke-CheckedCommand 'Generate Wails bindings' {
             & wails generate module -nocolour
         }

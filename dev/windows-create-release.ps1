@@ -65,7 +65,9 @@ foreach ($command in @('git', 'go', 'node', 'npm', 'wails')) {
 }
 
 $RequiredWailsVersion = 'v2.12.0'
-$InstalledWailsVersion = (& wails version | Select-Object -First 1).Trim()
+$WailsVersionOutput = (& wails version 2>&1 | Out-String)
+$VersionMatch = [regex]::Match($WailsVersionOutput, 'v\d+\.\d+\.\d+')
+$InstalledWailsVersion = if ($VersionMatch.Success) { $VersionMatch.Value } else { '' }
 if ($LASTEXITCODE -ne 0 -or $InstalledWailsVersion -ne $RequiredWailsVersion) {
     Stop-Release "Wails CLI $RequiredWailsVersion is required; found '$InstalledWailsVersion'."
 }
@@ -203,7 +205,9 @@ $ForbiddenPatterns = @(
     '(^|/)\.codex-tmp/',
     '(^|/)\.release/',
     '^build/bin/',
-    '^frontend/(dist|node_modules|wailsjs)/'
+    '^frontend/node_modules/',
+    '^frontend/wailsjs/',
+    '^frontend/dist/(?!\.gitkeep$)'
 )
 $ForbiddenFiles = @(
     $StagedFiles | Where-Object {

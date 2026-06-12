@@ -98,6 +98,7 @@ foreach ($requiredText in @(
     'macos-15-intel',
     'ubuntu-22.04-arm',
     'choco install nsis',
+    'Prepare embedded frontend directory',
     'wails generate module -nocolour',
     'FORCE_JAVASCRIPT_ACTIONS_TO_NODE24',
     'SHA256SUMS.txt'
@@ -108,6 +109,13 @@ foreach ($requiredText in @(
 }
 if ($Failures.Count -eq 0) {
     Write-OK 'All six release targets and checksums are configured.'
+}
+
+if (-not (Test-Path -LiteralPath (Join-Path $RepoRoot 'frontend\dist\.gitkeep'))) {
+    Add-Failure 'frontend/dist/.gitkeep is required so Go embed works before the first frontend build.'
+}
+if (-not (Test-Path -LiteralPath (Join-Path $RepoRoot 'frontend\public\.gitkeep'))) {
+    Add-Failure 'frontend/public/.gitkeep is required so Vite restores the embed placeholder after builds.'
 }
 
 Write-Host '[CHECK] Changelog structure' -ForegroundColor Gray

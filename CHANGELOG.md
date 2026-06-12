@@ -5,10 +5,13 @@ All notable changes to Rockion are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-06-12
+
 ## [0.1.2] - 2026-06-12
 
 ### Fixed
 - Generate ignored Wails JavaScript bindings before CI frontend builds.
+- Keep the embedded frontend directory valid in pristine checkouts before binding generation.
 - Updated pinned GitHub Actions to Node.js 24-compatible releases.
 - Consider failed/local release tags when suggesting the next release version.
 
@@ -59,3 +62,4 @@ First release. A working local-first markdown editor: Notion-style UI over plain
 [0.1.0]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.0
 [0.1.1]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.1
 [0.1.2]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.2
+[0.1.3]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.3

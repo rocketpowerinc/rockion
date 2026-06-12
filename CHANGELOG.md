@@ -5,6 +5,8 @@ All notable changes to Rockion are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-06-12
+
 ### Security
 - Hardened vault paths against root deletion, traversal, symlinks, and unsupported note types.
 - Added decoded image validation, payload and dimension limits, and bounded page-icon validation.
@@ -48,3 +50,4 @@ First release. A working local-first markdown editor: Notion-style UI over plain
 - Large bundle size warning at build time (TipTap); cosmetic only.
 
 [0.1.0]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.0
+[0.1.1]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.1

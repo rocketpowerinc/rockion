@@ -124,6 +124,7 @@ export default function App() {
         >
           {theme === "dark" ? "☀️" : "🌙"}
         </button>
+        <img className="hero-img" src="/Rockion-Hero.png" alt="Rockion" />
         <h1>Rockion</h1>
         <p>A local-first markdown workspace. Your notes stay plain files on disk.</p>
         <button className="primary" onClick={openVault}>

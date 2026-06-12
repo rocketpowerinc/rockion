@@ -64,6 +64,13 @@ body {
   gap: 12px;
   text-align: center;
 }
+.hero-img {
+  width: 112px;
+  height: 112px;
+  border-radius: 22px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.25);
+  margin-bottom: 6px;
+}
 .welcome h1 {
   font-size: 40px;
   margin: 0;

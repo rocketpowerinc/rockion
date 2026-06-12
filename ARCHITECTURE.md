@@ -56,8 +56,8 @@ without lag.
 | `db`       | SQLite connection, migrations, schema. Uses `modernc.org/sqlite` (pure Go, no cgo → easy cross-compile). |
 | `indexer`  | Walks the vault, parses frontmatter + links, upserts rows into SQLite. Incremental on file change. |
 | `search`   | Full-text search via SQLite FTS5; title/path search; backlink queries. |
-| `fswatcher`| `fsnotify` watcher → debounced reindex of changed files → emits events to frontend. |
-| `media`    | Copy/resolve images & attachments into `assets/`, rewrite relative links. |
+| `app.go` watcher | Recursive `fsnotify` watcher → per-path debounced reindex → frontend events. |
+| `vault` media | Validates decoded image bytes, caps size/dimensions, and writes into `assets/`. |
 
 ### Why these choices
 
@@ -107,10 +107,10 @@ open. Nothing here is irreplaceable.
 
 ### Incremental indexing
 
-On open, walk the tree and compare each file's `mtime`/`size` against the `notes` row. Only
-changed/new/deleted files are reparsed. `fswatcher` keeps it live while the app runs (and
-catches external edits made by Obsidian, git pull, etc.). Reindex is debounced (~300 ms) so a
-burst of writes coalesces.
+On open, the disposable index is rebuilt from all supported Markdown files. While the app runs,
+recursive `fsnotify` watches keep it current. Events are debounced independently per path so a
+burst affecting multiple notes does not discard earlier events. Folder operations reconcile full
+subtrees.
 
 ### Bound methods (Go → JS API)
 
@@ -121,9 +121,9 @@ OpenVault(path string) (VaultInfo, error)
 PickVault() (VaultInfo, error)            // native folder dialog
 ListTree() ([]TreeNode, error)
 ReadNote(path string) (Note, error)        // returns markdown + parsed frontmatter
-WriteNote(path, markdown string) error     // debounced autosave target
+WriteNote(path, markdown, version string) (Note, error) // conflict-checked autosave
 CreateNote(dir, title string) (Note, error)
-RenamePath(old, new string) error          // updates links across vault
+RenamePath(old, new string) error          // updates links, icons, and index
 DeletePath(path string) error
 Search(query string, limit int) ([]SearchHit, error)
 Backlinks(path string) ([]SearchHit, error)
@@ -177,8 +177,9 @@ TipTap (ProseMirror) is the editor core. The on-disk format is Markdown, so we n
 
 ### State & saving
 
-- Active note content held in React state; **debounced autosave** (~600 ms idle) calls
-  `WriteNote`. No save button.
+- Active note content uses **debounced autosave** (~600 ms idle). Navigation flushes pending text,
+  writes compare a SHA-256 content version, and external dirty conflicts require an explicit reload
+  or overwrite decision.
 - Tree + search results come from the Go backend; the frontend caches lightly and refreshes on
   `vault:changed` events.
 
@@ -225,7 +226,7 @@ rockion/
 
 ## 6. Performance notes (thousands of pages)
 
-- The sidebar tree loads from SQLite, not by walking the FS each render.
+- The sidebar tree is built from the filesystem on refresh; search and backlinks load from SQLite.
 - Search is FTS5 — sub-millisecond for typical vaults; results paginated.
 - Only the open note is parsed into the editor; everything else stays as rows.
 - Indexing is incremental + debounced; first-open of a large vault shows `index:progress`.
@@ -235,6 +236,6 @@ rockion/
 
 ## 7. Deliberately out of scope for v1
 
-Real-time collaboration, end-to-end sync, plugins/extensions API, graph view, mobile,
-encryption-at-rest. The architecture leaves room for each (the index already tracks links for
-a future graph view; bindings are the natural seam for a plugin host).
+Real-time collaboration, built-in sync, plugins/extensions API, graph view, mobile, and
+encryption-at-rest. A future plugin host must be permission-scoped; Wails bindings must not be
+exposed wholesale to untrusted plugin code.

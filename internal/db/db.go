@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	_ "embed"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -23,10 +24,22 @@ type DB struct {
 // Open opens (creating if needed) the index database at <vaultDir>/.rockion/index.db.
 func Open(vaultDir string) (*DB, error) {
 	dir := filepath.Join(vaultDir, ".rockion")
+	if info, err := os.Lstat(dir); err == nil {
+		if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+			return nil, errors.New(".rockion must be a real directory inside the vault")
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("inspect .rockion dir: %w", err)
+	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("create .rockion dir: %w", err)
 	}
 	path := filepath.Join(dir, "index.db")
+	if info, err := os.Lstat(path); err == nil && info.Mode()&os.ModeSymlink != 0 {
+		return nil, errors.New("index database cannot be a symlink")
+	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("inspect index database: %w", err)
+	}
 
 	// Use the plain path as the DSN (no query string — Windows paths like
 	// C:\... don't survive URL/query parsing reliably) and set pragmas after.

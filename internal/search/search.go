@@ -20,13 +20,19 @@ func New(d *db.DB) *Search {
 func (s *Search) Query(q string, limit int) ([]model.SearchHit, error) {
 	q = strings.TrimSpace(q)
 	if q == "" {
-		return nil, nil
+		return []model.SearchHit{}, nil
 	}
 	if limit <= 0 {
 		limit = 50
 	}
+	if limit > 200 {
+		limit = 200
+	}
 	// Make it a prefix match on the last token for as-you-type search.
 	match := ftsQuery(q)
+	if match == "" {
+		return []model.SearchHit{}, nil
+	}
 
 	rows, err := s.db.Query(`
 		SELECT path, title,
@@ -85,14 +91,8 @@ func (s *Search) Backlinks(path string) ([]model.SearchHit, error) {
 func ftsQuery(q string) string {
 	fields := strings.Fields(q)
 	for i, f := range fields {
-		// strip FTS special chars
-		f = strings.Map(func(r rune) rune {
-			switch r {
-			case '"', '*', '(', ')', ':', '^':
-				return -1
-			}
-			return r
-		}, f)
+		f = strings.ReplaceAll(f, `"`, `""`)
+		f = `"` + f + `"`
 		if i == len(fields)-1 && f != "" {
 			f += "*" // prefix match on final token
 		}

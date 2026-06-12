@@ -1,12 +1,19 @@
 package vault
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"errors"
 	"fmt"
+	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -14,35 +21,92 @@ import (
 	"rockion/internal/model"
 )
 
+var ErrConflict = errors.New("note changed on disk")
+
+const maxNoteBytes = 32 << 20
+
 // Vault is an opened folder of markdown files.
 type Vault struct {
-	Root string
+	Root    string
+	iconsMu sync.Mutex
 }
 
 // Open returns a Vault rooted at an existing directory.
 func Open(root string) (*Vault, error) {
-	info, err := os.Stat(root)
+	absolute, err := filepath.Abs(root)
 	if err != nil {
 		return nil, err
 	}
-	if !info.IsDir() {
+	linkInfo, err := os.Lstat(absolute)
+	if err != nil {
+		return nil, err
+	}
+	if linkInfo.Mode()&os.ModeSymlink != 0 {
+		return nil, errors.New("vault root cannot be a symlink")
+	}
+	if !linkInfo.IsDir() {
 		return nil, fmt.Errorf("%s is not a directory", root)
 	}
-	return &Vault{Root: filepath.Clean(root)}, nil
+	return &Vault{Root: filepath.Clean(absolute)}, nil
 }
 
 func (v *Vault) Info() model.VaultInfo {
 	return model.VaultInfo{Path: v.Root, Name: filepath.Base(v.Root)}
 }
 
-// abs resolves a vault-relative path and guards against escaping the root.
-func (v *Vault) abs(rel string) (string, error) {
-	clean := filepath.Clean("/" + rel) // force-rooted, strips ../
+// resolve resolves a non-root vault-relative path and rejects traversal through
+// symlinks. allowMissing permits a new final path, but every existing parent
+// component must still be a real directory inside the vault.
+func (v *Vault) resolve(rel string, allowMissing bool) (string, error) {
+	if strings.TrimSpace(rel) == "" || filepath.IsAbs(rel) || filepath.VolumeName(rel) != "" {
+		return "", errors.New("invalid vault-relative path")
+	}
+	clean := filepath.Clean(filepath.FromSlash(rel))
+	if clean == "." || clean == string(filepath.Separator) {
+		return "", errors.New("vault root is not a valid target")
+	}
 	full := filepath.Join(v.Root, clean)
-	if !strings.HasPrefix(full, v.Root) {
+	inside, err := filepath.Rel(v.Root, full)
+	if err != nil || inside == ".." || strings.HasPrefix(inside, ".."+string(filepath.Separator)) {
 		return "", errors.New("path escapes vault")
 	}
+
+	current := v.Root
+	parts := strings.Split(inside, string(filepath.Separator))
+	for i, part := range parts {
+		current = filepath.Join(current, part)
+		info, statErr := os.Lstat(current)
+		if statErr != nil {
+			if errors.Is(statErr, os.ErrNotExist) && allowMissing {
+				break
+			}
+			return "", statErr
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return "", fmt.Errorf("symlink paths are not allowed: %s", rel)
+		}
+		if i < len(parts)-1 && !info.IsDir() {
+			return "", fmt.Errorf("path component is not a directory: %s", part)
+		}
+	}
 	return full, nil
+}
+
+func requireMarkdownPath(rel string) error {
+	if !IsMarkdownPath(rel) {
+		return fmt.Errorf("not a supported markdown file: %s", rel)
+	}
+	return nil
+}
+
+func requireUserPath(rel string) error {
+	clean := filepath.Clean(filepath.FromSlash(rel))
+	for _, part := range strings.Split(clean, string(filepath.Separator)) {
+		if strings.HasPrefix(part, ".") || strings.EqualFold(part, "node_modules") {
+			return fmt.Errorf("protected vault path: %s", rel)
+		}
+	}
+	return nil
 }
 
 // hidden reports whether a path component should be skipped in the tree.
@@ -59,7 +123,7 @@ func (v *Vault) Tree() ([]model.TreeNode, error) {
 	return v.readDir(v.Root, 0, v.Icons())
 }
 
-func isMarkdown(name string) bool {
+func IsMarkdownPath(name string) bool {
 	ext := strings.ToLower(filepath.Ext(name))
 	return ext == ".md" || ext == ".markdown" || ext == ".mdx"
 }
@@ -89,7 +153,7 @@ func (v *Vault) readDir(dir string, depth int, icons map[string]string) ([]model
 				continue
 			}
 			nodes = append(nodes, model.TreeNode{Name: e.Name(), Path: rel, IsDir: true, Children: children})
-		} else if !e.IsDir() && isMarkdown(e.Name()) {
+		} else if !e.IsDir() && IsMarkdownPath(e.Name()) && e.Type()&os.ModeSymlink == 0 {
 			nodes = append(nodes, model.TreeNode{
 				Name:  strings.TrimSuffix(e.Name(), filepath.Ext(e.Name())),
 				Path:  rel,
@@ -110,16 +174,34 @@ func (v *Vault) readDir(dir string, depth int, icons map[string]string) ([]model
 
 // Read loads a note, splitting YAML frontmatter from the body.
 func (v *Vault) Read(rel string) (model.Note, error) {
-	full, err := v.abs(rel)
+	if err := requireUserPath(rel); err != nil {
+		return model.Note{}, err
+	}
+	if err := requireMarkdownPath(rel); err != nil {
+		return model.Note{}, err
+	}
+	full, err := v.resolve(rel, true)
 	if err != nil {
 		return model.Note{}, err
+	}
+	if err := recoverBackup(full); err != nil {
+		return model.Note{}, err
+	}
+	info, err := os.Stat(full)
+	if err != nil {
+		return model.Note{}, err
+	}
+	if !info.Mode().IsRegular() {
+		return model.Note{}, fmt.Errorf("note is not a regular file: %s", rel)
+	}
+	if info.Size() > maxNoteBytes {
+		return model.Note{}, fmt.Errorf("note exceeds the %d MB limit", maxNoteBytes>>20)
 	}
 	raw, err := os.ReadFile(full)
 	if err != nil {
 		return model.Note{}, err
 	}
-	info, _ := os.Stat(full)
-	fm, body := splitFrontmatter(string(raw))
+	fm, _, body := splitFrontmatter(string(raw))
 	relSlash := filepath.ToSlash(rel)
 	return model.Note{
 		Path:        relSlash,
@@ -127,27 +209,66 @@ func (v *Vault) Read(rel string) (model.Note, error) {
 		Icon:        v.Icons()[relSlash],
 		Markdown:    body,
 		Frontmatter: fm,
-		ModifiedAt:  info.ModTime().Unix(),
+		ModifiedAt:  info.ModTime().UnixMilli(),
+		Version:     contentVersion(raw),
 	}, nil
 }
 
-// Write saves markdown to a note, creating parent dirs as needed.
+// Write saves markdown to a note while preserving its existing YAML
+// frontmatter. The replacement is atomic so a crash cannot truncate the note.
 func (v *Vault) Write(rel, markdown string) error {
-	full, err := v.abs(rel)
+	return v.WriteExpected(rel, markdown, "")
+}
+
+// WriteExpected writes only if the file still has the content version the
+// caller last read. An empty expectedVersion disables the conflict check for
+// trusted internal operations.
+func (v *Vault) WriteExpected(rel, markdown, expectedVersion string) error {
+	if len(markdown) > maxNoteBytes {
+		return fmt.Errorf("note exceeds the %d MB limit", maxNoteBytes>>20)
+	}
+	if err := requireUserPath(rel); err != nil {
+		return err
+	}
+	if err := requireMarkdownPath(rel); err != nil {
+		return err
+	}
+	full, err := v.resolve(rel, true)
 	if err != nil {
+		return err
+	}
+	if err := recoverBackup(full); err != nil {
 		return err
 	}
 	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(full, []byte(markdown), 0o644)
+	header := ""
+	if raw, readErr := os.ReadFile(full); readErr == nil {
+		if expectedVersion != "" && contentVersion(raw) != expectedVersion {
+			return ErrConflict
+		}
+		_, header, _ = splitFrontmatter(string(raw))
+	} else if !errors.Is(readErr, os.ErrNotExist) {
+		return readErr
+	} else if expectedVersion != "" {
+		return ErrConflict
+	}
+	content := []byte(header + markdown)
+	if len(content) > maxNoteBytes {
+		return fmt.Errorf("note and frontmatter exceed the %d MB limit", maxNoteBytes>>20)
+	}
+	return atomicWriteFileChecked(full, content, 0o644, expectedVersion)
 }
 
 // Create makes a new empty note and returns it.
 func (v *Vault) Create(dir, title string) (model.Note, error) {
 	name := sanitize(title) + ".md"
 	rel := filepath.ToSlash(filepath.Join(dir, name))
-	full, err := v.abs(rel)
+	if err := requireUserPath(rel); err != nil {
+		return model.Note{}, err
+	}
+	full, err := v.resolve(rel, true)
 	if err != nil {
 		return model.Note{}, err
 	}
@@ -163,12 +284,35 @@ func (v *Vault) Create(dir, title string) (model.Note, error) {
 
 // Rename moves a note or folder.
 func (v *Vault) Rename(oldRel, newRel string) error {
-	from, err := v.abs(oldRel)
+	if err := requireUserPath(oldRel); err != nil {
+		return err
+	}
+	if err := requireUserPath(newRel); err != nil {
+		return err
+	}
+	from, err := v.resolve(oldRel, false)
 	if err != nil {
 		return err
 	}
-	to, err := v.abs(newRel)
+	to, err := v.resolve(newRel, true)
 	if err != nil {
+		return err
+	}
+	info, err := os.Stat(from)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() {
+		if err := requireMarkdownPath(oldRel); err != nil {
+			return err
+		}
+		if err := requireMarkdownPath(newRel); err != nil {
+			return err
+		}
+	}
+	if _, err := os.Lstat(to); err == nil {
+		return fmt.Errorf("destination already exists: %s", newRel)
+	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
 	if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
@@ -177,10 +321,41 @@ func (v *Vault) Rename(oldRel, newRel string) error {
 	return os.Rename(from, to)
 }
 
+func (v *Vault) IsDir(rel string) (bool, error) {
+	if err := requireUserPath(rel); err != nil {
+		return false, err
+	}
+	full, err := v.resolve(rel, false)
+	if err != nil {
+		return false, err
+	}
+	info, err := os.Stat(full)
+	if err != nil {
+		return false, err
+	}
+	return info.IsDir(), nil
+}
+
 // Delete removes a note or folder (recursively).
 func (v *Vault) Delete(rel string) error {
-	full, err := v.abs(rel)
+	if err := requireUserPath(rel); err != nil {
+		return err
+	}
+	full, err := v.resolve(rel, false)
 	if err != nil {
+		return err
+	}
+	info, err := os.Stat(full)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() {
+		if err := requireMarkdownPath(rel); err != nil {
+			return err
+		}
+		return os.Remove(full)
+	}
+	if err := ensureNoteOnlyDirectory(full); err != nil {
 		return err
 	}
 	return os.RemoveAll(full)
@@ -188,21 +363,76 @@ func (v *Vault) Delete(rel string) error {
 
 // SaveImage writes image bytes into assets/ and returns the vault-relative path.
 func (v *Vault) SaveImage(name string, data []byte) (string, error) {
-	dir := filepath.Join(v.Root, "assets")
+	const maxImageBytes = 10 << 20
+	if len(data) == 0 || len(data) > maxImageBytes {
+		return "", fmt.Errorf("image must be between 1 byte and %d MB", maxImageBytes>>20)
+	}
+	config, format, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil {
+		return "", errors.New("unsupported or invalid image data")
+	}
+	if config.Width <= 0 || config.Height <= 0 || config.Width > 12000 || config.Height > 12000 {
+		return "", errors.New("image dimensions are invalid or too large")
+	}
+	extensions := map[string]string{"png": ".png", "jpeg": ".jpg", "gif": ".gif"}
+	ext, ok := extensions[format]
+	if !ok {
+		return "", fmt.Errorf("unsupported image format: %s", format)
+	}
+	dir, err := v.resolve("assets", true)
+	if err != nil {
+		return "", err
+	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
 	base := sanitize(strings.TrimSuffix(name, filepath.Ext(name)))
-	ext := filepath.Ext(name)
-	if ext == "" {
-		ext = ".png"
-	}
 	fname := fmt.Sprintf("%s-%d%s", base, time.Now().UnixNano(), ext)
 	rel := filepath.ToSlash(filepath.Join("assets", fname))
-	if err := os.WriteFile(filepath.Join(v.Root, "assets", fname), data, 0o644); err != nil {
+	full, err := v.resolve(rel, true)
+	if err != nil {
+		return "", err
+	}
+	if err := atomicWriteFile(full, data, 0o644); err != nil {
 		return "", err
 	}
 	return rel, nil
+}
+
+// MarkdownFiles returns all real Markdown files, excluding hidden and generated
+// directories. Symlinked files and directories are never followed.
+func (v *Vault) MarkdownFiles() ([]string, error) {
+	files := []string{}
+	err := filepath.WalkDir(v.Root, func(path string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return nil
+		}
+		if path == v.Root {
+			return nil
+		}
+		if d.Type()&os.ModeSymlink != 0 {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if d.IsDir() {
+			if hidden(d.Name()) || d.Name() == "assets" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !IsMarkdownPath(d.Name()) {
+			return nil
+		}
+		rel, err := filepath.Rel(v.Root, path)
+		if err == nil {
+			files = append(files, filepath.ToSlash(rel))
+		}
+		return nil
+	})
+	sort.Strings(files)
+	return files, err
 }
 
 // --- helpers ---
@@ -217,26 +447,37 @@ func sanitize(s string) string {
 	return s
 }
 
-// splitFrontmatter separates a leading `---` YAML block from the body.
-func splitFrontmatter(raw string) (map[string]any, string) {
+// splitFrontmatter separates a leading YAML block while preserving its exact
+// bytes for lossless writes.
+func splitFrontmatter(raw string) (map[string]any, string, string) {
 	if !strings.HasPrefix(raw, "---\n") && !strings.HasPrefix(raw, "---\r\n") {
-		return nil, raw
+		return nil, "", raw
 	}
-	rest := raw[strings.IndexByte(raw, '\n')+1:]
-	end := strings.Index(rest, "\n---")
-	if end < 0 {
-		return nil, raw
+	firstEnd := strings.IndexByte(raw, '\n') + 1
+	offset := firstEnd
+	for offset <= len(raw) {
+		next := strings.IndexByte(raw[offset:], '\n')
+		lineEnd := len(raw)
+		afterLine := len(raw)
+		if next >= 0 {
+			lineEnd = offset + next
+			afterLine = lineEnd + 1
+		}
+		line := strings.TrimSuffix(raw[offset:lineEnd], "\r")
+		if line == "---" || line == "..." {
+			yamlPart := raw[firstEnd:offset]
+			fm := map[string]any{}
+			if err := yaml.Unmarshal([]byte(yamlPart), &fm); err != nil {
+				return nil, "", raw
+			}
+			return fm, raw[:afterLine], raw[afterLine:]
+		}
+		if next < 0 {
+			break
+		}
+		offset = afterLine
 	}
-	yamlPart := rest[:end]
-	body := rest[end+4:] // skip "\n---"
-	body = strings.TrimPrefix(body, "\n")
-	body = strings.TrimPrefix(body, "\r\n")
-
-	fm := map[string]any{}
-	if err := yaml.Unmarshal([]byte(yamlPart), &fm); err != nil {
-		return nil, raw
-	}
-	return fm, body
+	return nil, "", raw
 }
 
 // titleFor derives a display title: frontmatter title > first H1 > filename.
@@ -253,4 +494,105 @@ func titleFor(rel string, fm map[string]any, body string) string {
 	}
 	base := filepath.Base(rel)
 	return strings.TrimSuffix(base, filepath.Ext(base))
+}
+
+func atomicWriteFile(path string, data []byte, perm os.FileMode) (err error) {
+	return atomicWriteFileChecked(path, data, perm, "")
+}
+
+func atomicWriteFileChecked(path string, data []byte, perm os.FileMode, expectedVersion string) (err error) {
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, "."+filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer func() {
+		_ = tmp.Close()
+		if err != nil {
+			_ = os.Remove(tmpName)
+		}
+	}()
+	if err = tmp.Chmod(perm); err != nil {
+		return err
+	}
+	if _, err = tmp.Write(data); err != nil {
+		return err
+	}
+	if err = tmp.Sync(); err != nil {
+		return err
+	}
+	if err = tmp.Close(); err != nil {
+		return err
+	}
+	if expectedVersion != "" {
+		current, readErr := os.ReadFile(path)
+		if readErr != nil || contentVersion(current) != expectedVersion {
+			return ErrConflict
+		}
+	}
+	if err = replaceFile(tmpName, path); err != nil {
+		return err
+	}
+	return nil
+}
+
+func contentVersion(data []byte) string {
+	return fmt.Sprintf("%x", sha256.Sum256(data))
+}
+
+func ensureNoteOnlyDirectory(root string) error {
+	return filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if path == root {
+			return nil
+		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			return fmt.Errorf("refusing to delete directory containing a symlink: %s", path)
+		}
+		if !entry.IsDir() && !IsMarkdownPath(entry.Name()) {
+			return fmt.Errorf("refusing to delete directory containing a non-note file: %s", path)
+		}
+		return nil
+	})
+}
+
+func recoverBackup(path string) error {
+	backup := path + ".rockion-backup"
+	if _, err := os.Stat(path); err == nil {
+		return nil
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	info, err := os.Lstat(backup)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+		return errors.New("invalid Rockion recovery backup")
+	}
+	return os.Rename(backup, path)
+}
+
+func replaceFile(tempPath, destination string) error {
+	if err := os.Rename(tempPath, destination); err == nil {
+		return nil
+	}
+	// Windows does not replace an existing destination with os.Rename.
+	backup := destination + ".rockion-backup"
+	_ = os.Remove(backup)
+	if err := os.Rename(destination, backup); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	if err := os.Rename(tempPath, destination); err != nil {
+		_ = os.Rename(backup, destination)
+		return err
+	}
+	_ = os.Remove(backup)
+	return nil
 }

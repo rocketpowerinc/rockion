@@ -9,6 +9,7 @@
 
 # Vault index (per-vault, never committed)
 .rockion/
+.codex-tmp/
 
 # OS
 .DS_Store

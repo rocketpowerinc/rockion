@@ -3,6 +3,30 @@
 All notable changes to Rockion are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Security
+- Hardened vault paths against root deletion, traversal, symlinks, and unsupported note types.
+- Added decoded image validation, payload and dimension limits, and bounded page-icon validation.
+- Added SHA-256 compare-before-write conflict protection for external file changes.
+- Updated `golang.org/x/sys` to the advisory-fixed `v0.44.0`.
+- Hardened CI/release permissions, pinned Actions by commit, and added release checksums.
+
+### Fixed
+- Preserve YAML frontmatter byte-for-byte during editing.
+- Flush pending autosaves before navigation and surface save failures.
+- Reload clean external edits and require an explicit choice for dirty conflicts.
+- Use atomic replacement writes for notes, images, and icon metadata.
+- Watch nested vault directories with independent per-path debouncing.
+- Keep `.md`, `.markdown`, and `.mdx` indexing behavior consistent.
+- Remove complete folder subtrees from search and migrate links/icons during renames.
+- Index frontmatter and frontmatter tags, check SQL mutation errors, and ignore external URL schemes.
+
+### Added
+- Backend regression tests for persistence, path containment, media validation, conflicts,
+  indexing, subtree removal, and rename migration.
+- Pull-request and main-branch CI with frontend build, dependency audit, race tests, and vetting.
+
 ## [0.1.0] — 2026-06-10
 
 First release. A working local-first markdown editor: Notion-style UI over plain

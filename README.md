@@ -47,7 +47,7 @@ See the [CHANGELOG](./CHANGELOG.md) for what's in each release.
 
 ## Prerequisites
 
-- **Go** 1.22+
+- **Go** 1.26.4
 - **Node** 18+ (Node 22 recommended)
 - **Wails CLI v2**: `go install github.com/wailsapp/wails/v2/cmd/wails@latest`
 - Platform deps for Wails (WebView2 on Windows, WebKit on Linux). Run `wails doctor` to check.
@@ -129,16 +129,18 @@ markdown.
 
 - `vault` — opens a folder, reads/writes notes, builds the sidebar tree. On read it splits YAML
   frontmatter from the body and derives a title (frontmatter `title` → first `# H1` → filename).
-  Path handling guards against escaping the vault root and caps recursion to survive symlink loops.
+  Frontmatter is preserved byte-for-byte on save. Path handling rejects root targets, traversal,
+  symlinks, and unsupported note extensions.
 - `db` — opens `<vault>/.rockion/index.db` using **`modernc.org/sqlite`** (pure Go, no cgo → single
   static binary, easy cross-compile). Pragmas and schema are applied statement-by-statement.
-- `indexer` — walks the vault, parsing `[[wikilinks]]`, `[md](links)`, and `#tags` into the DB and
-  feeding an **FTS5** full-text table. Incremental on change; runs in a panic-recovering goroutine.
+- `indexer` — walks `.md`, `.markdown`, and `.mdx` files, parsing `[[wikilinks]]`, `[md](links)`,
+  frontmatter tags, and `#tags` into the DB and feeding an **FTS5** full-text table. Incremental
+  mutations are serialized and folder deletes remove the full indexed subtree.
 - `search` — FTS5 queries (prefix match on the last term) and backlink lookups. Slice results are
   always returned as `[]T{}` (never nil) so the JSON never serializes to `null`.
 - `app.go` — the Wails binding layer: every method here is callable from JS (`OpenVault`,
   `ReadNote`, `WriteNote`, `Search`, `Backlinks`, `SaveImage`, `SaveFile`, `SetNoteIcon`, …). A
-  debounced `fsnotify` watcher reflects external edits and emits events to the UI.
+  recursive, per-path-debounced `fsnotify` watcher reflects external edits and emits events to the UI.
 
 **Frontend (React + Vite + TS + TipTap, in `frontend/src/`)**
 
@@ -151,7 +153,9 @@ markdown.
   - `SlashCommand` — the `/` menu (positioned manually, no popper dependency).
   - `AddBlockButton` — the gutter `+`, anchored to the drag grip so spacing is consistent.
   - Drag-to-reorder is `tiptap-extension-global-drag-handle` (zero deps).
-- **Saving** is debounced autosave: the editor serializes to markdown and calls `WriteNote`.
+- **Saving** is debounced autosave with flush-before-navigation. Each write includes the SHA-256
+  version last read from disk. External changes reload clean notes automatically; dirty conflicts
+  pause autosave and require an explicit choice. Notes and sidecars use atomic replacement writes.
 - **Page icons** are stored in a sidecar `<vault>/.rockion/icons.json` (path → emoji), so picking an
   icon never rewrites your markdown. The tree and link picker read icons from there.
 - **Page links** are plain markdown links. The icon + ↗ badge are added by a ProseMirror
@@ -196,6 +200,5 @@ rockion/
 ## Roadmap (not yet built)
 
 Wikilink (`[[ ]]`) autocomplete, a graph view (the link index already tracks everything needed),
-drag-to-reorder in the sidebar tree, a tag browser, and a plugin host. Live-updating page-link
-icons were intentionally skipped to keep links as plain markdown. See the end of
-[ARCHITECTURE.md](./ARCHITECTURE.md).
+drag-to-reorder in the sidebar tree, a tag browser, history/recovery UI, and a permission-scoped
+plugin host. See the end of [ARCHITECTURE.md](./ARCHITECTURE.md).

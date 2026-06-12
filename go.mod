@@ -1,6 +1,6 @@
 module rockion
 
-go 1.22.0
+go 1.26.0
 
 require (
 	github.com/fsnotify/fsnotify v1.9.0
@@ -40,7 +40,7 @@ require (
 	github.com/wailsapp/mimetype v1.4.1 // indirect
 	golang.org/x/crypto v0.33.0 // indirect
 	golang.org/x/net v0.35.0 // indirect
-	golang.org/x/sys v0.30.0 // indirect
+	golang.org/x/sys v0.44.0 // indirect
 	golang.org/x/text v0.22.0 // indirect
 	modernc.org/gc/v3 v3.0.0-20240107210532-573471604cb6 // indirect
 	modernc.org/libc v1.50.9 // indirect

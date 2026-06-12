@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -23,26 +24,66 @@ import (
 type App struct {
 	ctx context.Context
 
-	mu      sync.Mutex
+	mu      sync.RWMutex
 	vault   *vault.Vault
 	db      *db.DB
 	indexer *indexer.Indexer
 	search  *search.Search
 	watcher *fsnotify.Watcher
+
+	indexCancel     context.CancelFunc
+	indexWG         sync.WaitGroup
+	watcherWG       sync.WaitGroup
+	watcherDebounce *keyedDebouncer
+
+	closeMu    sync.Mutex
+	allowClose bool
 }
 
 func NewApp() *App { return &App{} }
 
-func (a *App) startup(ctx context.Context)  { a.ctx = ctx }
-func (a *App) shutdown(ctx context.Context) { a.closeVault() }
+func (a *App) startup(ctx context.Context) { a.ctx = ctx }
+func (a *App) shutdown(ctx context.Context) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.closeVault()
+}
+
+func (a *App) beforeClose(ctx context.Context) bool {
+	a.closeMu.Lock()
+	defer a.closeMu.Unlock()
+	if a.allowClose {
+		return false
+	}
+	runtime.EventsEmit(ctx, "app:before-close")
+	return true
+}
+
+// ConfirmClose is called after the frontend flushes pending editor text.
+func (a *App) ConfirmClose() {
+	a.closeMu.Lock()
+	a.allowClose = true
+	a.closeMu.Unlock()
+	runtime.Quit(a.ctx)
+}
 
 func (a *App) closeVault() {
 	if a.watcher != nil {
-		a.watcher.Close()
+		_ = a.watcher.Close()
 		a.watcher = nil
 	}
+	if a.indexCancel != nil {
+		a.indexCancel()
+		a.indexCancel = nil
+	}
+	if a.watcherDebounce != nil {
+		a.watcherDebounce.Close()
+		a.watcherDebounce = nil
+	}
+	a.watcherWG.Wait()
+	a.indexWG.Wait()
 	if a.db != nil {
-		a.db.Close()
+		_ = a.db.Close()
 		a.db = nil
 	}
 	a.vault = nil
@@ -90,13 +131,20 @@ func (a *App) OpenVault(path string) (model.VaultInfo, error) {
 
 	// Index in the background so the window opens instantly. Recover from any
 	// panic here so a bad file or DB issue can never crash the whole app.
+	indexCtx, cancel := context.WithCancel(a.ctx)
+	a.indexCancel = cancel
+	a.indexWG.Add(1)
 	go func() {
+		defer a.indexWG.Done()
 		defer func() {
 			if r := recover(); r != nil {
 				runtime.LogErrorf(a.ctx, "index rebuild panicked: %v", r)
 			}
 		}()
-		if err := ix.Rebuild(); err != nil {
+		if err := ix.RebuildContext(indexCtx); err != nil {
+			if errors.Is(err, context.Canceled) {
+				return
+			}
 			runtime.LogErrorf(a.ctx, "index rebuild failed: %v", err)
 			return
 		}
@@ -115,6 +163,8 @@ func (a *App) requireVault() error {
 }
 
 func (a *App) ListTree() ([]model.TreeNode, error) {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	if err := a.requireVault(); err != nil {
 		return nil, err
 	}
@@ -122,23 +172,39 @@ func (a *App) ListTree() ([]model.TreeNode, error) {
 }
 
 func (a *App) ReadNote(path string) (model.Note, error) {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	if err := a.requireVault(); err != nil {
 		return model.Note{}, err
 	}
 	return a.vault.Read(path)
 }
 
-func (a *App) WriteNote(path, markdown string) error {
+func (a *App) WriteNote(path, markdown, expectedVersion string) (model.Note, error) {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	if err := a.requireVault(); err != nil {
-		return err
+		return model.Note{}, err
 	}
-	if err := a.vault.Write(path, markdown); err != nil {
-		return err
+	if err := a.vault.WriteExpected(path, markdown, expectedVersion); err != nil {
+		if errors.Is(err, vault.ErrConflict) {
+			return model.Note{}, fmt.Errorf("conflict: %w", err)
+		}
+		return model.Note{}, err
 	}
-	return a.indexer.IndexFile(path)
+	saved, err := a.vault.Read(path)
+	if err != nil {
+		return model.Note{}, err
+	}
+	if err := a.indexer.IndexFile(path); err != nil {
+		runtime.LogErrorf(a.ctx, "index saved note failed: %v", err)
+	}
+	return saved, nil
 }
 
 func (a *App) CreateNote(dir, title string) (model.Note, error) {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	if err := a.requireVault(); err != nil {
 		return model.Note{}, err
 	}
@@ -146,35 +212,64 @@ func (a *App) CreateNote(dir, title string) (model.Note, error) {
 	if err != nil {
 		return model.Note{}, err
 	}
-	a.indexer.IndexFile(note.Path)
+	if err := a.indexer.IndexFile(note.Path); err != nil {
+		runtime.LogErrorf(a.ctx, "index created note failed: %v", err)
+	}
 	return note, nil
 }
 
 func (a *App) RenamePath(oldPath, newPath string) error {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	if err := a.requireVault(); err != nil {
+		return err
+	}
+	isDir, err := a.vault.IsDir(oldPath)
+	if err != nil {
 		return err
 	}
 	if err := a.vault.Rename(oldPath, newPath); err != nil {
 		return err
 	}
-	a.indexer.RemoveFile(oldPath)
-	if strings.EqualFold(filepath.Ext(newPath), ".md") {
-		a.indexer.IndexFile(newPath)
+	var followUpErrs []error
+	if err := a.vault.RenameIconPath(oldPath, newPath, isDir); err != nil {
+		followUpErrs = append(followUpErrs, fmt.Errorf("rename icon metadata: %w", err))
 	}
-	return nil
+	if err := a.vault.RewriteLinksAfterRename(oldPath, newPath, isDir); err != nil {
+		followUpErrs = append(followUpErrs, fmt.Errorf("rewrite links: %w", err))
+	}
+	if err := a.indexer.Rebuild(); err != nil {
+		followUpErrs = append(followUpErrs, fmt.Errorf("rebuild index: %w", err))
+	}
+	return errors.Join(followUpErrs...)
 }
 
 func (a *App) DeletePath(path string) error {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	if err := a.requireVault(); err != nil {
+		return err
+	}
+	isDir, err := a.vault.IsDir(path)
+	if err != nil {
 		return err
 	}
 	if err := a.vault.Delete(path); err != nil {
 		return err
 	}
-	return a.indexer.RemoveFile(path)
+	var followUpErrs []error
+	if err := a.vault.RemoveIconPath(path, isDir); err != nil {
+		followUpErrs = append(followUpErrs, fmt.Errorf("remove icon metadata: %w", err))
+	}
+	if err := a.indexer.RemovePath(path); err != nil {
+		followUpErrs = append(followUpErrs, fmt.Errorf("remove index path: %w", err))
+	}
+	return errors.Join(followUpErrs...)
 }
 
 func (a *App) Search(query string, limit int) ([]model.SearchHit, error) {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	if err := a.requireVault(); err != nil {
 		return nil, err
 	}
@@ -182,6 +277,8 @@ func (a *App) Search(query string, limit int) ([]model.SearchHit, error) {
 }
 
 func (a *App) Backlinks(path string) ([]model.SearchHit, error) {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	if err := a.requireVault(); err != nil {
 		return nil, err
 	}
@@ -190,6 +287,8 @@ func (a *App) Backlinks(path string) ([]model.SearchHit, error) {
 
 // SaveImage stores image bytes in assets/ and returns the vault-relative path.
 func (a *App) SaveImage(name string, data []byte) (string, error) {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	if err := a.requireVault(); err != nil {
 		return "", err
 	}
@@ -198,6 +297,8 @@ func (a *App) SaveImage(name string, data []byte) (string, error) {
 
 // SetNoteIcon sets (or clears, if icon == "") the emoji icon for a note.
 func (a *App) SetNoteIcon(path, icon string) error {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	if err := a.requireVault(); err != nil {
 		return err
 	}
@@ -226,8 +327,7 @@ func (a *App) SaveFile(defaultName, content string) (string, error) {
 // --- File watching: reflect external edits (Obsidian, git, etc.) ---
 
 func isMarkdownPath(name string) bool {
-	ext := strings.ToLower(filepath.Ext(name))
-	return ext == ".md" || ext == ".markdown" || ext == ".mdx"
+	return vault.IsMarkdownPath(name)
 }
 
 func (a *App) startWatcher() {
@@ -235,12 +335,20 @@ func (a *App) startWatcher() {
 	if err != nil {
 		return
 	}
+	if err := addWatchDirs(w, a.vault.Root); err != nil {
+		_ = w.Close()
+		runtime.LogErrorf(a.ctx, "watcher setup failed: %v", err)
+		return
+	}
 	a.watcher = w
-	// Watch the root; for nested folders a production build would walk and add each.
-	_ = w.Add(a.vault.Root)
 
-	debounce := newDebouncer(300 * time.Millisecond)
+	debounce := newKeyedDebouncer(300 * time.Millisecond)
+	a.watcherDebounce = debounce
+	ix := a.indexer
+	root := a.vault.Root
+	a.watcherWG.Add(1)
 	go func() {
+		defer a.watcherWG.Done()
 		defer func() {
 			if r := recover(); r != nil {
 				runtime.LogErrorf(a.ctx, "watcher panicked: %v", r)
@@ -252,32 +360,42 @@ func (a *App) startWatcher() {
 				if !ok {
 					return
 				}
-				if !isMarkdownPath(ev.Name) {
+				event := ev
+				if shouldSkipWatchPath(event.Name, a.vault.Root) {
 					continue
 				}
-				if strings.Contains(ev.Name, string(filepath.Separator)+".rockion") {
+				info, statErr := os.Stat(event.Name)
+				isDir := statErr == nil && info.IsDir()
+				if isDir && event.Op&fsnotify.Create != 0 {
+					if err := addWatchDirs(w, event.Name); err != nil {
+						runtime.LogErrorf(a.ctx, "watch nested directory failed: %v", err)
+					}
+				}
+				if !isDir && !isMarkdownPath(event.Name) &&
+					event.Op&(fsnotify.Remove|fsnotify.Rename) == 0 {
 					continue
 				}
-				debounce(func() {
-					a.mu.Lock()
-					ix := a.indexer
-					root := ""
-					if a.vault != nil {
-						root = a.vault.Root
-					}
-					a.mu.Unlock()
-					if ix == nil || root == "" {
-						return // vault closed; nothing to do
-					}
-					rel, err := filepath.Rel(root, ev.Name)
-					if err != nil {
+				debounce.Do(event.Name, func() {
+					rel, err := filepath.Rel(root, event.Name)
+					if err != nil || rel == "." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 						return
 					}
 					rel = filepath.ToSlash(rel)
-					if ev.Op&(fsnotify.Remove|fsnotify.Rename) != 0 {
-						ix.RemoveFile(rel)
+					if event.Op&(fsnotify.Remove|fsnotify.Rename) != 0 {
+						if err := ix.RemovePath(rel); err != nil {
+							runtime.LogErrorf(a.ctx, "remove index path failed: %v", err)
+						}
 					} else {
-						ix.IndexFile(rel)
+						info, err := os.Stat(event.Name)
+						if err == nil && info.IsDir() {
+							if err := ix.Rebuild(); err != nil {
+								runtime.LogErrorf(a.ctx, "rebuild after directory change failed: %v", err)
+							}
+						} else if isMarkdownPath(rel) {
+							if err := ix.IndexFile(rel); err != nil {
+								runtime.LogErrorf(a.ctx, "index changed file failed: %v", err)
+							}
+						}
 					}
 					runtime.EventsEmit(a.ctx, "vault:changed", rel)
 				})
@@ -290,16 +408,94 @@ func (a *App) startWatcher() {
 	}()
 }
 
-// newDebouncer returns a function that delays the most recent call by d.
-func newDebouncer(d time.Duration) func(func()) {
-	var mu sync.Mutex
-	var t *time.Timer
-	return func(fn func()) {
-		mu.Lock()
-		defer mu.Unlock()
-		if t != nil {
-			t.Stop()
+func addWatchDirs(w *fsnotify.Watcher, root string) error {
+	return filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return nil
 		}
-		t = time.AfterFunc(d, fn)
+		if entry.Type()&os.ModeSymlink != 0 {
+			if entry.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !entry.IsDir() {
+			return nil
+		}
+		if path != root {
+			name := entry.Name()
+			if strings.HasPrefix(name, ".") || name == "node_modules" || name == "assets" {
+				return filepath.SkipDir
+			}
+		}
+		return w.Add(path)
+	})
+}
+
+func shouldSkipWatchPath(path, root string) bool {
+	rel, err := filepath.Rel(root, path)
+	if err != nil || rel == "." {
+		return false
 	}
+	for _, part := range strings.Split(filepath.Clean(rel), string(filepath.Separator)) {
+		if strings.HasPrefix(part, ".") || part == "node_modules" || part == "assets" {
+			return true
+		}
+	}
+	return false
+}
+
+type debounceEntry struct {
+	timer *time.Timer
+	done  sync.Once
+}
+
+type keyedDebouncer struct {
+	mu     sync.Mutex
+	delay  time.Duration
+	timers map[string]*debounceEntry
+	wg     sync.WaitGroup
+	closed bool
+}
+
+func newKeyedDebouncer(delay time.Duration) *keyedDebouncer {
+	return &keyedDebouncer{delay: delay, timers: map[string]*debounceEntry{}}
+}
+
+func (d *keyedDebouncer) Do(key string, fn func()) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.closed {
+		return
+	}
+	if previous := d.timers[key]; previous != nil && previous.timer.Stop() {
+		previous.done.Do(d.wg.Done)
+	}
+	entry := &debounceEntry{}
+	d.wg.Add(1)
+	entry.timer = time.AfterFunc(d.delay, func() {
+		defer entry.done.Do(d.wg.Done)
+		d.mu.Lock()
+		if d.closed {
+			d.mu.Unlock()
+			return
+		}
+		delete(d.timers, key)
+		d.mu.Unlock()
+		fn()
+	})
+	d.timers[key] = entry
+}
+
+func (d *keyedDebouncer) Close() {
+	d.mu.Lock()
+	d.closed = true
+	for key, entry := range d.timers {
+		if entry.timer.Stop() {
+			entry.done.Do(d.wg.Done)
+		}
+		delete(d.timers, key)
+	}
+	d.mu.Unlock()
+	d.wg.Wait()
 }

@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Sidebar from "./components/Sidebar";
-import Editor from "./components/Editor";
+import Editor, { type EditorHandle } from "./components/Editor";
 import Backlinks from "./components/Backlinks";
 import QuickSwitcher from "./components/QuickSwitcher";
 import {
   api,
+  onBeforeClose,
   onIndexReady,
   onVaultChanged,
   type Note,
@@ -19,6 +20,8 @@ export default function App() {
   const [note, setNote] = useState<Note | null>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const editorRef = useRef<EditorHandle>(null);
+  const closing = useRef(false);
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     const saved =
       typeof localStorage !== "undefined" ? localStorage.getItem("rockion-theme") : null;
@@ -36,6 +39,10 @@ export default function App() {
   }, [theme]);
 
   const toggleTheme = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
+
+  const flushEditor = useCallback(async () => {
+    return (await editorRef.current?.flushSave()) ?? true;
+  }, []);
 
   // Flatten the tree into a list of pages for the "link to page" picker.
   const pages = useMemo(() => {
@@ -80,6 +87,7 @@ export default function App() {
   );
 
   const openVault = useCallback(async () => {
+    if (!(await flushEditor())) return;
     try {
       const info = await api.pickVault();
       setVault(info);
@@ -89,21 +97,33 @@ export default function App() {
       console.error("openVault failed:", e);
       setError(`Couldn't open vault: ${String(e)}`);
     }
-  }, [refreshTree]);
+  }, [flushEditor, refreshTree]);
 
   const openNote = useCallback(async (path: string) => {
-    setNote(await api.readNote(path));
-  }, []);
+    if (note?.path === path) return;
+    if (!(await flushEditor())) return;
+    try {
+      setNote(await api.readNote(path));
+      setError(null);
+    } catch (e) {
+      setError(`Couldn't open note: ${String(e)}`);
+    }
+  }, [flushEditor, note?.path]);
 
   const newNote = useCallback(
     async (dir: string) => {
+      if (!(await flushEditor())) return;
       const title = window.prompt("Note title", "Untitled");
       if (!title) return;
-      const created = await api.createNote(dir, title);
-      await refreshTree();
-      setNote(created);
+      try {
+        const created = await api.createNote(dir, title);
+        await refreshTree();
+        setNote(created);
+      } catch (e) {
+        setError(`Couldn't create note: ${String(e)}`);
+      }
     },
-    [refreshTree]
+    [flushEditor, refreshTree]
   );
 
   // Global keyboard shortcuts.
@@ -131,6 +151,21 @@ export default function App() {
       off2?.();
     };
   }, [refreshTree]);
+
+  useEffect(() => {
+    return onBeforeClose(() => {
+      if (closing.current) return;
+      closing.current = true;
+      void (async () => {
+        if (await flushEditor()) {
+          await api.confirmClose();
+        } else {
+          closing.current = false;
+          setError("Rockion stayed open because pending edits could not be saved.");
+        }
+      })();
+    });
+  }, [flushEditor]);
 
   if (!vault) {
     return (
@@ -167,11 +202,15 @@ export default function App() {
       />
       <main className="main">
         <Editor
+          ref={editorRef}
           note={note}
           pages={pages}
           onDirtySaved={refreshTree}
           onOpenLink={openNote}
           onSetIcon={setIcon}
+          onNoteUpdated={(updated) =>
+            setNote((current) => (current?.path === updated.path ? updated : current))
+          }
         />
         <Backlinks path={note?.path ?? null} onOpen={openNote} />
       </main>

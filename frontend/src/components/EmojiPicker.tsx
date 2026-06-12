@@ -22,6 +22,10 @@ export default function EmojiPicker({ onPick, onClose }: Props) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      console.error("icon upload failed: image exceeds 5 MB");
+      return;
+    }
     try {
       onPick(await fileToIconDataUrl(file));
     } catch (err) {
@@ -63,6 +67,10 @@ function fileToIconDataUrl(file: File): Promise<string> {
       const img = new Image();
       img.onerror = () => reject(new Error("invalid image"));
       img.onload = () => {
+        if (img.width <= 0 || img.height <= 0 || img.width > 4096 || img.height > 4096) {
+          reject(new Error("icon dimensions are invalid or too large"));
+          return;
+        }
         const size = 64;
         const canvas = document.createElement("canvas");
         canvas.width = size;

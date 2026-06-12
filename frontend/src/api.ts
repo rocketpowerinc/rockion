@@ -3,7 +3,7 @@
 // The files under ./wailsjs are generated automatically by `wails dev` / `wails build`
 // (and `wails generate module`). They will not exist until you run Wails once.
 import * as App from "../wailsjs/go/main/App";
-import { EventsOn } from "../wailsjs/runtime/runtime";
+import { BrowserOpenURL, EventsOn } from "../wailsjs/runtime/runtime";
 
 export interface VaultInfo {
   path: string;
@@ -25,6 +25,7 @@ export interface Note {
   markdown: string;
   frontmatter?: Record<string, unknown>;
   modifiedAt: number;
+  version: string;
 }
 
 export interface SearchHit {
@@ -38,7 +39,8 @@ export const api = {
   openVault: (path: string): Promise<VaultInfo> => App.OpenVault(path),
   listTree: (): Promise<TreeNode[]> => App.ListTree(),
   readNote: (path: string): Promise<Note> => App.ReadNote(path),
-  writeNote: (path: string, markdown: string): Promise<void> => App.WriteNote(path, markdown),
+  writeNote: (path: string, markdown: string, expectedVersion: string): Promise<Note> =>
+    App.WriteNote(path, markdown, expectedVersion),
   createNote: (dir: string, title: string): Promise<Note> => App.CreateNote(dir, title),
   renamePath: (oldPath: string, newPath: string): Promise<void> => App.RenamePath(oldPath, newPath),
   deletePath: (path: string): Promise<void> => App.DeletePath(path),
@@ -50,9 +52,12 @@ export const api = {
   saveFile: (name: string, content: string): Promise<string> => App.SaveFile(name, content),
   // SetNoteIcon stores an emoji icon for a note ("" clears it).
   setNoteIcon: (path: string, icon: string): Promise<void> => App.SetNoteIcon(path, icon),
+  openExternal: (url: string): void => BrowserOpenURL(url),
+  confirmClose: (): Promise<void> => App.ConfirmClose(),
 };
 
 export const onVaultChanged = (cb: (path: string) => void) =>
   EventsOn("vault:changed", cb);
 
 export const onIndexReady = (cb: () => void) => EventsOn("index:ready", cb);
+export const onBeforeClose = (cb: () => void) => EventsOn("app:before-close", cb);

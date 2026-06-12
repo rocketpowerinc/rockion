@@ -1,17 +1,58 @@
 name: Release
 
-# Push a tag like v0.1.0 to trigger a cross-platform build + GitHub Release.
 on:
   push:
     tags:
       - "v*"
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
+  verify:
+    name: Verify release
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: "1.26.4"
+          cache: true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install Linux test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgtk-3-dev libwebkit2gtk-4.0-dev
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+      - name: Test and vet Go
+        run: |
+          go test ./...
+          go vet ./...
+      - name: Verify tag matches release metadata
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          node -e "const w=require('./wails.json'); if(w.info.productVersion !== '$version') process.exit(1)"
+          grep -Fq "## [$version]" CHANGELOG.md
+
   build:
     name: Build (${{ matrix.name }})
+    needs: verify
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -20,8 +61,8 @@ jobs:
           - name: windows
             os: windows-latest
             platform: windows/amd64
-            # -nsis also produces an installer alongside the portable .exe.
             extra: "-nsis"
+            artifact: rockion-windows
             files: |
               build/bin/rockion-windows-amd64.exe
               build/bin/rockion-windows-amd64-installer.exe
@@ -29,60 +70,79 @@ jobs:
             os: macos-latest
             platform: darwin/universal
             extra: ""
+            artifact: rockion-macos
             files: build/bin/rockion-macos-universal.zip
           - name: linux
             os: ubuntu-22.04
             platform: linux/amd64
             extra: ""
+            artifact: rockion-linux
             files: build/bin/rockion-linux-amd64.tar.gz
 
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          go-version: "1.22"
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: "1.26.4"
+          cache: true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "20"
-
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
       - name: Install Linux build dependencies
         if: matrix.name == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
-
+          sudo apt-get install -y --no-install-recommends libgtk-3-dev libwebkit2gtk-4.0-dev
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
-
       - name: Build
         run: wails build -platform ${{ matrix.platform }} -clean -trimpath ${{ matrix.extra }}
-
       - name: Package Windows artifacts
         if: matrix.name == 'windows'
         shell: cmd
         run: |
           copy build\bin\rockion.exe build\bin\rockion-windows-amd64.exe
           copy build\bin\rockion-amd64-installer.exe build\bin\rockion-windows-amd64-installer.exe
-
       - name: Package macOS app
         if: matrix.name == 'macos'
         run: |
           cd build/bin
           ditto -c -k --keepParent rockion.app rockion-macos-universal.zip
-
       - name: Package Linux binary
         if: matrix.name == 'linux'
         run: |
           cd build/bin
           tar -czf rockion-linux-amd64.tar.gz rockion
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error
+          retention-days: 7
 
+  publish:
+    name: Publish draft release
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Generate checksums
+        working-directory: release-assets
+        run: sha256sum * > SHA256SUMS.txt
       - name: Publish to GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           draft: true
           generate_release_notes: true
-          files: ${{ matrix.files }}
+          fail_on_unmatched_files: true
+          files: release-assets/*

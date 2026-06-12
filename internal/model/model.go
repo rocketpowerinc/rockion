@@ -23,6 +23,7 @@ type Note struct {
 	Markdown    string         `json:"markdown"`
 	Frontmatter map[string]any `json:"frontmatter,omitempty"`
 	ModifiedAt  int64          `json:"modifiedAt"`
+	Version     string         `json:"version"`
 }
 
 // SearchHit is a single search/backlink result.

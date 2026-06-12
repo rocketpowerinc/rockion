@@ -25,7 +25,7 @@ function Invoke-CheckedCommand {
     }
 }
 
-foreach ($command in @('node', 'npm')) {
+foreach ($command in @('node', 'npm', 'wails')) {
     if (-not (Get-Command $command -ErrorAction SilentlyContinue)) {
         Write-Host "[ERROR] $command was not found on PATH." -ForegroundColor Red
         exit 1
@@ -42,6 +42,15 @@ try {
         Write-Host '[SKIP] npm ci' -ForegroundColor Yellow
     } else {
         Invoke-CheckedCommand 'Reproducible dependency install' { & npm ci }
+    }
+
+    Push-Location $RepoRoot
+    try {
+        Invoke-CheckedCommand 'Generate Wails bindings' {
+            & wails generate module -nocolour
+        }
+    } finally {
+        Pop-Location
     }
 
     Invoke-CheckedCommand 'Full dependency audit' {

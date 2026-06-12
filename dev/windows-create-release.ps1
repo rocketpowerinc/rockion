@@ -81,27 +81,34 @@ if (-not $Branch) {
 }
 
 $Repository = Get-RepositorySlug
-$LatestVersion = $null
+$VersionCandidates = [System.Collections.Generic.List[version]]::new()
+$LocalTags = @(& git tag --list 'v*')
+foreach ($localTag in $LocalTags) {
+    $candidate = $localTag.TrimStart('v')
+    if ($candidate -match '^\d+\.\d+\.\d+$') {
+        $VersionCandidates.Add([version]$candidate)
+    }
+}
 try {
     $latest = Invoke-RestMethod `
         -Uri "https://api.github.com/repos/$Repository/releases/latest" `
         -Headers @{ Accept = 'application/vnd.github+json' } `
         -TimeoutSec 10
     if ($latest.tag_name) {
-        $LatestVersion = $latest.tag_name.TrimStart('v')
+        $publishedVersion = $latest.tag_name.TrimStart('v')
+        if ($publishedVersion -match '^\d+\.\d+\.\d+$') {
+            $VersionCandidates.Add([version]$publishedVersion)
+        }
     }
 } catch {
-    $latestTag = (& git tag --sort=-version:refname | Select-Object -First 1)
-    if ($latestTag) {
-        $LatestVersion = $latestTag.TrimStart('v')
-    }
     Write-Host '[WARN] GitHub release lookup failed; using local tags for version guidance.' -ForegroundColor Yellow
 }
 
 $Suggestion = 'for example 0.2.0'
-if ($LatestVersion -and $LatestVersion -match '^(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)$') {
-    $nextPatch = [int]$Matches.patch + 1
-    $Suggestion = "latest is v$LatestVersion; suggested $($Matches.major).$($Matches.minor).$nextPatch"
+if ($VersionCandidates.Count -gt 0) {
+    $LatestVersion = $VersionCandidates | Sort-Object -Descending | Select-Object -First 1
+    $nextPatch = $LatestVersion.Build + 1
+    $Suggestion = "latest tag is v$LatestVersion; suggested $($LatestVersion.Major).$($LatestVersion.Minor).$nextPatch"
 }
 
 $RawVersion = $Version

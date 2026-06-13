@@ -186,12 +186,62 @@ button.primary,
   bottom: 46px;
   left: 10px;
   z-index: 50;
-  width: 230px;
+  width: 250px;
   padding: 5px;
   border: 1px solid var(--border);
   border-radius: 9px;
   background: var(--bg);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.26);
+}
+
+/* ---- Encrypted vault import/export ---- */
+.vault-transfer-dialog {
+  width: min(460px, calc(100vw - 32px));
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+}
+.vault-transfer-dialog h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+.vault-transfer-dialog p {
+  margin: 0 0 18px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.vault-transfer-dialog label {
+  display: block;
+  margin-top: 12px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+.vault-transfer-dialog input {
+  width: 100%;
+  margin-top: 5px;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: none;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+.vault-transfer-dialog input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(35, 131, 226, 0.18);
+}
+.vault-transfer-error {
+  margin-top: 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+  font-size: 12px;
 }
 .settings-menu button {
   display: flex;

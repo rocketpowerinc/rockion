@@ -18,6 +18,7 @@ import (
 	"rockion/internal/model"
 	"rockion/internal/search"
 	"rockion/internal/vault"
+	"rockion/internal/vaultbackup"
 )
 
 // App is the Wails-bound application struct. Its exported methods are callable from JS.
@@ -358,6 +359,70 @@ func (a *App) SaveFile(defaultName, content string) (string, error) {
 		return "", err
 	}
 	return path, nil
+}
+
+// ExportVault prompts for a destination and writes an authenticated, encrypted
+// snapshot of the currently open vault. The password is never written to disk.
+func (a *App) ExportVault(password string) (string, error) {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	if err := a.requireVault(); err != nil {
+		return "", err
+	}
+	timestamp := time.Now().Format("2006-01-02_150405")
+	defaultName := fmt.Sprintf("%s-%s.rockion", a.vault.Info().Name, timestamp)
+	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		DefaultFilename: defaultName,
+		Title:           "Export encrypted Rockion vault",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "Rockion Vault Archive (*.rockion)", Pattern: "*.rockion"},
+		},
+	})
+	if err != nil || path == "" {
+		return path, err
+	}
+	if !strings.EqualFold(filepath.Ext(path), ".rockion") {
+		path += ".rockion"
+	}
+	if err := vaultbackup.Export(a.vault.Root, path, password); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+// PickVaultImportArchive prompts for the encrypted archive to restore.
+func (a *App) PickVaultImportArchive() (string, error) {
+	return runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "Choose an encrypted Rockion vault",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "Rockion Vault Archive (*.rockion)", Pattern: "*.rockion"},
+		},
+	})
+}
+
+// ImportVault decrypts an archive into a newly created folder and opens it.
+func (a *App) ImportVault(archivePath, password string) (model.VaultInfo, error) {
+	if strings.TrimSpace(archivePath) == "" {
+		return model.VaultInfo{}, errors.New("no archive selected")
+	}
+	parent, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "Choose where to restore the imported vault",
+	})
+	if err != nil {
+		return model.VaultInfo{}, err
+	}
+	if parent == "" {
+		return model.VaultInfo{}, errors.New("no restore location selected")
+	}
+	path, err := vaultbackup.Import(archivePath, parent, password)
+	if err != nil {
+		return model.VaultInfo{}, err
+	}
+	info, err := a.OpenVault(path)
+	if err != nil {
+		return model.VaultInfo{}, fmt.Errorf("vault restored to %s but could not be opened: %w", path, err)
+	}
+	return info, nil
 }
 
 // --- File watching: reflect external edits (Obsidian, git, etc.) ---

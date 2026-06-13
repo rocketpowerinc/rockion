@@ -72,6 +72,10 @@ export const api = {
   saveImage: (name: string, data: number[]): Promise<string> => App.SaveImage(name, data),
   // SaveFile opens a native save dialog and writes content; returns chosen path ("" if cancelled).
   saveFile: (name: string, content: string): Promise<string> => App.SaveFile(name, content),
+  exportVault: (password: string): Promise<string> => App.ExportVault(password),
+  pickVaultImportArchive: (): Promise<string> => App.PickVaultImportArchive(),
+  importVault: (archivePath: string, password: string): Promise<VaultInfo> =>
+    App.ImportVault(archivePath, password),
   // SetNoteIcon stores an emoji icon for a note ("" clears it).
   setNoteIcon: (path: string, icon: string): Promise<void> => App.SetNoteIcon(path, icon),
   checkForUpdates: (): Promise<UpdateInfo> => App.CheckForUpdates(),

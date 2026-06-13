@@ -4,6 +4,7 @@ import Editor, { type EditorHandle } from "./components/Editor";
 import Backlinks from "./components/Backlinks";
 import QuickSwitcher from "./components/QuickSwitcher";
 import NewPageModal from "./components/NewPageModal";
+import VaultTransferModal from "./components/VaultTransferModal";
 import {
   api,
   onBeforeClose,
@@ -25,6 +26,9 @@ export default function App() {
   const [note, setNote] = useState<Note | null>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [newPageDir, setNewPageDir] = useState<string | null>(null);
+  const [vaultTransfer, setVaultTransfer] = useState<
+    { mode: "export" } | { mode: "import"; archivePath: string } | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
   const editorRef = useRef<EditorHandle>(null);
   const closing = useRef(false);
@@ -160,6 +164,44 @@ export default function App() {
     }
   }, [flushEditor]);
 
+  const beginVaultExport = useCallback(async () => {
+    if (!(await flushEditor())) return;
+    setVaultTransfer({ mode: "export" });
+  }, [flushEditor]);
+
+  const beginVaultImport = useCallback(async () => {
+    if (!(await flushEditor())) return;
+    try {
+      const archivePath = await api.pickVaultImportArchive();
+      if (archivePath) {
+        setVaultTransfer({ mode: "import", archivePath });
+      }
+    } catch (reason) {
+      setError(`Couldn't select vault archive: ${String(reason)}`);
+    }
+  }, [flushEditor]);
+
+  const submitVaultTransfer = useCallback(
+    async (password: string) => {
+      if (!vaultTransfer) return;
+      if (vaultTransfer.mode === "export") {
+        const path = await api.exportVault(password);
+        setVaultTransfer(null);
+        if (path) {
+          window.alert(`Encrypted vault exported to:\n${path}`);
+        }
+        return;
+      }
+      const info = await api.importVault(vaultTransfer.archivePath, password);
+      setVault(info);
+      setNote(null);
+      setVaultTransfer(null);
+      setError(null);
+      await refreshTree();
+    },
+    [refreshTree, vaultTransfer]
+  );
+
   const openNote = useCallback(async (path: string) => {
     if (note?.path === path) return;
     if (!(await flushEditor())) return;
@@ -271,6 +313,8 @@ export default function App() {
           setWritingLanguage((current) => (current === "en-US" ? "fr-FR" : "en-US"))
         }
         onCheckForUpdate={checkForUpdate}
+        onExportVault={beginVaultExport}
+        onImportVault={beginVaultImport}
       />
       <main className="main">
         <Editor
@@ -298,6 +342,13 @@ export default function App() {
       />
       {newPageDir !== null && (
         <NewPageModal onSubmit={createPage} onClose={() => setNewPageDir(null)} />
+      )}
+      {vaultTransfer && (
+        <VaultTransferModal
+          mode={vaultTransfer.mode}
+          onSubmit={submitVaultTransfer}
+          onClose={() => setVaultTransfer(null)}
+        />
       )}
     </div>
   );

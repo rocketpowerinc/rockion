@@ -5,6 +5,14 @@ All notable changes to Rockion are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [0.1.12] - 2026-06-13
+
+### Added
+- Add password-protected vault export and import from the Settings menu. Exports
+  are timestamped `.rockion` archives encrypted with scrypt and chunked
+  AES-256-GCM; imports verify integrity, restore into a new folder, and open the
+  restored vault automatically.
+
 ## [0.1.11] - 2026-06-13
 
 - Fixed Enter being swallowed after slash-prefixed text when no slash command matches.
@@ -164,3 +172,4 @@ First release. A working local-first markdown editor: Notion-style UI over plain
 [0.1.9]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.9
 [0.1.10]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.10
 [0.1.11]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.11
+[0.1.12]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.12

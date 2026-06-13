@@ -18,6 +18,8 @@ interface Props {
   onToggleTheme: () => void;
   onToggleWritingLanguage: () => void;
   onCheckForUpdate: () => Promise<void>;
+  onExportVault: () => Promise<void>;
+  onImportVault: () => Promise<void>;
 }
 
 export default function Sidebar({
@@ -33,6 +35,8 @@ export default function Sidebar({
   onToggleTheme,
   onToggleWritingLanguage,
   onCheckForUpdate,
+  onExportVault,
+  onImportVault,
 }: Props) {
   const items = Array.isArray(tree) ? tree : [];
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -113,6 +117,24 @@ export default function Sidebar({
               }}
             >
               <span>Open a New Vault</span>
+            </button>
+            <button
+              role="menuitem"
+              onClick={() => {
+                setSettingsOpen(false);
+                void onExportVault();
+              }}
+            >
+              <span>Export Encrypted Vault</span>
+            </button>
+            <button
+              role="menuitem"
+              onClick={() => {
+                setSettingsOpen(false);
+                void onImportVault();
+              }}
+            >
+              <span>Import Encrypted Vault</span>
             </button>
             <button
               role="menuitem"

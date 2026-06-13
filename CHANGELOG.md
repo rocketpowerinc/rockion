@@ -5,8 +5,11 @@ All notable changes to Rockion are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-06-12
+
 ### Fixed
 - Bundle WebKitGTK helper processes and font dependencies inside Linux AppImages, and resolve helpers from the AppImage at runtime.
+- Launch the AppImage from its mounted application directory so WebKit can start its bundled helper processes.
 - Validate the Ubuntu AppImage through an untagged GitHub Actions preflight before creating release tags.
 - Simplify releases to Windows x64, macOS Apple Silicon, and an x64 AppImage tested on Ubuntu 26.04.
 
@@ -94,3 +97,4 @@ First release. A working local-first markdown editor: Notion-style UI over plain
 [0.1.5]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.5
 [0.1.6]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.6
 [0.1.7]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.7
+[0.1.8]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.8

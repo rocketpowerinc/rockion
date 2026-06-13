@@ -183,6 +183,7 @@ jobs:
           test -f squashfs-root/usr/lib/libfreetype.so.6
           test -f squashfs-root/usr/lib/libfribidi.so.0
           test -f squashfs-root/usr/lib/libharfbuzz.so.0
+          grep -Fqx 'cd "$APPDIR"' squashfs-root/apprun-hooks/rockion-webkit.sh
           find squashfs-root -name libwebkit2gtk-4.0.so.37 -print -quit | grep -q .
 
           set +e
@@ -245,6 +246,7 @@ jobs:
           test -f squashfs-root/usr/lib/libfreetype.so.6
           test -f squashfs-root/usr/lib/libfribidi.so.0
           test -f squashfs-root/usr/lib/libharfbuzz.so.0
+          grep -Fqx 'cd "$APPDIR"' squashfs-root/apprun-hooks/rockion-webkit.sh
           find squashfs-root -name libwebkit2gtk-4.0.so.37 -print -quit | grep -q .
 
           set +e

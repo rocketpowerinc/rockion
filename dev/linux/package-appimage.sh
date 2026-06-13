@@ -143,6 +143,7 @@ mkdir -p "$(dirname "$webkit_hook")"
 cat > "$webkit_hook" <<'HOOK'
 #!/usr/bin/env bash
 export WEBKIT_INJECTED_BUNDLE_PATH="$APPDIR/usr/lib/libwebkit2gtkinjectedbundle.so"
+cd "$APPDIR"
 HOOK
 chmod 0755 "$webkit_hook"
 
@@ -153,12 +154,14 @@ for required_file in \
   "$appdir/usr/lib/libfontconfig.so.1" \
   "$appdir/usr/lib/libfreetype.so.6" \
   "$appdir/usr/lib/libfribidi.so.0" \
-  "$appdir/usr/lib/libharfbuzz.so.0"; do
+  "$appdir/usr/lib/libharfbuzz.so.0" \
+  "$webkit_hook"; do
   if [[ ! -e "$required_file" ]]; then
     echo "Required AppImage runtime file was not bundled: $required_file" >&2
     exit 1
   fi
 done
+grep -Fqx 'cd "$APPDIR"' "$webkit_hook"
 
 PATH="$tools_dir:$PATH" \
 OUTPUT="$output_name" \

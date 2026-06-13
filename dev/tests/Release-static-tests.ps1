@@ -105,6 +105,7 @@ foreach ($requiredText in @(
     'libegl1 libgl1 libgles2',
     'squashfs-root/usr/bin/WebKitNetworkProcess',
     'squashfs-root/usr/lib/libharfbuzz.so.0',
+    "grep -Fqx 'cd `"`$APPDIR`"' squashfs-root/apprun-hooks/rockion-webkit.sh",
     'xvfb-run',
     'linux-compatibility',
     'choco install nsis',
@@ -219,6 +220,7 @@ foreach ($requiredText in @(
     '--executable "$webkit_network_process"',
     'patch-webkit-helper-path.py',
     'WEBKIT_INJECTED_BUNDLE_PATH',
+    'cd "$APPDIR"',
     '--plugin gtk',
     '--output appimage'
 )) {

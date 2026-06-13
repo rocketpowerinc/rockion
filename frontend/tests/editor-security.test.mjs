@@ -7,6 +7,7 @@ import { shouldHandleSlashMenuKey } from "../src/editor/slashMenuKeys.mjs";
 import nspell from "nspell";
 import englishDictionary from "dictionary-en";
 import frenchDictionary from "dictionary-fr";
+import { isMarkdownAutoLink, shouldAutoLink } from "../src/editor/linkPolicy.mjs";
 
 test("plain markdown filenames are not fuzzy-linked", () => {
   const source = fs.readFileSync(new URL("../src/editor/extensions.ts", import.meta.url), "utf8");
@@ -14,6 +15,28 @@ test("plain markdown filenames are not fuzzy-linked", () => {
 
   const parser = new MarkdownIt({ html: false, linkify: false });
   assert.equal(parser.render("notes.md"), "<p>notes.md</p>\n");
+  for (const value of [
+    "notes.md",
+    "folder/notes.md",
+    "https://example.com/notes.md",
+    "https://example.md",
+  ]) {
+    assert.equal(isMarkdownAutoLink(value), true, value);
+    assert.equal(shouldAutoLink(value), false, value);
+  }
+  for (const value of ["example.com", "https://example.org", "hello.net/path"]) {
+    assert.equal(shouldAutoLink(value), true, value);
+  }
+});
+
+test("links have a removable context menu", () => {
+  const source = fs.readFileSync(
+    new URL("../src/editor/LinkContextMenu.ts", import.meta.url),
+    "utf8"
+  );
+  assert.match(source, /Remove link/);
+  assert.match(source, /removeMark\(range\.from,\s*range\.to,\s*linkType\)/);
+  assert.match(source, /setMeta\("preventAutolink",\s*true\)/);
 });
 
 test("only local and explicitly embedded image sources are allowed", () => {

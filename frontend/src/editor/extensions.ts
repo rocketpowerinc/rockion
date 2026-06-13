@@ -1,5 +1,4 @@
 import StarterKit from "@tiptap/starter-kit";
-import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import Table from "@tiptap/extension-table";
 import TableRow from "@tiptap/extension-table-row";
@@ -17,6 +16,8 @@ import { AddBlockButton } from "./AddBlockButton";
 import { PageLinkDecorations } from "./PageLinkDecorations";
 import { SafeImage } from "./SafeImage";
 import { Spellcheck } from "./Spellcheck";
+import { AutoLink } from "./AutoLink";
+import { LinkContextMenu } from "./LinkContextMenu";
 
 // The full set of TipTap extensions that make up the Rockion editor.
 export const editorExtensions = [
@@ -36,10 +37,7 @@ export const editorExtensions = [
   TableHeader,
   TableCell,
   SafeImage,
-  // autolink is off: ".md" is a real TLD (Moldova), so linkify would turn any
-  // "word.md" into a web link — and internal page links are themselves *.md.
-  // Links are created explicitly via "/Link to page" or typed [text](url) markdown.
-  Link.configure({ openOnClick: false, autolink: false }),
+  AutoLink,
   // Round-trips the document to/from GitHub-Flavored Markdown on disk.
   Markdown.configure({
     html: false,
@@ -60,5 +58,6 @@ export const editorExtensions = [
   }),
   AddBlockButton,
   PageLinkDecorations,
+  LinkContextMenu,
   Spellcheck,
 ];

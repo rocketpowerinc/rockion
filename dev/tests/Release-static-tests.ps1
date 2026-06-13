@@ -268,6 +268,24 @@ foreach ($requiredText in @(
     }
 }
 
+$windowsInstallerPath = Join-Path $RepoRoot 'build\windows\installer\project.nsi'
+if (-not (Test-Path -LiteralPath $windowsInstallerPath)) {
+    Add-Failure 'Windows installer definition is missing.'
+} else {
+    $windowsInstaller = Get-Content -Raw -LiteralPath $windowsInstallerPath
+    foreach ($requiredText in @(
+        '!define PRODUCT_EXECUTABLE "Rockion.exe"',
+        'InstallDir "$PROGRAMFILES64\${INFO_PRODUCTNAME}"',
+        '!define LEGACY_INSTALL_DIR "$PROGRAMFILES64\Rockion\Rockion"',
+        'ExecWait ''"${LEGACY_INSTALL_DIR}\uninstall.exe" /S''',
+        'RMDir /r "${LEGACY_INSTALL_DIR}"'
+    )) {
+        if (-not $windowsInstaller.Contains($requiredText)) {
+            Add-Failure "Windows installer is missing path migration behavior: $requiredText"
+        }
+    }
+}
+
 $installerChecks = @(
     @{
         Path = 'dev\linux\install-latest.sh'

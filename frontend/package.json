@@ -1,7 +1,7 @@
 {
   "name": "rockion-frontend",
   "private": true,
-  "version": "0.1.10",
+  "version": "0.1.11",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -28,6 +28,7 @@
     "dictionary-en": "^4.0.0",
     "dictionary-fr": "^3.0.0",
     "highlight.js": "^11.9.0",
+    "linkifyjs": "^4.3.2",
     "lowlight": "^3.1.0",
     "nspell": "^2.1.5",
     "react": "^18.3.1",

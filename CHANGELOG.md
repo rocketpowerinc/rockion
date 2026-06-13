@@ -5,14 +5,20 @@ All notable changes to Rockion are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-06-13
+
 - Fixed Enter being swallowed after slash-prefixed text when no slash command matches.
 - Added a persistent English/French writing-language setting backed by bundled
   offline dictionaries, with English as the default. Existing text is reparsed
   immediately, and right-clicking an underlined word shows language-correct
   replacement choices.
+- Restored automatic linking for recognized web addresses and domains while
+  keeping `.md` filenames as plain text. Web links are light blue and include a
+  right-click action to remove the link without deleting its text.
 ### Fixed
 - Install the Windows app into a single `C:\Program Files\Rockion\` folder (was the doubled
   `C:\Program Files\Rockion\Rockion\`) and name the installed executable `Rockion.exe`.
+  The installer now removes the legacy nested installation before upgrading.
 - Name the macOS bundle `Rockion.app` (was lowercase `rockion.app`) so the Dock, Launchpad,
   and Finder all show "Rockion" with a capital R.
 
@@ -155,3 +161,4 @@ First release. A working local-first markdown editor: Notion-style UI over plain
 [0.1.8]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.8
 [0.1.9]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.9
 [0.1.10]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.10
+[0.1.11]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.11

@@ -619,14 +619,18 @@ button.primary,
   color: var(--text-muted);
   font-size: 13px;
 }
-/* Links read as normal text (not blue), no underline, pointer cursor. */
+/* Web links use a restrained Notion-like blue. */
 .rk-prose a {
-  color: var(--text);
+  color: #2f80c9;
   cursor: pointer;
   text-decoration: none;
 }
+.rk-prose a:hover {
+  text-decoration: underline;
+}
 /* Internal page links: tinted hover, paired with the icon + arrow badge widget. */
 .rk-prose a.page-link {
+  color: var(--text);
   border-radius: 4px;
   padding: 0 2px;
   text-decoration: none;
@@ -670,6 +674,34 @@ button.primary,
   background: var(--bg);
   color: var(--text-muted);
   box-shadow: 0 0 0 1px var(--border);
+}
+
+.link-context-menu {
+  position: fixed;
+  z-index: 1001;
+  width: 180px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3);
+}
+
+.link-context-menu button {
+  display: block;
+  width: 100%;
+  padding: 7px 9px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.link-context-menu button:hover {
+  background: var(--hover);
 }
 
 /* image page icons */

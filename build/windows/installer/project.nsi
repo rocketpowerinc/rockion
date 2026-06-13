@@ -27,6 +27,7 @@ Unicode true
 ###
 ## !define PRODUCT_EXECUTABLE  "Application.exe"      # Default "${INFO_PROJECTNAME}.exe"
 !define PRODUCT_EXECUTABLE "Rockion.exe" # Install as Rockion.exe (project name "rockion" would default to lowercase).
+!define LEGACY_INSTALL_DIR "$PROGRAMFILES64\Rockion\Rockion"
 ## !define UNINST_KEY_NAME     "UninstKeyInRegistry"  # Default "${INFO_COMPANYNAME}${INFO_PRODUCTNAME}"
 ####
 ## !define REQUEST_EXECUTION_LEVEL "admin"            # Default "admin"  see also https://nsis.sourceforge.io/Docs/Chapter4.html
@@ -82,6 +83,18 @@ FunctionEnd
 
 Section
     !insertmacro wails.setShellContext
+
+    # Releases through v0.1.10 used Rockion\Rockion with a lowercase executable.
+    # Remove that registered installation before writing the corrected layout.
+    IfFileExists "${LEGACY_INSTALL_DIR}\uninstall.exe" 0 legacy_cleanup_done
+        DetailPrint "Removing legacy Rockion installation..."
+        ExecWait '"${LEGACY_INSTALL_DIR}\uninstall.exe" /S' $0
+        ${If} $0 != 0
+            MessageBox MB_ICONSTOP "Could not remove the old Rockion installation (exit code $0). Close Rockion and try again."
+            Abort
+        ${EndIf}
+        RMDir /r "${LEGACY_INSTALL_DIR}"
+    legacy_cleanup_done:
 
     !insertmacro wails.webview2runtime
 

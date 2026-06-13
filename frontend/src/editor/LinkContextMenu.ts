@@ -1,6 +1,7 @@
 import { Extension, getMarkRange } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
+import { managedPageIDFromHref } from "./pagePaths.mjs";
 
 export const LinkContextMenu = Extension.create({
   name: "rockionLinkContextMenu",
@@ -37,6 +38,7 @@ class LinkMenuView {
     const $pos = this.view.state.doc.resolve(coords.pos);
     const range = getMarkRange($pos, linkType);
     if (!range) return;
+    const href = anchor.getAttribute("href") || "";
 
     event.preventDefault();
     event.stopImmediatePropagation();
@@ -47,21 +49,35 @@ class LinkMenuView {
     menu.style.left = `${Math.min(event.clientX, window.innerWidth - 190)}px`;
     menu.style.top = `${Math.min(event.clientY, window.innerHeight - 48)}px`;
 
-    const remove = document.createElement("button");
-    remove.type = "button";
-    remove.textContent = "Remove link";
-    remove.addEventListener("mousedown", (click) => {
-      click.preventDefault();
-      const { state } = this.view;
-      this.view.dispatch(
-        state.tr
-          .removeMark(range.from, range.to, linkType)
-          .setMeta("preventAutolink", true)
-      );
-      this.view.focus();
-      this.close();
-    });
-    menu.appendChild(remove);
+    if (managedPageIDFromHref(href)) {
+      const removePage = document.createElement("button");
+      removePage.type = "button";
+      removePage.textContent = "Delete linked page";
+      removePage.addEventListener("mousedown", (click) => {
+        click.preventDefault();
+        window.dispatchEvent(
+          new CustomEvent("rockion:delete-managed-page", { detail: href })
+        );
+        this.close();
+      });
+      menu.appendChild(removePage);
+    } else {
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.textContent = "Remove link";
+      remove.addEventListener("mousedown", (click) => {
+        click.preventDefault();
+        const { state } = this.view;
+        this.view.dispatch(
+          state.tr
+            .removeMark(range.from, range.to, linkType)
+            .setMeta("preventAutolink", true)
+        );
+        this.view.focus();
+        this.close();
+      });
+      menu.appendChild(remove);
+    }
     document.body.appendChild(menu);
     this.menu = menu;
 

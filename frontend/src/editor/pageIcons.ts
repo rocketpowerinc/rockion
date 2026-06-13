@@ -2,15 +2,24 @@
 // App keeps this in sync with the vault; the page-link decorations read from it
 // so link icons are resolved live (never baked into the markdown on disk).
 
+import { resolvePageHref } from "./pagePaths.mjs";
+
 let registry: Record<string, string> = {};
+let currentPagePath = "";
 
 export function setPageIcons(map: Record<string, string>) {
   registry = map || {};
 }
 
+export function setCurrentPagePath(path: string) {
+  currentPagePath = path || "";
+}
+
 export function getPageIcon(path: string): string {
   if (!path) return "";
-  return registry[path] || registry[safeDecode(path)] || "";
+  const decoded = safeDecode(path);
+  const resolved = resolvePageHref(currentPagePath, decoded);
+  return registry[path] || registry[decoded] || registry[resolved] || "";
 }
 
 function safeDecode(s: string): string {

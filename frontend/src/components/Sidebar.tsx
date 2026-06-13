@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { TreeNode } from "../api";
 import {
   writingLanguageLabel,
@@ -8,39 +8,47 @@ import {
 interface Props {
   vaultName: string;
   tree: TreeNode[];
+  favorites: TreeNode[];
   error?: string | null;
   theme: "light" | "dark";
   writingLanguage: WritingLanguage;
   activePath: string | null;
   onOpen: (path: string) => void;
-  onNewNote: (dir: string) => void;
+  onNewProject: () => void;
   onOpenVault: () => void;
   onToggleTheme: () => void;
   onToggleWritingLanguage: () => void;
   onCheckForUpdate: () => Promise<void>;
   onExportVault: () => Promise<void>;
   onImportVault: () => Promise<void>;
+  onReorderFavorites: (paths: string[]) => Promise<void>;
 }
 
 export default function Sidebar({
   vaultName,
   tree,
+  favorites,
   error,
   theme,
   writingLanguage,
   activePath,
   onOpen,
-  onNewNote,
+  onNewProject,
   onOpenVault,
   onToggleTheme,
   onToggleWritingLanguage,
   onCheckForUpdate,
   onExportVault,
   onImportVault,
+  onReorderFavorites,
 }: Props) {
   const items = Array.isArray(tree) ? tree : [];
+  const folders = items.filter((item) => item.isDir);
+  const rootNotes = items.filter((item) => !item.isDir);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [unsortedOpen, setUnsortedOpen] = useState(true);
+  const [draggedFavorite, setDraggedFavorite] = useState<string | null>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -78,25 +86,76 @@ export default function Sidebar({
           {vaultName || "Open vault…"}
         </button>
         <div className="sidebar-head-actions">
-          <button className="icon-btn" title="New note" onClick={() => onNewNote("")}>
+          <button className="icon-btn" title="New project" onClick={onNewProject}>
             +
           </button>
         </div>
       </div>
       <nav className="tree">
         {error && <div className="tree-empty tree-error">{error}</div>}
-        {!error && items.length === 0 && (
-          <div className="tree-empty">No markdown files here yet. Click + to create one.</div>
+        <SidebarSection title="Favorites">
+          {favorites.length === 0 && (
+            <div className="sidebar-section-empty">Star a page to keep it here.</div>
+          )}
+          {favorites.map((node) => (
+            <PageRow
+              key={node.path}
+              node={node}
+              activePath={activePath}
+              onOpen={onOpen}
+              favorite
+              draggable
+              dragging={draggedFavorite === node.path}
+              onDragStart={() => setDraggedFavorite(node.path)}
+              onDragEnd={() => setDraggedFavorite(null)}
+              onDrop={() => {
+                if (!draggedFavorite || draggedFavorite === node.path) return;
+                const paths = favorites.map((favorite) => favorite.path);
+                const from = paths.indexOf(draggedFavorite);
+                const to = paths.indexOf(node.path);
+                if (from < 0 || to < 0) return;
+                paths.splice(to, 0, paths.splice(from, 1)[0]);
+                setDraggedFavorite(null);
+                void onReorderFavorites(paths);
+              }}
+            />
+          ))}
+        </SidebarSection>
+        <SidebarSection title="Folders">
+          {!error && folders.length === 0 && (
+            <div className="sidebar-section-empty">Create a folder in the vault to add it here.</div>
+          )}
+          {folders.map((node) => (
+            <button
+              key={node.path}
+              className={`tree-row folder sidebar-row-button ${
+                activePath === node.entryPath ? "is-active" : ""
+              }`}
+              onClick={() => onOpen(node.entryPath || `${node.path}/dashboard.md`)}
+            >
+              <span className="tree-icon">📁</span>
+              <span className="tree-row-label">{node.name}</span>
+            </button>
+          ))}
+        </SidebarSection>
+        {rootNotes.length > 0 && (
+          <SidebarSection
+            title="Unsorted"
+            collapsible
+            open={unsortedOpen}
+            onToggle={() => setUnsortedOpen((open) => !open)}
+          >
+            {unsortedOpen &&
+              rootNotes.map((node) => (
+                <PageRow
+                  key={node.path}
+                  node={node}
+                  activePath={activePath}
+                  onOpen={onOpen}
+                />
+              ))}
+          </SidebarSection>
         )}
-        {items.map((node) => (
-          <TreeItem
-            key={node.path}
-            node={node}
-            depth={0}
-            activePath={activePath}
-            onOpen={onOpen}
-          />
-        ))}
       </nav>
       <div className="sidebar-footer" ref={settingsRef}>
         {settingsOpen && (
@@ -193,56 +252,85 @@ export default function Sidebar({
   );
 }
 
-function TreeItem({
+function SidebarSection({
+  title,
+  children,
+  collapsible = false,
+  open = true,
+  onToggle,
+}: {
+  title: string;
+  children: ReactNode;
+  collapsible?: boolean;
+  open?: boolean;
+  onToggle?: () => void;
+}) {
+  return (
+    <section className="sidebar-section">
+      <button
+        className="sidebar-section-title"
+        disabled={!collapsible}
+        onClick={onToggle}
+      >
+        {collapsible && <span className="sidebar-section-chevron">{open ? "▾" : "▸"}</span>}
+        {title}
+      </button>
+      {(!collapsible || open) && children}
+    </section>
+  );
+}
+
+function PageRow({
   node,
-  depth,
   activePath,
   onOpen,
+  favorite = false,
+  draggable = false,
+  dragging = false,
+  onDragStart,
+  onDragEnd,
+  onDrop,
 }: {
   node: TreeNode;
-  depth: number;
   activePath: string | null;
   onOpen: (path: string) => void;
+  favorite?: boolean;
+  draggable?: boolean;
+  dragging?: boolean;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
+  onDrop?: () => void;
 }) {
-  const [open, setOpen] = useState(depth < 1);
-
-  if (node.isDir) {
-    return (
-      <div>
-        <div
-          className="tree-row folder"
-          style={{ paddingLeft: 8 + depth * 14 }}
-          onClick={() => setOpen((o) => !o)}
-        >
-          <span className="chevron">{open ? "▾" : "▸"}</span>
-          {node.name}
-        </div>
-        {open &&
-          node.children?.map((c) => (
-            <TreeItem
-              key={c.path}
-              node={c}
-              depth={depth + 1}
-              activePath={activePath}
-              onOpen={onOpen}
-            />
-          ))}
-      </div>
-    );
-  }
-
   return (
-    <div
-      className={`tree-row file ${activePath === node.path ? "is-active" : ""}`}
-      style={{ paddingLeft: 8 + depth * 14 + 14 }}
+    <button
+      className={`tree-row file sidebar-row-button ${activePath === node.path ? "is-active" : ""} ${
+        dragging ? "is-dragging" : ""
+      }`}
       onClick={() => onOpen(node.path)}
+      draggable={draggable}
+      onDragStart={(event) => {
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", node.path);
+        onDragStart?.();
+      }}
+      onDragEnd={onDragEnd}
+      onDragOver={(event) => {
+        if (!draggable) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        onDrop?.();
+      }}
     >
+      {favorite && <span className="favorite-drag-handle" aria-hidden="true">⋮⋮</span>}
       {node.icon && node.icon.startsWith("data:") ? (
         <img className="tree-icon-img" src={node.icon} alt="" />
       ) : (
         <span className="tree-icon">{node.icon || "📄"}</span>
       )}
-      {node.name}
-    </div>
+      <span className="tree-row-label">{node.name}</span>
+    </button>
   );
 }

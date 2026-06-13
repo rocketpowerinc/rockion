@@ -12,6 +12,13 @@ import {
   markdownFilenameRanges,
   shouldAutoLink,
 } from "../src/editor/linkPolicy.mjs";
+import {
+  managedPageHref,
+  managedPageIDFromHref,
+  pageDirectory,
+  relativePageHref,
+  resolvePageHref,
+} from "../src/editor/pagePaths.mjs";
 
 test("plain markdown filenames are not fuzzy-linked", () => {
   const source = fs.readFileSync(new URL("../src/editor/extensions.ts", import.meta.url), "utf8");
@@ -46,6 +53,8 @@ test("links have a removable context menu", () => {
     "utf8"
   );
   assert.match(source, /Remove link/);
+  assert.match(source, /Delete linked page/);
+  assert.match(source, /rockion:delete-managed-page/);
   assert.match(source, /removeMark\(range\.from,\s*range\.to,\s*linkType\)/);
   assert.match(source, /setMeta\("preventAutolink",\s*true\)/);
 });
@@ -106,4 +115,49 @@ test("offline dictionaries switch between English and French", () => {
   assert.equal(english.correct("maison"), false);
   assert.equal(french.correct("maison"), true);
   assert.ok(french.suggest("maizon").includes("maison"));
+});
+
+test("sub-pages use portable relative markdown links", () => {
+  assert.equal(pageDirectory("Projects/dashboard.md"), "Projects");
+  assert.equal(
+    relativePageHref("Projects/dashboard.md", "Projects/New Page.md"),
+    "New Page.md"
+  );
+  assert.equal(
+    resolvePageHref("Projects/dashboard.md", "New%20Page.md"),
+    "Projects/New Page.md"
+  );
+  assert.equal(
+    relativePageHref("Projects/dashboard.md", "Reference/Other.md"),
+    "../Reference/Other.md"
+  );
+  const managed = managedPageHref(
+    "Projects/dashboard.md",
+    "Projects/New Page.md",
+    "page-id",
+    "New Page"
+  );
+  assert.match(managed, /^New Page\.md\?/);
+  assert.equal(managedPageIDFromHref(managed), "page-id");
+});
+
+test("the slash menu includes new sub-page creation", () => {
+  const source = fs.readFileSync(
+    new URL("../src/editor/slashItems.ts", import.meta.url),
+    "utf8"
+  );
+  assert.match(source, /title:\s*"New sub-page"/);
+  assert.match(source, /rockion:new-sub-page/);
+});
+
+test("the sidebar plus button creates projects rather than root notes", () => {
+  const app = fs.readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
+  const sidebar = fs.readFileSync(
+    new URL("../src/components/Sidebar.tsx", import.meta.url),
+    "utf8"
+  );
+  assert.match(sidebar, /title="New project"/);
+  assert.match(sidebar, /onClick=\{onNewProject\}/);
+  assert.match(app, /api\.createProject\(trimmed\)/);
+  assert.doesNotMatch(app, /setNewPageDir/);
 });

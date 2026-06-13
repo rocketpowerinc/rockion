@@ -120,6 +120,12 @@ func (a *App) OpenVault(path string) (model.VaultInfo, error) {
 	if err != nil {
 		return model.VaultInfo{}, err
 	}
+	if err := v.EnsureRootDashboards(); err != nil {
+		return model.VaultInfo{}, fmt.Errorf("create folder dashboards: %w", err)
+	}
+	if err := v.EnsureManagedDashboards(); err != nil {
+		return model.VaultInfo{}, fmt.Errorf("prepare managed project pages: %w", err)
+	}
 	d, err := db.Open(path)
 	if err != nil {
 		return model.VaultInfo{}, err
@@ -165,12 +171,48 @@ func (a *App) requireVault() error {
 }
 
 func (a *App) ListTree() ([]model.TreeNode, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if err := a.requireVault(); err != nil {
+		return nil, err
+	}
+	return a.vault.SidebarTree()
+}
+
+func (a *App) ListPages() ([]model.TreeNode, error) {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	if err := a.requireVault(); err != nil {
 		return nil, err
 	}
-	return a.vault.Tree()
+	return a.vault.Pages()
+}
+
+func (a *App) ListFavorites() ([]model.TreeNode, error) {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	if err := a.requireVault(); err != nil {
+		return nil, err
+	}
+	return a.vault.Favorites()
+}
+
+func (a *App) SetFavorite(path string, favorite bool) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if err := a.requireVault(); err != nil {
+		return err
+	}
+	return a.vault.SetFavorite(path, favorite)
+}
+
+func (a *App) ReorderFavorites(paths []string) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if err := a.requireVault(); err != nil {
+		return err
+	}
+	return a.vault.ReorderFavorites(paths)
 }
 
 func (a *App) ReadNote(path string) (model.Note, error) {
@@ -194,6 +236,9 @@ func (a *App) WriteNote(path, markdown, expectedVersion string) (model.Note, err
 		}
 		return model.Note{}, err
 	}
+	if _, err := a.vault.NormalizeManagedDashboard(path); err != nil {
+		return model.Note{}, fmt.Errorf("normalize managed dashboard links: %w", err)
+	}
 	saved, err := a.vault.Read(path)
 	if err != nil {
 		return model.Note{}, err
@@ -204,18 +249,39 @@ func (a *App) WriteNote(path, markdown, expectedVersion string) (model.Note, err
 	return saved, nil
 }
 
-func (a *App) CreateNote(dir, title string) (model.Note, error) {
+func (a *App) CreateSubPage(dashboardPath, title string) (model.Note, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if err := a.requireVault(); err != nil {
 		return model.Note{}, err
 	}
-	note, err := a.vault.Create(dir, title)
+	note, err := a.vault.CreateManagedPage(dashboardPath, title)
 	if err != nil {
 		return model.Note{}, err
 	}
 	if err := a.indexer.IndexFile(note.Path); err != nil {
 		runtime.LogErrorf(a.ctx, "index created note failed: %v", err)
+	}
+	return note, nil
+}
+
+func (a *App) CreateProject(title string) (model.Note, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if err := a.requireVault(); err != nil {
+		return model.Note{}, err
+	}
+	note, err := a.vault.CreateProject(title)
+	if err != nil {
+		return model.Note{}, err
+	}
+	if a.watcher != nil {
+		if err := addWatchDirs(a.watcher, filepath.Join(a.vault.Root, filepath.Dir(filepath.FromSlash(note.Path)))); err != nil {
+			runtime.LogErrorf(a.ctx, "watch new project failed: %v", err)
+		}
+	}
+	if err := a.indexer.IndexFile(note.Path); err != nil {
+		runtime.LogErrorf(a.ctx, "index project dashboard failed: %v", err)
 	}
 	return note, nil
 }
@@ -245,6 +311,9 @@ func (a *App) renamePathLocked(oldPath, newPath string) error {
 	if err := a.vault.RenameIconPath(oldPath, newPath, isDir); err != nil {
 		followUpErrs = append(followUpErrs, fmt.Errorf("rename icon metadata: %w", err))
 	}
+	if err := a.vault.RenameFavoritePath(oldPath, newPath, isDir); err != nil {
+		followUpErrs = append(followUpErrs, fmt.Errorf("rename favorite metadata: %w", err))
+	}
 	rewritten, rewriteErr := a.vault.RewriteLinksAfterRename(
 		oldPath,
 		newPath,
@@ -253,6 +322,14 @@ func (a *App) renamePathLocked(oldPath, newPath string) error {
 	)
 	if rewriteErr != nil {
 		followUpErrs = append(followUpErrs, fmt.Errorf("rewrite links: %w", rewriteErr))
+	}
+	if !isDir {
+		dashboardPath, changed, err := a.vault.NormalizeDashboardForPage(newPath)
+		if err != nil {
+			followUpErrs = append(followUpErrs, fmt.Errorf("update managed dashboard link: %w", err))
+		} else if changed {
+			rewritten = append(rewritten, dashboardPath)
+		}
 	}
 	if err := a.indexer.ApplyRename(oldPath, newPath, isDir, rewritten); err != nil {
 		followUpErrs = append(followUpErrs, fmt.Errorf("update index: %w", err))
@@ -268,6 +345,9 @@ func (a *App) RenameToTitle(path, title string) (model.Note, error) {
 	if err := a.requireVault(); err != nil {
 		return model.Note{}, err
 	}
+	if strings.EqualFold(filepath.Base(filepath.FromSlash(path)), "dashboard.md") {
+		return a.vault.Read(path)
+	}
 	newRel, changed, err := a.vault.PlanTitleRename(path, title)
 	if err != nil {
 		return model.Note{}, err
@@ -277,6 +357,16 @@ func (a *App) RenameToTitle(path, title string) (model.Note, error) {
 			return model.Note{}, err
 		}
 		path = newRel
+	} else {
+		dashboardPath, dashboardChanged, err := a.vault.NormalizeDashboardForPage(path)
+		if err != nil {
+			return model.Note{}, fmt.Errorf("update managed dashboard link: %w", err)
+		}
+		if dashboardChanged && a.indexer != nil {
+			if err := a.indexer.IndexFile(dashboardPath); err != nil {
+				return model.Note{}, fmt.Errorf("index updated dashboard: %w", err)
+			}
+		}
 	}
 	return a.vault.Read(path)
 }
@@ -286,6 +376,10 @@ func (a *App) DeletePath(path string) error {
 	defer a.mu.Unlock()
 	if err := a.requireVault(); err != nil {
 		return err
+	}
+	clean := filepath.ToSlash(filepath.Clean(filepath.FromSlash(path)))
+	if filepath.Dir(filepath.FromSlash(clean)) != "." && !vault.IsDashboardPath(clean) {
+		return errors.New("project pages must be deleted from their dashboard link")
 	}
 	isDir, err := a.vault.IsDir(path)
 	if err != nil {
@@ -298,10 +392,47 @@ func (a *App) DeletePath(path string) error {
 	if err := a.vault.RemoveIconPath(path, isDir); err != nil {
 		followUpErrs = append(followUpErrs, fmt.Errorf("remove icon metadata: %w", err))
 	}
+	if err := a.vault.RemoveFavoritePath(path, isDir); err != nil {
+		followUpErrs = append(followUpErrs, fmt.Errorf("remove favorite metadata: %w", err))
+	}
 	if err := a.indexer.RemovePath(path); err != nil {
 		followUpErrs = append(followUpErrs, fmt.Errorf("remove index path: %w", err))
 	}
 	return errors.Join(followUpErrs...)
+}
+
+func (a *App) DeleteManagedPage(
+	dashboardPath, href, expectedVersion string,
+) (model.Note, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if err := a.requireVault(); err != nil {
+		return model.Note{}, err
+	}
+	result, err := a.vault.DeleteManagedPage(dashboardPath, href, expectedVersion)
+	if err != nil {
+		if errors.Is(err, vault.ErrConflict) {
+			return model.Note{}, fmt.Errorf("conflict: %w", err)
+		}
+		return model.Note{}, err
+	}
+	var followUpErrs []error
+	if err := a.vault.RemoveIconPath(result.DeletedPath, false); err != nil {
+		followUpErrs = append(followUpErrs, fmt.Errorf("remove icon metadata: %w", err))
+	}
+	if err := a.vault.RemoveFavoritePath(result.DeletedPath, false); err != nil {
+		followUpErrs = append(followUpErrs, fmt.Errorf("remove favorite metadata: %w", err))
+	}
+	if err := a.indexer.RemovePath(result.DeletedPath); err != nil {
+		followUpErrs = append(followUpErrs, fmt.Errorf("remove deleted page from index: %w", err))
+	}
+	if err := a.indexer.IndexFile(dashboardPath); err != nil {
+		followUpErrs = append(followUpErrs, fmt.Errorf("index updated dashboard: %w", err))
+	}
+	if err := errors.Join(followUpErrs...); err != nil {
+		return result.Dashboard, err
+	}
+	return result.Dashboard, nil
 }
 
 func (a *App) Search(query string, limit int) ([]model.SearchHit, error) {

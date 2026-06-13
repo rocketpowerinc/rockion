@@ -122,13 +122,22 @@ PickVault() (VaultInfo, error)            // native folder dialog
 ListTree() ([]TreeNode, error)
 ReadNote(path string) (Note, error)        // returns markdown + parsed frontmatter
 WriteNote(path, markdown, version string) (Note, error) // conflict-checked autosave
-CreateNote(dir, title string) (Note, error)
+CreateProject(title string) (Note, error)    // root folder + dashboard.md
+CreateSubPage(dashboard, title string) (Note, error) // managed project page
 RenamePath(old, new string) error          // updates links, icons, and index
 DeletePath(path string) error
+DeleteManagedPage(dashboard, href, version string) (Note, error)
 Search(query string, limit int) ([]SearchHit, error)
 Backlinks(path string) ([]SearchHit, error)
 SaveImage(path string, data []byte) (string, error)  // returns vault-relative asset path
 ```
+
+Project pages remain ordinary Markdown files. Rockion stores a stable
+`rockion_id` in each page's YAML frontmatter and adds that ID to its dashboard
+link query. This lets links follow title and filename changes without a
+proprietary dashboard format. Custom link labels remain unchanged. Removing a
+managed link in the editor restores it on save; deleting its linked page uses
+the dashboard link's context menu so the link and file are removed together.
 
 Events emitted Go → JS: `vault:changed` (file changed externally), `index:progress`.
 

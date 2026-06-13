@@ -23,9 +23,11 @@ import {
 export default function App() {
   const [vault, setVault] = useState<VaultInfo | null>(null);
   const [tree, setTree] = useState<TreeNode[]>([]);
+  const [pages, setPages] = useState<TreeNode[]>([]);
+  const [favorites, setFavorites] = useState<TreeNode[]>([]);
   const [note, setNote] = useState<Note | null>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
-  const [newPageDir, setNewPageDir] = useState<string | null>(null);
+  const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [vaultTransfer, setVaultTransfer] = useState<
     { mode: "export" } | { mode: "import"; archivePath: string } | null
   >(null);
@@ -74,37 +76,69 @@ export default function App() {
     return (await editorRef.current?.flushSave()) ?? true;
   }, []);
 
-  // Flatten the tree into a list of pages for the "link to page" picker.
-  const pages = useMemo(() => {
-    const out: { path: string; title: string; icon?: string }[] = [];
-    const walk = (nodes: TreeNode[]) => {
-      for (const n of nodes) {
-        if (n.isDir) walk(n.children ?? []);
-        else out.push({ path: n.path, title: n.name, icon: n.icon });
-      }
-    };
-    walk(Array.isArray(tree) ? tree : []);
-    return out;
-  }, [tree]);
+  const pageRefs = useMemo(
+    () =>
+      pages.map((page) => ({
+        path: page.path,
+        title: page.name,
+        icon: page.icon,
+      })),
+    [pages]
+  );
 
   // Keep the page-link icon registry in sync so link icons resolve live.
   useEffect(() => {
     const map: Record<string, string> = {};
-    for (const p of pages) map[p.path] = p.icon || "";
+    for (const p of pageRefs) map[p.path] = p.icon || "";
     setPageIcons(map);
-  }, [pages]);
+  }, [pageRefs]);
 
   const refreshTree = useCallback(async () => {
     try {
-      const t = await api.listTree();
+      const [t, allPages, savedFavorites] = await Promise.all([
+        api.listTree(),
+        api.listPages(),
+        api.listFavorites(),
+      ]);
       setTree(Array.isArray(t) ? t : []);
+      setPages(Array.isArray(allPages) ? allPages : []);
+      setFavorites(Array.isArray(savedFavorites) ? savedFavorites : []);
       setError(null);
     } catch (e) {
       console.error("listTree failed:", e);
       setError(`Couldn't load files: ${String(e)}`);
       setTree([]);
+      setPages([]);
+      setFavorites([]);
     }
   }, []);
+
+  const toggleFavorite = useCallback(
+    async (path: string) => {
+      try {
+        const favorite = favorites.some((item) => item.path === path);
+        await api.setFavorite(path, !favorite);
+        await refreshTree();
+      } catch (reason) {
+        setError(`Couldn't update Favorites: ${String(reason)}`);
+      }
+    },
+    [favorites, refreshTree]
+  );
+
+  const reorderFavorites = useCallback(
+    async (paths: string[]) => {
+      const byPath = new Map(favorites.map((item) => [item.path, item]));
+      setFavorites(paths.map((path) => byPath.get(path)).filter(Boolean) as TreeNode[]);
+      try {
+        await api.reorderFavorites(paths);
+      } catch (reason) {
+        await refreshTree();
+        setError(`Couldn't reorder favorites: ${String(reason)}`);
+      }
+    },
+    [favorites, refreshTree]
+  );
 
   // Set/clear a page's emoji icon.
   const setIcon = useCallback(
@@ -213,33 +247,27 @@ export default function App() {
     }
   }, [flushEditor, note?.path]);
 
-  // Open the in-app new-page prompt. (Native window.prompt returns null on
-  // macOS under Wails, so a real modal is used instead.)
-  const newNote = useCallback(
-    async (dir: string) => {
-      if (!(await flushEditor())) return;
-      setNewPageDir(dir);
-    },
-    [flushEditor]
-  );
+  const newProject = useCallback(async () => {
+    if (!(await flushEditor())) return;
+    setNewProjectOpen(true);
+  }, [flushEditor]);
 
-  const createPage = useCallback(
+  const createProject = useCallback(
     async (title: string) => {
-      const dir = newPageDir ?? "";
       const trimmed = title.trim();
       if (!trimmed) return;
       try {
-        const created = await api.createNote(dir, trimmed);
-        setNewPageDir(null);
+        const dashboard = await api.createProject(trimmed);
+        setNewProjectOpen(false);
         await refreshTree();
-        setNote(created);
+        setNote(dashboard);
         setError(null);
       } catch (e) {
-        // Keep the modal open so the user can pick a different title.
-        setError(`Couldn't create note: ${String(e)}`);
+        setError(`Couldn't create project: ${String(e)}`);
+        throw e;
       }
     },
-    [newPageDir, refreshTree]
+    [refreshTree]
   );
 
   // Global keyboard shortcuts.
@@ -251,12 +279,12 @@ export default function App() {
         setSwitcherOpen(true);
       } else if (mod && (e.key === "n" || e.key === "N")) {
         e.preventDefault();
-        void newNote("");
+        void newProject();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [newNote]);
+  }, [newProject]);
 
   // React to external vault changes and index readiness.
   useEffect(() => {
@@ -301,12 +329,13 @@ export default function App() {
       <Sidebar
         vaultName={vault.name}
         tree={tree}
+        favorites={favorites}
         error={error}
         theme={theme}
         writingLanguage={writingLanguage}
         activePath={note?.path ?? null}
         onOpen={openNote}
-        onNewNote={newNote}
+        onNewProject={newProject}
         onOpenVault={openVault}
         onToggleTheme={toggleTheme}
         onToggleWritingLanguage={() =>
@@ -315,16 +344,19 @@ export default function App() {
         onCheckForUpdate={checkForUpdate}
         onExportVault={beginVaultExport}
         onImportVault={beginVaultImport}
+        onReorderFavorites={reorderFavorites}
       />
       <main className="main">
         <Editor
           ref={editorRef}
           note={note}
           writingLanguage={writingLanguage}
-          pages={pages}
-          onDirtySaved={refreshTree}
+          pages={pageRefs}
+          isFavorite={favorites.some((favorite) => favorite.path === note?.path)}
+          onPageCreated={refreshTree}
           onOpenLink={openNote}
           onSetIcon={setIcon}
+          onToggleFavorite={toggleFavorite}
           onNoteUpdated={(updated) =>
             setNote((current) => (current?.path === updated.path ? updated : current))
           }
@@ -340,8 +372,12 @@ export default function App() {
         onClose={() => setSwitcherOpen(false)}
         onOpen={openNote}
       />
-      {newPageDir !== null && (
-        <NewPageModal onSubmit={createPage} onClose={() => setNewPageDir(null)} />
+      {newProjectOpen && (
+        <NewPageModal
+          itemName="project"
+          onSubmit={createProject}
+          onClose={() => setNewProjectOpen(false)}
+        />
       )}
       {vaultTransfer && (
         <VaultTransferModal

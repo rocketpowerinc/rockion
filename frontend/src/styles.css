@@ -153,6 +153,39 @@ button.primary,
   padding-bottom: 12px;
   font-size: 14px;
 }
+.sidebar-section {
+  margin: 2px 0 12px;
+}
+.sidebar-section-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 4px 12px;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: left;
+  text-transform: uppercase;
+}
+.sidebar-section-title:not(:disabled) {
+  cursor: pointer;
+}
+.sidebar-section-title:disabled {
+  opacity: 1;
+}
+.sidebar-section-chevron {
+  width: 10px;
+}
+.sidebar-section-empty {
+  padding: 4px 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
 .sidebar-footer {
   position: relative;
   flex: 0 0 auto;
@@ -243,6 +276,11 @@ button.primary,
   color: #dc2626;
   font-size: 12px;
 }
+.new-item-error {
+  margin-top: 10px;
+  color: #dc2626;
+  font-size: 12px;
+}
 .settings-menu button {
   display: flex;
   align-items: center;
@@ -280,6 +318,31 @@ button.primary,
   margin: 0 6px;
   color: var(--text);
 }
+.sidebar-row-button {
+  display: flex;
+  align-items: center;
+  width: calc(100% - 12px);
+  border: none;
+  background: none;
+  font: inherit;
+  text-align: left;
+}
+.tree-row-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.favorite-drag-handle {
+  flex: 0 0 auto;
+  width: 18px;
+  color: var(--text-muted);
+  cursor: grab;
+  font-size: 11px;
+  letter-spacing: -3px;
+}
+.tree-row.is-dragging {
+  opacity: 0.45;
+}
 .tree-row:hover {
   background: var(--hover);
 }
@@ -309,6 +372,28 @@ button.primary,
   max-width: 740px;
   margin: 0 auto;
   padding: 44px 56px 0;
+}
+.favorite-button {
+  position: absolute;
+  top: 48px;
+  right: 56px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 24px;
+  line-height: 1;
+}
+.favorite-button:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.favorite-button.is-favorite {
+  color: #e6a700;
 }
 .page-header + .editor-wrap {
   padding-top: 10px;

@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"gopkg.in/yaml.v3"
 
@@ -27,8 +28,9 @@ const maxNoteBytes = 32 << 20
 
 // Vault is an opened folder of markdown files.
 type Vault struct {
-	Root    string
-	iconsMu sync.Mutex
+	Root      string
+	iconsMu   sync.Mutex
+	sidebarMu sync.Mutex
 }
 
 // Open returns a Vault rooted at an existing directory.
@@ -123,6 +125,131 @@ func (v *Vault) Tree() ([]model.TreeNode, error) {
 	return v.readDir(v.Root, 0, v.Icons())
 }
 
+// SidebarTree returns root folders and loose root notes. Folder children are
+// intentionally omitted: their dashboard is the navigation entry point.
+func (v *Vault) SidebarTree() ([]model.TreeNode, error) {
+	if err := v.EnsureRootDashboards(); err != nil {
+		return nil, err
+	}
+	icons := v.Icons()
+	entries, err := os.ReadDir(v.Root)
+	if err != nil {
+		return nil, err
+	}
+	nodes := []model.TreeNode{}
+	for _, entry := range entries {
+		if sidebarHidden(entry.Name()) || entry.Type()&os.ModeSymlink != 0 {
+			continue
+		}
+		if entry.IsDir() {
+			dashboard, err := v.dashboardPath(entry.Name())
+			if err != nil {
+				return nil, err
+			}
+			nodes = append(nodes, model.TreeNode{
+				Name:      entry.Name(),
+				Path:      filepath.ToSlash(entry.Name()),
+				EntryPath: dashboard,
+				IsDir:     true,
+			})
+			continue
+		}
+		if !IsMarkdownPath(entry.Name()) {
+			continue
+		}
+		note, err := v.read(entry.Name(), icons)
+		if err != nil {
+			continue
+		}
+		nodes = append(nodes, model.TreeNode{
+			Name: note.Title,
+			Path: note.Path,
+			Icon: icons[note.Path],
+		})
+	}
+	sort.SliceStable(nodes, func(i, j int) bool {
+		if nodes[i].IsDir != nodes[j].IsDir {
+			return nodes[i].IsDir
+		}
+		return strings.ToLower(nodes[i].Name) < strings.ToLower(nodes[j].Name)
+	})
+	return nodes, nil
+}
+
+// Pages returns every note in the vault for search, linking, and favorites.
+func (v *Vault) Pages() ([]model.TreeNode, error) {
+	files, err := v.MarkdownFiles()
+	if err != nil {
+		return nil, err
+	}
+	icons := v.Icons()
+	pages := make([]model.TreeNode, 0, len(files))
+	for _, path := range files {
+		note, err := v.read(path, icons)
+		if err != nil {
+			continue
+		}
+		pages = append(pages, model.TreeNode{
+			Name: note.Title,
+			Path: note.Path,
+			Icon: icons[note.Path],
+		})
+	}
+	return pages, nil
+}
+
+// EnsureRootDashboards creates dashboard.md in each user-visible root folder.
+func (v *Vault) EnsureRootDashboards() error {
+	entries, err := os.ReadDir(v.Root)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() || entry.Type()&os.ModeSymlink != 0 || sidebarHidden(entry.Name()) {
+			continue
+		}
+		if _, err := v.dashboardPath(entry.Name()); err == nil {
+			continue
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		rel := filepath.ToSlash(filepath.Join(entry.Name(), "dashboard.md"))
+		full, err := v.resolve(rel, true)
+		if err != nil {
+			return err
+		}
+		content := []byte("# " + entry.Name() + "\n\n")
+		if err := createFileExclusive(full, content, 0o644); err != nil && !errors.Is(err, os.ErrExist) {
+			return err
+		}
+	}
+	return nil
+}
+
+func (v *Vault) dashboardPath(folder string) (string, error) {
+	dir, err := v.resolve(folder, false)
+	if err != nil {
+		return "", err
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return "", err
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() && entry.Type()&os.ModeSymlink == 0 &&
+			strings.EqualFold(entry.Name(), "dashboard.md") {
+			return filepath.ToSlash(filepath.Join(folder, entry.Name())), nil
+		}
+	}
+	return "", os.ErrNotExist
+}
+
+func sidebarHidden(name string) bool {
+	return strings.HasPrefix(name, ".") ||
+		strings.EqualFold(name, "node_modules") ||
+		strings.EqualFold(name, "assets")
+}
+
 func IsMarkdownPath(name string) bool {
 	ext := strings.ToLower(filepath.Ext(name))
 	return ext == ".md" || ext == ".markdown" || ext == ".mdx"
@@ -174,6 +301,10 @@ func (v *Vault) readDir(dir string, depth int, icons map[string]string) ([]model
 
 // Read loads a note, splitting YAML frontmatter from the body.
 func (v *Vault) Read(rel string) (model.Note, error) {
+	return v.read(rel, v.Icons())
+}
+
+func (v *Vault) read(rel string, icons map[string]string) (model.Note, error) {
 	if err := requireUserPath(rel); err != nil {
 		return model.Note{}, err
 	}
@@ -203,10 +334,12 @@ func (v *Vault) Read(rel string) (model.Note, error) {
 	}
 	fm, _, body := splitFrontmatter(string(raw))
 	relSlash := filepath.ToSlash(rel)
+	pageID, _ := fm["rockion_id"].(string)
 	return model.Note{
 		Path:        relSlash,
 		Title:       titleFor(rel, fm, body),
-		Icon:        v.Icons()[relSlash],
+		PageID:      pageID,
+		Icon:        icons[relSlash],
 		Markdown:    body,
 		Frontmatter: fm,
 		ModifiedAt:  info.ModTime().UnixMilli(),
@@ -261,25 +394,64 @@ func (v *Vault) WriteExpected(rel, markdown, expectedVersion string) error {
 	return atomicWriteFileChecked(full, content, 0o644, expectedVersion)
 }
 
-// Create makes a new empty note and returns it.
-func (v *Vault) Create(dir, title string) (model.Note, error) {
-	name := sanitize(title) + ".md"
-	rel := filepath.ToSlash(filepath.Join(dir, name))
-	if err := requireUserPath(rel); err != nil {
+// CreateProject creates a root project folder with its dashboard entry page.
+func (v *Vault) CreateProject(title string) (note model.Note, err error) {
+	title = strings.TrimSpace(title)
+	name, err := projectName(title)
+	if err != nil {
 		return model.Note{}, err
 	}
+	project, err := v.resolve(name, true)
+	if err != nil {
+		return model.Note{}, err
+	}
+	if err := os.Mkdir(project, 0o755); err != nil {
+		if errors.Is(err, os.ErrExist) {
+			return model.Note{}, fmt.Errorf("project already exists: %s", name)
+		}
+		return model.Note{}, err
+	}
+	defer func() {
+		if err != nil {
+			_ = os.RemoveAll(project)
+		}
+	}()
+	rel := filepath.ToSlash(filepath.Join(name, "dashboard.md"))
 	full, err := v.resolve(rel, true)
 	if err != nil {
 		return model.Note{}, err
 	}
-	body := "# " + title + "\n\n"
-	if err := createFileExclusive(full, []byte(body), 0o644); err != nil {
-		if errors.Is(err, os.ErrExist) {
-			return model.Note{}, fmt.Errorf("note already exists: %s", rel)
-		}
+	if err := createFileExclusive(full, []byte("# "+title+"\n\n"), 0o644); err != nil {
 		return model.Note{}, err
 	}
 	return v.Read(rel)
+}
+
+func projectName(title string) (string, error) {
+	if strings.TrimSpace(title) == "" {
+		return "", errors.New("project name is required")
+	}
+	if strings.IndexFunc(title, unicode.IsControl) >= 0 {
+		return "", errors.New("project name contains control characters")
+	}
+	name := strings.Trim(sanitize(title), ". ")
+	if name == "" || name == "." || name == ".." {
+		return "", errors.New("invalid project name")
+	}
+	if len([]rune(name)) > 120 {
+		return "", errors.New("project name is longer than 120 characters")
+	}
+	if sidebarHidden(name) {
+		return "", fmt.Errorf("reserved project name: %s", name)
+	}
+	device := strings.ToUpper(strings.SplitN(name, ".", 2)[0])
+	switch device {
+	case "CON", "PRN", "AUX", "NUL",
+		"COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+		"LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9":
+		return "", fmt.Errorf("reserved project name: %s", name)
+	}
+	return name, nil
 }
 
 // PlanTitleRename computes the vault-relative path a note should have so its
@@ -289,6 +461,9 @@ func (v *Vault) Create(dir, title string) (model.Note, error) {
 func (v *Vault) PlanTitleRename(oldRel, title string) (string, bool, error) {
 	if err := requireUserPath(oldRel); err != nil {
 		return "", false, err
+	}
+	if strings.EqualFold(filepath.Base(filepath.FromSlash(oldRel)), "dashboard.md") {
+		return oldRel, false, nil
 	}
 	// A blank heading would sanitize to "Untitled"; treat it as "no change" so
 	// an empty title doesn't churn files to Untitled.md.

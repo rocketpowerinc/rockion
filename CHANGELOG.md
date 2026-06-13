@@ -5,6 +5,18 @@ All notable changes to Rockion are documented here. This project adheres to
 
 ## [Unreleased]
 
+### Added
+- Give project sub-pages stable UUIDs in Markdown frontmatter and manage their
+  dashboard links so automatic labels and targets follow page title or filename
+  changes while custom link aliases remain intact.
+- Add a dashboard link context action that deletes a managed project page and
+  its entry together. Direct deletion of project pages is blocked to prevent
+  orphaned dashboard state.
+
+### Fixed
+- Repair duplicate managed-page IDs automatically when a page file is copied,
+  ensuring both pages keep independent dashboard entries.
+
 ## [0.1.12] - 2026-06-13
 
 ### Added
@@ -12,6 +24,13 @@ All notable changes to Rockion are documented here. This project adheres to
   are timestamped `.rockion` archives encrypted with scrypt and chunked
   AES-256-GCM; imports verify integrity, restore into a new folder, and open the
   restored vault automatically.
+- Add a dashboard-based sidebar: every visible root folder receives a
+  `dashboard.md` entry page, Favorites support starring and drag reordering,
+  loose root notes remain available under Unsorted, and `/New sub-page` creates
+  a linked Markdown page beside the current page.
+- Change the sidebar `+` button and `Ctrl/Cmd+N` to create a root project with
+  an integrated `dashboard.md`. New pages can now only be created inside a
+  project through `/New sub-page`.
 
 ## [0.1.11] - 2026-06-13
 

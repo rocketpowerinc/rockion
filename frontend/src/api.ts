@@ -18,6 +18,7 @@ export interface VaultInfo {
 export interface TreeNode {
   name: string;
   path: string;
+  entryPath?: string;
   isDir: boolean;
   icon?: string;
   children?: TreeNode[];
@@ -26,6 +27,7 @@ export interface TreeNode {
 export interface Note {
   path: string;
   title: string;
+  pageId?: string;
   icon?: string;
   markdown: string;
   frontmatter?: Record<string, unknown>;
@@ -58,14 +60,26 @@ export const api = {
   pickVault: (): Promise<VaultInfo> => App.PickVault(),
   openVault: (path: string): Promise<VaultInfo> => App.OpenVault(path),
   listTree: (): Promise<TreeNode[]> => App.ListTree(),
+  listPages: (): Promise<TreeNode[]> => App.ListPages(),
+  listFavorites: (): Promise<TreeNode[]> => App.ListFavorites(),
+  setFavorite: (path: string, favorite: boolean): Promise<void> =>
+    App.SetFavorite(path, favorite),
+  reorderFavorites: (paths: string[]): Promise<void> => App.ReorderFavorites(paths),
   readNote: (path: string): Promise<Note> => App.ReadNote(path),
   writeNote: (path: string, markdown: string, expectedVersion: string): Promise<Note> =>
     App.WriteNote(path, markdown, expectedVersion),
-  createNote: (dir: string, title: string): Promise<Note> => App.CreateNote(dir, title),
+  createSubPage: (dashboardPath: string, title: string): Promise<Note> =>
+    App.CreateSubPage(dashboardPath, title),
+  createProject: (title: string): Promise<Note> => App.CreateProject(title),
   renamePath: (oldPath: string, newPath: string): Promise<void> => App.RenamePath(oldPath, newPath),
   // Rename a note so its filename matches its title (first H1); returns the moved note.
   renameToTitle: (path: string, title: string): Promise<Note> => App.RenameToTitle(path, title),
   deletePath: (path: string): Promise<void> => App.DeletePath(path),
+  deleteManagedPage: (
+    dashboardPath: string,
+    href: string,
+    expectedVersion: string
+  ): Promise<Note> => App.DeleteManagedPage(dashboardPath, href, expectedVersion),
   search: (query: string, limit = 50): Promise<SearchHit[]> => App.Search(query, limit),
   backlinks: (path: string): Promise<SearchHit[]> => App.Backlinks(path),
   // SaveImage takes a Go []byte; Wails marshals a number[] / base64. We pass an array.

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 export interface PageRef {
   path: string;
   title: string;
+  pageId?: string;
   icon?: string;
 }
 

@@ -125,12 +125,6 @@ func TestDeleteRefusesProtectedAndMixedContentDirectories(t *testing.T) {
 	if err := v.Delete(".rockion"); err == nil {
 		t.Fatal("protected metadata directory was deletable")
 	}
-	if _, err := v.Create(".rockion", "hidden"); err == nil {
-		t.Fatal("note creation in protected metadata succeeded")
-	}
-	if _, err := v.Create("NODE_MODULES", "hidden"); err == nil {
-		t.Fatal("case-insensitive node_modules protection failed")
-	}
 	if _, err := os.Stat(filepath.Join(v.Root, "mixed", "data.txt")); err != nil {
 		t.Fatalf("non-note content was removed: %v", err)
 	}
@@ -297,6 +291,12 @@ func TestFolderMoveRecalculatesRelativeLinks(t *testing.T) {
 
 func TestCreateIsExclusive(t *testing.T) {
 	v := openTestVault(t)
+	if err := os.Mkdir(filepath.Join(v.Root, "Project"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := v.Write("Project/dashboard.md", "# Project\n\n"); err != nil {
+		t.Fatal(err)
+	}
 	const attempts = 8
 	var wg sync.WaitGroup
 	results := make(chan error, attempts)
@@ -304,7 +304,7 @@ func TestCreateIsExclusive(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, err := v.Create("", "Only Once")
+			_, err := v.CreateManagedPage("Project/dashboard.md", "Only Once")
 			results <- err
 		}()
 	}
@@ -320,12 +320,33 @@ func TestCreateIsExclusive(t *testing.T) {
 	if successes != 1 {
 		t.Fatalf("exclusive create succeeded %d times, want 1", successes)
 	}
-	note, err := v.Read("Only Once.md")
+	note, err := v.Read("Project/Only Once.md")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if note.Markdown != "# Only Once\n\n" {
 		t.Fatalf("created note was corrupted: %q", note.Markdown)
+	}
+}
+
+func TestCreateProjectCreatesDashboardAndRejectsCollisions(t *testing.T) {
+	v := openTestVault(t)
+	dashboard, err := v.CreateProject("Client Work")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dashboard.Path != "Client Work/dashboard.md" ||
+		dashboard.Markdown != "# Client Work\n\n" {
+		t.Fatalf("created project dashboard = %#v", dashboard)
+	}
+	if _, err := v.CreateProject("Client Work"); err == nil {
+		t.Fatal("duplicate project was created")
+	}
+	if _, err := v.CreateProject("assets"); err == nil {
+		t.Fatal("reserved project was created")
+	}
+	if _, err := v.CreateProject("CON.txt"); err == nil {
+		t.Fatal("Windows reserved project was created")
 	}
 }
 
@@ -355,5 +376,138 @@ func TestPlanTitleRenameHandlesCollisionsAndCaseChanges(t *testing.T) {
 	}
 	if !changed || collisionPath != "Target 2.md" {
 		t.Fatalf("collision plan = %q, %v; want Target 2.md, true", collisionPath, changed)
+	}
+}
+
+func TestRootDashboardsAndSidebarTree(t *testing.T) {
+	v := openTestVault(t)
+	if err := os.MkdirAll(filepath.Join(v.Root, "Projects"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(v.Root, "assets"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(v.Root, "NODE_MODULES"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := v.Write("Projects/hidden.md", "# Hidden\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := v.Write("loose.md", "# Loose\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := v.EnsureRootDashboards(); err != nil {
+		t.Fatal(err)
+	}
+	dashboard, err := v.Read("Projects/dashboard.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dashboard.Markdown != "# Projects\n\n" {
+		t.Fatalf("dashboard content = %q", dashboard.Markdown)
+	}
+	if _, err := os.Stat(filepath.Join(v.Root, "assets", "dashboard.md")); !os.IsNotExist(err) {
+		t.Fatal("internal assets folder received a dashboard")
+	}
+	if _, err := os.Stat(filepath.Join(v.Root, "NODE_MODULES", "dashboard.md")); !os.IsNotExist(err) {
+		t.Fatal("node_modules folder received a dashboard")
+	}
+
+	nodes, err := v.SidebarTree()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(nodes) != 2 {
+		t.Fatalf("sidebar nodes = %#v", nodes)
+	}
+	if !nodes[0].IsDir || nodes[0].Path != "Projects" ||
+		nodes[0].EntryPath != "Projects/dashboard.md" || len(nodes[0].Children) != 0 {
+		t.Fatalf("folder sidebar node = %#v", nodes[0])
+	}
+	if nodes[1].IsDir || nodes[1].Path != "loose.md" {
+		t.Fatalf("loose note sidebar node = %#v", nodes[1])
+	}
+}
+
+func TestExistingDashboardCaseIsPreservedAndNeverTitleRenamed(t *testing.T) {
+	v := openTestVault(t)
+	if err := os.MkdirAll(filepath.Join(v.Root, "Area"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := v.Write("Area/Dashboard.md", "# Custom\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := v.EnsureRootDashboards(); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := os.ReadDir(filepath.Join(v.Root, "Area"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dashboards := 0
+	for _, entry := range entries {
+		if strings.EqualFold(entry.Name(), "dashboard.md") {
+			dashboards++
+		}
+	}
+	if dashboards != 1 {
+		t.Fatalf("dashboard file count = %d", dashboards)
+	}
+	path, changed, err := v.PlanTitleRename("Area/Dashboard.md", "Renamed")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if changed || path != "Area/Dashboard.md" {
+		t.Fatalf("dashboard rename plan = %q, %v", path, changed)
+	}
+}
+
+func TestFavoritesPersistReorderAndFollowRenames(t *testing.T) {
+	v := openTestVault(t)
+	if err := v.Write("Area/one.md", "# One\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := v.Write("Area/two.md", "# Two\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := v.SetFavorite("Area/one.md", true); err != nil {
+		t.Fatal(err)
+	}
+	if err := v.SetFavorite("Area/two.md", true); err != nil {
+		t.Fatal(err)
+	}
+	if err := v.ReorderFavorites([]string{"Area/two.md", "Area/one.md"}); err != nil {
+		t.Fatal(err)
+	}
+	favorites, err := v.Favorites()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(favorites) != 2 || favorites[0].Path != "Area/two.md" ||
+		favorites[1].Path != "Area/one.md" {
+		t.Fatalf("favorite order = %#v", favorites)
+	}
+	if err := v.Rename("Area", "Archive"); err != nil {
+		t.Fatal(err)
+	}
+	if err := v.RenameFavoritePath("Area", "Archive", true); err != nil {
+		t.Fatal(err)
+	}
+	favorites, err = v.Favorites()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if favorites[0].Path != "Archive/two.md" || favorites[1].Path != "Archive/one.md" {
+		t.Fatalf("favorites did not follow folder rename: %#v", favorites)
+	}
+	if err := v.RemoveFavoritePath("Archive/two.md", false); err != nil {
+		t.Fatal(err)
+	}
+	favorites, err = v.Favorites()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(favorites) != 1 || favorites[0].Path != "Archive/one.md" {
+		t.Fatalf("favorite removal = %#v", favorites)
 	}
 }

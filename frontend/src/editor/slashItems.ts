@@ -44,6 +44,23 @@ export const slashItems: SlashItem[] = [
       editor.chain().focus().deleteRange(range).toggleTaskList().run(),
   },
   {
+    title: "New sub-page",
+    hint: "Create and link a page beside this one",
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).run();
+      window.dispatchEvent(new CustomEvent("rockion:new-sub-page"));
+    },
+  },
+  {
+    title: "Link to page",
+    hint: "Insert a link to another note 🔗",
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).run();
+      // Editor.tsx listens for this and opens the page picker.
+      window.dispatchEvent(new CustomEvent("rockion:link-page"));
+    },
+  },
+  {
     title: "Table",
     hint: "3×3 table",
     command: ({ editor, range }) =>
@@ -65,15 +82,6 @@ export const slashItems: SlashItem[] = [
     hint: "Click its icon to cycle green → red → yellow 🟢",
     command: ({ editor, range }) =>
       editor.chain().focus().deleteRange(range).wrapIn("callout", { type: "green" }).run(),
-  },
-  {
-    title: "Link to page",
-    hint: "Insert a link to another note 🔗",
-    command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).run();
-      // Editor.tsx listens for this and opens the page picker.
-      window.dispatchEvent(new CustomEvent("rockion:link-page"));
-    },
   },
   {
     title: "Code block",

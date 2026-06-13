@@ -14,14 +14,24 @@ import PagePicker, { type PageRef } from "./PagePicker";
 import EmojiPicker from "./EmojiPicker";
 import type { WritingLanguage } from "../writingLanguage";
 import { refreshSpellcheck } from "../editor/Spellcheck";
+import NewPageModal from "./NewPageModal";
+import {
+  managedPageHref,
+  relativePageHref,
+  resolvePageHref,
+} from "../editor/pagePaths.mjs";
+import { setCurrentPagePath } from "../editor/pageIcons";
 
 interface Props {
   note: Note | null;
   writingLanguage: WritingLanguage;
   pages?: PageRef[];
   onDirtySaved?: () => void;
+  onPageCreated?: () => void;
   onOpenLink?: (path: string) => void;
   onSetIcon?: (path: string, icon: string) => void;
+  isFavorite?: boolean;
+  onToggleFavorite?: (path: string) => Promise<void>;
   onNoteUpdated?: (note: Note) => void;
   onNoteRenamed?: (note: Note) => void;
 }
@@ -59,8 +69,11 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
     writingLanguage,
     pages,
     onDirtySaved,
+    onPageCreated,
     onOpenLink,
     onSetIcon,
+    isFavorite = false,
+    onToggleFavorite,
     onNoteUpdated,
     onNoteRenamed,
   },
@@ -83,6 +96,7 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
   const [conflict, setConflict] = useState<Conflict | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [subPagePromptOpen, setSubPagePromptOpen] = useState(false);
 
   const clearSaveTimer = useCallback(() => {
     if (saveTimer.current !== null) {
@@ -219,8 +233,8 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
         version.current = renamed.version;
         if (renamed.path !== path) {
           currentPath.current = renamed.path;
-          onNoteRenamedRef.current?.(renamed);
         }
+        onNoteRenamedRef.current?.(renamed);
       } catch (error) {
         setSaveError(`Couldn't rename the file to match the title: ${String(error)}`);
       }
@@ -281,6 +295,7 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
       clearSaveTimer();
       clearRenameTimer();
       currentPath.current = next?.path ?? null;
+      setCurrentPagePath(next?.path ?? "");
       version.current = next?.version ?? "";
       // Seed with the note's current title so opening a note never triggers a
       // rename; only an actual title edit does.
@@ -363,32 +378,96 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
     };
   }, [clearRenameTimer]);
 
-  // Open the page picker when the "/Link to page" command fires.
+  // Open page creation and linking dialogs from slash commands.
   useEffect(() => {
     const open = () => setLinkPickerOpen(true);
+    const createSubPage = () => setSubPagePromptOpen(true);
+    const deleteManagedPage = (event: Event) => {
+      const href = (event as CustomEvent).detail as string;
+      if (!href || !currentPath.current) return;
+      void (async () => {
+        if (
+          !window.confirm(
+            "Delete this page? This removes both the dashboard link and its Markdown file."
+          )
+        ) {
+          return;
+        }
+        if (!(await saveNowRef.current()) || !currentPath.current) return;
+        try {
+          const updated = await api.deleteManagedPage(
+            currentPath.current,
+            href,
+            version.current
+          );
+          loadNote(updated);
+          onNoteUpdated?.(updated);
+          onPageCreated?.();
+        } catch (error) {
+          setSaveError(`Couldn't delete managed page: ${String(error)}`);
+        }
+      })();
+    };
     const openPage = (event: Event) => {
       const href = (event as CustomEvent).detail as string;
-      if (href) onOpenLink?.(decodeURIComponent(href));
+      const resolved = resolvePageHref(currentPath.current || "", href);
+      if (resolved) onOpenLink?.(resolved);
     };
     window.addEventListener("rockion:link-page", open);
+    window.addEventListener("rockion:new-sub-page", createSubPage);
+    window.addEventListener("rockion:delete-managed-page", deleteManagedPage);
     window.addEventListener("rockion:open-page", openPage);
     return () => {
       window.removeEventListener("rockion:link-page", open);
+      window.removeEventListener("rockion:new-sub-page", createSubPage);
+      window.removeEventListener("rockion:delete-managed-page", deleteManagedPage);
       window.removeEventListener("rockion:open-page", openPage);
     };
-  }, [onOpenLink]);
+  }, [loadNote, onNoteUpdated, onOpenLink, onPageCreated]);
 
   function insertPageLink(page: PageRef) {
     setLinkPickerOpen(false);
     if (!editor) return;
+    const href = relativePageHref(currentPath.current || "", page.path);
     editor
       .chain()
       .focus()
       .insertContent([
-        { type: "text", text: page.title, marks: [{ type: "link", attrs: { href: page.path } }] },
+        { type: "text", text: page.title, marks: [{ type: "link", attrs: { href } }] },
         { type: "text", text: " " },
       ])
       .run();
+  }
+
+  async function createSubPage(title: string) {
+    const sourcePath = currentPath.current;
+    if (!sourcePath || !editor) return;
+    try {
+      const created = await api.createSubPage(sourcePath, title.trim());
+      setSubPagePromptOpen(false);
+      const href = managedPageHref(
+        sourcePath,
+        created.path,
+        created.pageId,
+        created.title
+      );
+      editor
+        .chain()
+        .focus()
+        .insertContent([
+          {
+            type: "text",
+            text: created.title,
+            marks: [{ type: "link", attrs: { href } }],
+          },
+          { type: "text", text: " " },
+        ])
+        .run();
+      setSaveError(null);
+      onPageCreated?.();
+    } catch (error) {
+      setSaveError(`Couldn't create sub-page: ${String(error)}`);
+    }
   }
 
   function handleWrapClick(event: ReactMouseEvent<HTMLDivElement>) {
@@ -401,7 +480,8 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
         api.openExternal(href);
       } else if (href && !/^(tel:|#)/i.test(href) && !/^[a-z][a-z0-9+.-]*:/i.test(href)) {
         event.preventDefault();
-        onOpenLink?.(decodeURIComponent(href));
+        const resolved = resolvePageHref(currentPath.current || "", href);
+        if (resolved) onOpenLink?.(resolved);
       } else if (/^[a-z][a-z0-9+.-]*:/i.test(href)) {
         event.preventDefault();
       }
@@ -474,6 +554,15 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
     <>
       <div className="page-header">
         <button
+          className={`favorite-button ${isFavorite ? "is-favorite" : ""}`}
+          title={isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+          aria-label={isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+          aria-pressed={isFavorite}
+          onClick={() => note && void onToggleFavorite?.(note.path)}
+        >
+          {isFavorite ? "★" : "☆"}
+        </button>
+        <button
           className="page-icon"
           title="Change page icon"
           onClick={() => setIconPickerOpen((open) => !open)}
@@ -504,6 +593,12 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
         onPick={insertPageLink}
         onClose={() => setLinkPickerOpen(false)}
       />
+      {subPagePromptOpen && (
+        <NewPageModal
+          onSubmit={createSubPage}
+          onClose={() => setSubPagePromptOpen(false)}
+        />
+      )}
       {conflict && (
         <div className="conflict-overlay" role="dialog" aria-modal="true">
           <div className="conflict-dialog">

@@ -41,17 +41,17 @@ Grab a prebuilt binary from the [Releases](https://github.com/rocketpowerinc/roc
 
 - **Windows x64** - `rockion-windows-amd64-installer.exe` or portable `.exe`
 - **macOS Apple Silicon** - `rockion-macos-arm64.zip`
-- **Debian 12 x64** - `rockion-linux-amd64.deb`
+- **AnduinOS x64** - `rockion-anduinos-amd64.deb`
 
-The Linux release is an amd64 Debian package built and startup-tested on
-Debian 12. GTK and WebKitGTK are installed through Debian package dependencies.
+The Linux release is an amd64 package built against the Ubuntu 24.04
+WebKitGTK 4.1 ABI used by AnduinOS.
 
 ```bash
-sudo apt install ./rockion-linux-amd64.deb
+sudo apt install ./rockion-anduinos-amd64.deb
 ```
 
-This package targets Debian 12 on x86_64 systems. Other Debian-based
-distributions are not part of the release compatibility guarantee.
+This package targets AnduinOS on x86_64 systems. Other Linux distributions are
+not part of the release compatibility guarantee.
 
 See the [CHANGELOG](./CHANGELOG.md) for what's in each release.
 
@@ -97,9 +97,8 @@ Run the Windows release coordinator:
 
 It updates version metadata and the changelog, runs the full Go/frontend/security
 suite, creates the release commit and tag, builds a local Windows smoke artifact,
-and runs the Debian 12 package preflight. It then pushes the tag, and GitHub
-Actions builds Windows x64, macOS Apple Silicon, and a Debian 12 amd64 package
-with SHA-256 checksums.
+then pushes the tag. GitHub Actions builds Windows x64, macOS Apple Silicon,
+and an AnduinOS amd64 package with SHA-256 checksums.
 
 After all three platform builds and checksum generation succeed, the resulting
 GitHub release is published automatically. See [dev/README.md](./dev/README.md)

@@ -5,6 +5,10 @@ All notable changes to Rockion are documented here. This project adheres to
 
 ## [Unreleased]
 
+### Fixed
+- Replace the Debian 12 package with an AnduinOS amd64 package linked against WebKitGTK 4.1.
+- Build the Linux package once per release; keep the standalone AnduinOS preflight optional.
+
 ## [0.1.8] - 2026-06-12
 
 ### Fixed

@@ -4,8 +4,8 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 binary="${BINARY:-$repo_root/build/bin/rockion}"
-output="${OUTPUT:-$repo_root/build/bin/rockion-linux-amd64.deb}"
-package_root="${PACKAGE_ROOT:-$repo_root/build/debian-amd64}"
+output="${OUTPUT:-$repo_root/build/bin/rockion-anduinos-amd64.deb}"
+package_root="${PACKAGE_ROOT:-$repo_root/build/anduinos-amd64}"
 version="$(
   node -e "const w=require(process.argv[1]); process.stdout.write(w.info.productVersion)" \
     "$repo_root/wails.json"
@@ -16,7 +16,7 @@ if [[ ! -x "$binary" ]]; then
   exit 1
 fi
 if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+~.-][0-9A-Za-z.+~-]+)?$ ]]; then
-  echo "Invalid Debian package version: $version" >&2
+  echo "Invalid package version: $version" >&2
   exit 1
 fi
 
@@ -44,7 +44,7 @@ Version: $version
 Section: editors
 Priority: optional
 Architecture: amd64
-Depends: libgtk-3-0, libwebkit2gtk-4.0-37, xdg-utils
+Depends: libgtk-3-0t64, libwebkit2gtk-4.1-0, xdg-utils
 Installed-Size: $installed_size
 Maintainer: Rockion <support@rocketpowerinc.com>
 Homepage: https://github.com/rocketpowerinc/rockion

@@ -141,18 +141,11 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  build-debian:
-    name: Build Debian 12 package (amd64)
+  build-anduinos:
+    name: Build AnduinOS package (amd64)
     needs: verify
     runs-on: ubuntu-24.04
-    container: debian:12
     steps:
-      - name: Install action and build prerequisites
-        run: |
-          apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            ca-certificates curl git build-essential pkg-config \
-            libgtk-3-dev libwebkit2gtk-4.0-dev dpkg-dev
       - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
         with:
           persist-credentials: false
@@ -165,71 +158,68 @@ jobs:
           node-version: "20"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev dpkg-dev
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
       - name: Build Linux application
-        run: wails build -platform linux/amd64 -clean -trimpath -o rockion
-      - name: Verify Debian linkage
+        run: wails build -platform linux/amd64 -clean -trimpath -tags webkit2_41 -o rockion
+      - name: Verify AnduinOS linkage
         shell: bash
         run: |
           links="$(ldd build/bin/rockion)"
           printf '%s\n' "$links"
-          grep -Fq 'libwebkit2gtk-4.0.so.37' <<<"$links"
+          grep -Fq 'libwebkit2gtk-4.1.so.0' <<<"$links"
           if grep -Fq 'not found' <<<"$links"; then
-            echo 'Rockion has unresolved Debian runtime dependencies.' >&2
+            echo 'Rockion has unresolved AnduinOS runtime dependencies.' >&2
             exit 1
           fi
-      - name: Package Debian application
+      - name: Package AnduinOS application
         env:
           BINARY: build/bin/rockion
-          OUTPUT: build/bin/rockion-linux-amd64.deb
-        run: bash ./dev/linux/package-deb.sh
-      - name: Verify Debian package metadata
+          OUTPUT: build/bin/rockion-anduinos-amd64.deb
+        run: bash ./dev/linux/package-anduinos-deb.sh
+      - name: Verify AnduinOS package metadata
         run: |
-          dpkg-deb --info build/bin/rockion-linux-amd64.deb
-          dpkg-deb --contents build/bin/rockion-linux-amd64.deb
-          test "$(dpkg-deb -f build/bin/rockion-linux-amd64.deb Architecture)" = amd64
-          test "$(dpkg-deb -f build/bin/rockion-linux-amd64.deb Package)" = rockion
-      - name: Upload Debian package
+          dpkg-deb --info build/bin/rockion-anduinos-amd64.deb
+          dpkg-deb --contents build/bin/rockion-anduinos-amd64.deb
+          test "$(dpkg-deb -f build/bin/rockion-anduinos-amd64.deb Architecture)" = amd64
+          test "$(dpkg-deb -f build/bin/rockion-anduinos-amd64.deb Package)" = rockion
+      - name: Upload AnduinOS package
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: rockion-linux-amd64
-          path: build/bin/rockion-linux-amd64.deb
+          name: rockion-anduinos-amd64
+          path: build/bin/rockion-anduinos-amd64.deb
           if-no-files-found: error
           retention-days: 7
 
-  test-debian:
-    name: Install and launch on Debian 12 (amd64)
-    needs: build-debian
+  test-anduinos:
+    name: Install and launch on AnduinOS baseline (amd64)
+    needs: build-anduinos
     runs-on: ubuntu-24.04
-    container: debian:12
     steps:
-      - name: Install action prerequisites
-        run: |
-          apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates
-      - name: Download Debian package
+      - name: Download AnduinOS package
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: rockion-linux-amd64
+          name: rockion-anduinos-amd64
           path: package
-      - name: Install Debian package
+      - name: Install AnduinOS package
         run: |
-          apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y \
-            ./package/rockion-linux-amd64.deb xvfb xauth passwd
-          useradd --create-home --shell /bin/bash rockion-test
+          sudo apt-get update
+          sudo apt-get install -y ./package/rockion-anduinos-amd64.deb xvfb xauth
       - name: Launch Rockion
         shell: bash
         run: |
           set +e
-          runuser -u rockion-test -- \
-            timeout 15s xvfb-run -a rockion > rockion-smoke.log 2>&1
+          timeout 15s xvfb-run -a rockion > rockion-smoke.log 2>&1
           status=$?
           set -e
           cat rockion-smoke.log
           if [[ $status -ne 0 && $status -ne 124 ]]; then
-            echo "Rockion failed its Debian 12 startup test with status $status." >&2
+            echo "Rockion failed its AnduinOS baseline startup test with status $status." >&2
             exit "$status"
           fi
 
@@ -237,8 +227,8 @@ jobs:
     name: Publish release
     needs:
       - build-native
-      - build-debian
-      - test-debian
+      - build-anduinos
+      - test-anduinos
     runs-on: ubuntu-22.04
     permissions:
       contents: write

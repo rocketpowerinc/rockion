@@ -24,7 +24,7 @@ function Get-RepositorySlug {
 }
 
 if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
-    Stop-Preflight 'This Debian package preflight coordinator must run on Windows.'
+    Stop-Preflight 'This AnduinOS package preflight coordinator must run on Windows.'
 }
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -70,23 +70,38 @@ if ($RemoteCommit -ne $LocalCommit) {
 $Repository = Get-RepositorySlug
 $ExistingRunJson = & gh run list `
     --repo $Repository `
-    --workflow debian-preflight.yml `
+    --workflow anduinos-preflight.yml `
     --branch $Branch `
     --event workflow_dispatch `
     --limit 20 `
     --json databaseId 2>$null
-if ($LASTEXITCODE -ne 0) {
-    Stop-Preflight 'Could not list existing Debian package preflight runs.'
-}
 $ExistingRunIds = @()
-if ($ExistingRunJson) {
+if ($LASTEXITCODE -eq 0 -and $ExistingRunJson) {
     $ExistingRunIds = @($ExistingRunJson | ConvertFrom-Json | ForEach-Object { $_.databaseId })
+} elseif ($LASTEXITCODE -ne 0) {
+    Write-Host '[WARN] GitHub has not indexed the AnduinOS workflow yet; dispatch will be retried.' -ForegroundColor Yellow
 }
 
-Write-Host 'Starting Debian 12 package preflight...' -ForegroundColor Cyan
-& gh workflow run debian-preflight.yml --repo $Repository --ref $Branch
-if ($LASTEXITCODE -ne 0) {
-    Stop-Preflight 'Could not start the Debian package preflight workflow.'
+Write-Host 'Starting AnduinOS package preflight...' -ForegroundColor Cyan
+$DispatchSucceeded = $false
+for ($attempt = 1; $attempt -le 12 -and -not $DispatchSucceeded; $attempt++) {
+    $DispatchResult = @(
+        & gh workflow run anduinos-preflight.yml --repo $Repository --ref $Branch 2>&1
+    )
+    if ($LASTEXITCODE -eq 0) {
+        $DispatchSucceeded = $true
+        break
+    }
+    if ($attempt -lt 12) {
+        Write-Host "[WARN] Workflow dispatch attempt $attempt failed; retrying in 5 seconds." -ForegroundColor Yellow
+        Start-Sleep -Seconds 5
+    }
+}
+if (-not $DispatchSucceeded) {
+    if ($DispatchResult) {
+        Write-Host ($DispatchResult -join [Environment]::NewLine) -ForegroundColor DarkGray
+    }
+    Stop-Preflight 'Could not start the AnduinOS package preflight workflow.'
 }
 
 Write-Host 'Waiting for GitHub Actions to register the workflow...' -ForegroundColor Gray
@@ -94,7 +109,7 @@ $RunId = $null
 for ($attempt = 0; $attempt -lt 24 -and -not $RunId; $attempt++) {
     $json = & gh run list `
         --repo $Repository `
-        --workflow debian-preflight.yml `
+        --workflow anduinos-preflight.yml `
         --branch $Branch `
         --event workflow_dispatch `
         --limit 10 `
@@ -114,18 +129,18 @@ for ($attempt = 0; $attempt -lt 24 -and -not $RunId; $attempt++) {
 }
 
 if (-not $RunId) {
-    Stop-Preflight 'Could not locate the Debian package preflight workflow run.'
+    Stop-Preflight 'Could not locate the AnduinOS package preflight workflow run.'
 }
 
 $RunURL = "https://github.com/$Repository/actions/runs/$RunId"
-Write-Host "Debian package preflight: $RunURL" -ForegroundColor Cyan
+Write-Host "AnduinOS package preflight: $RunURL" -ForegroundColor Cyan
 if ($NoWait) {
     exit 0
 }
 
 & gh run watch $RunId --repo $Repository --exit-status
 if ($LASTEXITCODE -ne 0) {
-    Stop-Preflight "Debian package preflight run $RunId failed."
+    Stop-Preflight "AnduinOS package preflight run $RunId failed."
 }
 
-Write-Host 'The amd64 package installed and launched successfully on Debian 12.' -ForegroundColor Green
+Write-Host 'The amd64 package installed and launched on the AnduinOS baseline.' -ForegroundColor Green

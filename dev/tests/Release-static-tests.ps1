@@ -83,20 +83,19 @@ $workflow = Get-Content -Raw -LiteralPath $workflowPath
 foreach ($requiredText in @(
     'platform: windows/amd64',
     'platform: darwin/arm64',
-    'container: debian:12',
+    'runs-on: ubuntu-24.04',
     'wails build -platform linux/amd64',
-    'libwebkit2gtk-4.0-dev',
     'libwebkit2gtk-4.1-dev',
     '-tags webkit2_41',
-    'rockion-linux-amd64.deb',
-    'bash ./dev/linux/package-deb.sh',
+    'libwebkit2gtk-4.1.so.0',
+    'rockion-anduinos-amd64.deb',
+    'bash ./dev/linux/package-anduinos-deb.sh',
     'dpkg-deb --info',
-    'Install and launch on Debian 12 (amd64)',
-    'apt-get install -y \',
-    'runuser -u rockion-test',
+    'Install and launch on AnduinOS baseline (amd64)',
+    'sudo apt-get install -y',
     'xvfb-run',
-    'build-debian',
-    'test-debian',
+    'build-anduinos',
+    'test-anduinos',
     'choco install nsis',
     'makensis.exe',
     'GITHUB_PATH',
@@ -119,6 +118,10 @@ foreach ($forbiddenText in @(
     'AppImage',
     'appimage',
     'linuxdeploy',
+    'container: debian:12',
+    'libwebkit2gtk-4.0-dev',
+    'libwebkit2gtk-4.0.so.37',
+    'rockion-linux-amd64.deb',
     'ubuntu-26.04',
     'fedora:42',
     'linux-distro-compatibility',
@@ -132,31 +135,30 @@ if ($workflow.Contains('draft: true')) {
     Add-Failure 'Release workflow must publish completed releases, not drafts.'
 }
 if ($workflow.Contains('workflow_dispatch:')) {
-    Add-Failure 'Release workflow must only run for release tags; use the Debian package preflight for manual checks.'
+    Add-Failure 'Release workflow must only run for release tags; use the AnduinOS package preflight for manual checks.'
 }
 if ($Failures.Count -eq 0) {
-    Write-OK 'Windows x64, macOS ARM64, and Debian 12 amd64 releases are configured.'
+    Write-OK 'Windows x64, macOS ARM64, and AnduinOS amd64 releases are configured.'
 }
 
-$debianWorkflowPath = Join-Path $RepoRoot '.github\workflows\debian-preflight.yml'
-if (-not (Test-Path -LiteralPath $debianWorkflowPath)) {
-    Add-Failure 'The standalone Debian package preflight workflow is missing.'
+$anduinosWorkflowPath = Join-Path $RepoRoot '.github\workflows\anduinos-preflight.yml'
+if (-not (Test-Path -LiteralPath $anduinosWorkflowPath)) {
+    Add-Failure 'The standalone AnduinOS package preflight workflow is missing.'
 } else {
-    $debianWorkflow = Get-Content -Raw -LiteralPath $debianWorkflowPath
+    $anduinosWorkflow = Get-Content -Raw -LiteralPath $anduinosWorkflowPath
     foreach ($requiredText in @(
         'workflow_dispatch:',
-        'Build Debian 12 package (amd64)',
-        'container: debian:12',
-        'wails build -platform linux/amd64',
-        'libwebkit2gtk-4.0-dev',
-        'bash ./dev/linux/package-deb.sh',
-        'rockion-linux-amd64.deb',
-        'Install and launch on Debian 12 (amd64)',
-        'runuser -u rockion-test',
+        'Build AnduinOS package (amd64)',
+        'runs-on: ubuntu-24.04',
+        'wails build -platform linux/amd64 -clean -trimpath -tags webkit2_41',
+        'libwebkit2gtk-4.1-dev',
+        'bash ./dev/linux/package-anduinos-deb.sh',
+        'rockion-anduinos-amd64.deb',
+        'Install and launch on AnduinOS baseline (amd64)',
         'xvfb-run -a rockion'
     )) {
-        if (-not $debianWorkflow.Contains($requiredText)) {
-            Add-Failure "Debian package preflight workflow is missing required configuration: $requiredText"
+        if (-not $anduinosWorkflow.Contains($requiredText)) {
+            Add-Failure "AnduinOS package preflight workflow is missing required configuration: $requiredText"
         }
     }
     foreach ($forbiddenText in @(
@@ -168,33 +170,36 @@ if (-not (Test-Path -LiteralPath $debianWorkflowPath)) {
         'AppImage',
         'appimage',
         'linuxdeploy',
+        'container: debian:12',
+        'libwebkit2gtk-4.0-dev',
+        'rockion-linux-amd64.deb',
         'docker run --rm --interactive',
         'action-gh-release',
         'Publish release'
     )) {
-        if ($debianWorkflow.Contains($forbiddenText)) {
-            Add-Failure "Debian preflight contains removed or non-Linux release behavior: $forbiddenText"
+        if ($anduinosWorkflow.Contains($forbiddenText)) {
+            Add-Failure "AnduinOS preflight contains removed or non-Linux release behavior: $forbiddenText"
         }
     }
 }
 
-$debScriptPath = Join-Path $RepoRoot 'dev\linux\package-deb.sh'
-if (-not (Test-Path -LiteralPath $debScriptPath)) {
-    Add-Failure 'The Debian packaging script is missing.'
+$packageScriptPath = Join-Path $RepoRoot 'dev\linux\package-anduinos-deb.sh'
+if (-not (Test-Path -LiteralPath $packageScriptPath)) {
+    Add-Failure 'The AnduinOS packaging script is missing.'
 } else {
-    $debScript = Get-Content -Raw -LiteralPath $debScriptPath
+    $packageScript = Get-Content -Raw -LiteralPath $packageScriptPath
     foreach ($requiredText in @(
         'Architecture: amd64',
-        'libgtk-3-0',
-        'libwebkit2gtk-4.0-37',
+        'libgtk-3-0t64',
+        'libwebkit2gtk-4.1-0',
         'xdg-utils',
         'dpkg-deb --root-owner-group --build',
         '/usr/bin/rockion',
         '/usr/share/applications/rockion.desktop',
         '/usr/share/icons/hicolor/1024x1024/apps/rockion.png'
     )) {
-        if (-not $debScript.Contains($requiredText)) {
-            Add-Failure "Debian packaging script is missing required configuration: $requiredText"
+        if (-not $packageScript.Contains($requiredText)) {
+            Add-Failure "AnduinOS packaging script is missing required configuration: $requiredText"
         }
     }
 }
@@ -203,10 +208,13 @@ foreach ($removedPath in @(
     '.github\workflows\appimage-preflight.yml',
     'dev\linux\package-appimage.sh',
     'dev\linux\patch-webkit-helper-path.py',
-    'dev\windows-test-appimages.ps1'
+    'dev\windows-test-appimages.ps1',
+    '.github\workflows\debian-preflight.yml',
+    'dev\linux\package-deb.sh',
+    'dev\windows-test-debian-package.ps1'
 )) {
     if (Test-Path -LiteralPath (Join-Path $RepoRoot $removedPath)) {
-        Add-Failure "Removed AppImage file still exists: $removedPath"
+        Add-Failure "Removed packaging file still exists: $removedPath"
     }
 }
 
@@ -222,11 +230,8 @@ foreach ($requiredText in @(
     'git ls-remote --refs --tags origin',
     '$attempt -le 3',
     'Git reported:',
-    'gh workflow run debian-preflight.yml',
-    '--event workflow_dispatch',
-    'Watching Debian package preflight run',
     'No new release changes to commit; reusing the current HEAD',
-    '$ExistingPreflightRunIds -notcontains $_.databaseId'
+    'Pushing tag $Tag'
 )) {
     if (-not $releaseCoordinator.Contains($requiredText)) {
         Add-Failure "Release coordinator is missing resilient remote-tag handling: $requiredText"
@@ -235,28 +240,29 @@ foreach ($requiredText in @(
 if ($releaseCoordinator.Contains('git ls-remote --exit-code')) {
     Add-Failure 'Release coordinator must not depend on the special git ls-remote --exit-code status for missing tags.'
 }
-$preflightIndex = $releaseCoordinator.IndexOf('Watching Debian package preflight run')
-$tagPushIndex = $releaseCoordinator.IndexOf('Pushing tag $Tag')
-if ($preflightIndex -lt 0 -or $tagPushIndex -lt 0 -or $preflightIndex -gt $tagPushIndex) {
-    Add-Failure 'Release coordinator must complete the untagged preflight before pushing the release tag.'
+if ($releaseCoordinator.Contains('workflow run anduinos-preflight.yml')) {
+    Add-Failure 'Release coordinator must not build the AnduinOS package twice; the preflight is standalone.'
 }
 
-$debianCoordinatorPath = Join-Path $RepoRoot 'dev\windows-test-debian-package.ps1'
-if (-not (Test-Path -LiteralPath $debianCoordinatorPath)) {
-    Add-Failure 'The Windows Debian package preflight coordinator is missing.'
+$anduinosCoordinatorPath = Join-Path $RepoRoot 'dev\windows-test-anduinos-package.ps1'
+if (-not (Test-Path -LiteralPath $anduinosCoordinatorPath)) {
+    Add-Failure 'The Windows AnduinOS package preflight coordinator is missing.'
 } else {
-    $debianCoordinator = Get-Content -Raw -LiteralPath $debianCoordinatorPath
+    $anduinosCoordinator = Get-Content -Raw -LiteralPath $anduinosCoordinatorPath
     foreach ($requiredText in @(
-        'gh workflow run debian-preflight.yml',
+        'gh workflow run anduinos-preflight.yml',
         '--event workflow_dispatch',
         '$_.headSha -eq $LocalCommit',
         'gh run watch $RunId',
         'git status --porcelain',
         'git ls-remote --heads origin',
-        '$ExistingRunIds -notcontains $_.databaseId'
+        '$ExistingRunIds -notcontains $_.databaseId',
+        '$attempt -le 12',
+        'Workflow dispatch attempt $attempt failed; retrying in 5 seconds.',
+        'GitHub has not indexed the AnduinOS workflow yet'
     )) {
-        if (-not $debianCoordinator.Contains($requiredText)) {
-            Add-Failure "Debian package preflight coordinator is missing required behavior: $requiredText"
+        if (-not $anduinosCoordinator.Contains($requiredText)) {
+            Add-Failure "AnduinOS package preflight coordinator is missing required behavior: $requiredText"
         }
     }
     foreach ($forbiddenText in @(
@@ -264,8 +270,8 @@ if (-not (Test-Path -LiteralPath $debianCoordinatorPath)) {
         'gh release',
         'npm version'
     )) {
-        if ($debianCoordinator.Contains($forbiddenText)) {
-            Add-Failure "Debian package preflight coordinator must not modify release state: $forbiddenText"
+        if ($anduinosCoordinator.Contains($forbiddenText)) {
+            Add-Failure "AnduinOS package preflight coordinator must not modify release state: $forbiddenText"
         }
     }
 }

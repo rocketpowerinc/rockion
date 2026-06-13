@@ -297,7 +297,7 @@ func expectedAssetName(goos, arch, mode string) string {
 		return ""
 	case "linux":
 		if arch == "amd64" {
-			return "rockion-linux-amd64.deb"
+			return "rockion-anduinos-amd64.deb"
 		}
 		return ""
 	default:

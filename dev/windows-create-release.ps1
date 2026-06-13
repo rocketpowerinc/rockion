@@ -266,66 +266,6 @@ if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
 Write-Host
 Invoke-Native "Pushing branch $Branch..." { & git push origin $Branch }
 
-$ExistingPreflightJson = & gh run list `
-    --repo $Repository `
-    --workflow debian-preflight.yml `
-    --branch $Branch `
-    --event workflow_dispatch `
-    --limit 20 `
-    --json databaseId 2>$null
-if ($LASTEXITCODE -ne 0) {
-    Stop-Release 'Could not list existing Debian package preflight runs.'
-}
-$ExistingPreflightRunIds = @()
-if ($ExistingPreflightJson) {
-    $ExistingPreflightRunIds = @(
-        $ExistingPreflightJson |
-            ConvertFrom-Json |
-            ForEach-Object { $_.databaseId }
-    )
-}
-
-Invoke-Native 'Starting Debian 12 package preflight workflow...' {
-    & gh workflow run debian-preflight.yml --repo $Repository --ref $Branch
-}
-
-$ReleaseCommit = (& git rev-parse HEAD).Trim()
-if ($LASTEXITCODE -ne 0 -or -not $ReleaseCommit) {
-    Stop-Release 'Could not determine the release commit SHA.'
-}
-
-Write-Host 'Waiting for GitHub Actions to register the preflight workflow...' -ForegroundColor Gray
-$PreflightRunId = $null
-for ($attempt = 0; $attempt -lt 24 -and -not $PreflightRunId; $attempt++) {
-    $json = & gh run list `
-        --repo $Repository `
-        --workflow debian-preflight.yml `
-        --branch $Branch `
-        --event workflow_dispatch `
-        --limit 10 `
-        --json databaseId,headSha 2>$null
-    if ($LASTEXITCODE -eq 0 -and $json) {
-        $run = @($json | ConvertFrom-Json) |
-            Where-Object {
-                $_.headSha -eq $ReleaseCommit -and
-                $ExistingPreflightRunIds -notcontains $_.databaseId
-            } |
-            Select-Object -First 1
-        $PreflightRunId = $run.databaseId
-    }
-    if (-not $PreflightRunId) {
-        Start-Sleep -Seconds 5
-    }
-}
-
-if (-not $PreflightRunId) {
-    Stop-Release 'Could not locate the Debian package preflight workflow run.'
-}
-
-Invoke-Native "Watching Debian package preflight run $PreflightRunId..." {
-    & gh run watch $PreflightRunId --repo $Repository --exit-status
-}
-
 Invoke-Native "Creating annotated tag $Tag..." {
     & git tag -a $Tag -m "Rockion $Tag"
 }

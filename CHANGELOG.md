@@ -5,6 +5,11 @@ All notable changes to Rockion are documented here. This project adheres to
 
 ## [Unreleased]
 
+### Fixed
+- Ship the Linux app icon at standard hicolor sizes (64–512px) plus a `/usr/share/pixmaps`
+  fallback, and refresh the icon/desktop caches on install, so Rockion shows its icon in the
+  AnduinOS app drawer (the previous 1024×1024-only icon was never indexed by the icon theme).
+
 ## [0.1.9] - 2026-06-12
 
 ### Fixed

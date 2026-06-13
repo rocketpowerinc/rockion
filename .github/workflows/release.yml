@@ -272,7 +272,7 @@ jobs:
       - name: Install AppImage smoke-test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libegl1 libgl1 xauth xvfb
+          sudo apt-get install -y --no-install-recommends libegl1 libfontconfig1 libgl1 libgles2 xauth xvfb
       - name: Verify and launch Linux AppImage
         shell: bash
         run: |
@@ -348,10 +348,10 @@ jobs:
           case "$family" in
             debian)
               apt-get update
-              DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libegl1 libgl1 xauth xvfb
+              DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libegl1 libfontconfig1 libgl1 libgles2 xauth xvfb
               ;;
             fedora)
-              dnf install -y libglvnd-egl libglvnd-glx xorg-x11-server-Xvfb xorg-x11-xauth
+              dnf install -y fontconfig libglvnd-egl libglvnd-gles libglvnd-glx xorg-x11-server-Xvfb xorg-x11-xauth
               ;;
             *)
               echo "Unknown Linux family: $family" >&2

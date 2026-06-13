@@ -5,6 +5,11 @@ All notable changes to Rockion are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-06-12
+
+### Fixed
+- Install Fontconfig and GLES interfaces in Linux AppImage compatibility smoke environments.
+
 ## [0.1.6] - 2026-06-12
 
 ## [0.1.5] - 2026-06-12
@@ -83,3 +88,4 @@ First release. A working local-first markdown editor: Notion-style UI over plain
 [0.1.4]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.4
 [0.1.5]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.5
 [0.1.6]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.6
+[0.1.7]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.7

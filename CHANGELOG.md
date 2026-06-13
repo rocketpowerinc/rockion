@@ -5,6 +5,11 @@ All notable changes to Rockion are documented here. This project adheres to
 
 ## [Unreleased]
 
+- Fixed Enter being swallowed after slash-prefixed text when no slash command matches.
+- Added a persistent English/French writing-language setting backed by bundled
+  offline dictionaries, with English as the default. Existing text is reparsed
+  immediately, and right-clicking an underlined word shows language-correct
+  replacement choices.
 ### Fixed
 - Install the Windows app into a single `C:\Program Files\Rockion\` folder (was the doubled
   `C:\Program Files\Rockion\Rockion\`) and name the installed executable `Rockion.exe`.
@@ -30,6 +35,17 @@ All notable changes to Rockion are documented here. This project adheres to
 - Creating a new page now works on macOS. The "+" button used the native `window.prompt`,
   which returns `null` under Wails' macOS WebView, so it silently did nothing; replaced it
   with an in-app new-page dialog that works on all platforms.
+- Serialize vault mutations and use conflict-checked link rewrites so title renames cannot
+  overwrite simultaneous saves or external edits.
+- Update only renamed and rewritten notes in the search index instead of rebuilding the
+  entire vault after each title change.
+- Prevent duplicate page submissions, create notes exclusively, and handle case-only title
+  renames without adding an unnecessary numeric suffix.
+- Disable fuzzy Markdown linkification so plain filenames such as `notes.md` remain text.
+- Block remote images in notes and add a restrictive content security policy so opening a
+  vault cannot make hidden image requests.
+- Verify SHA-256 checksums before maintained install scripts execute release artifacts, add
+  optional Windows/macOS signing hooks, and expand release-time secret detection.
 
 ## [0.1.10] - 2026-06-13
 

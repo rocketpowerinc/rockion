@@ -128,6 +128,100 @@ jobs:
           }
           $target = "build/bin/rockion-windows-${{ matrix.arch }}-installer.exe"
           Move-Item -LiteralPath $installer.FullName -Destination $target -Force
+      - name: Sign Windows artifacts when credentials are configured
+        if: startsWith(matrix.name, 'windows-')
+        shell: pwsh
+        env:
+          WINDOWS_SIGNING_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_BASE64 }}
+          WINDOWS_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_PASSWORD }}
+        run: |
+          $certificate = $env:WINDOWS_SIGNING_CERTIFICATE_BASE64
+          $password = $env:WINDOWS_SIGNING_CERTIFICATE_PASSWORD
+          if ([string]::IsNullOrWhiteSpace($certificate) -and [string]::IsNullOrWhiteSpace($password)) {
+            Write-Host 'Windows signing credentials are not configured; artifacts remain unsigned.'
+            exit 0
+          }
+          if ([string]::IsNullOrWhiteSpace($certificate) -or [string]::IsNullOrWhiteSpace($password)) {
+            throw 'Both Windows signing secrets must be configured.'
+          }
+          $pfx = Join-Path $env:RUNNER_TEMP 'rockion-signing.pfx'
+          try {
+            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($certificate))
+            Get-ChildItem build/bin -Filter 'rockion-windows-amd64*.exe' | ForEach-Object {
+              & signtool sign /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com `
+                /f $pfx /p $password $_.FullName
+              if ($LASTEXITCODE -ne 0) {
+                throw "signtool failed for $($_.Name)"
+              }
+              & signtool verify /pa /v $_.FullName
+              if ($LASTEXITCODE -ne 0) {
+                throw "signature verification failed for $($_.Name)"
+              }
+            }
+          } finally {
+            Remove-Item -LiteralPath $pfx -Force -ErrorAction SilentlyContinue
+          }
+      - name: Sign and notarize macOS app when credentials are configured
+        if: startsWith(matrix.name, 'macos-')
+        env:
+          MACOS_SIGNING_CERTIFICATE_BASE64: ${{ secrets.MACOS_SIGNING_CERTIFICATE_BASE64 }}
+          MACOS_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_SIGNING_CERTIFICATE_PASSWORD }}
+          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+          MACOS_NOTARY_APPLE_ID: ${{ secrets.MACOS_NOTARY_APPLE_ID }}
+          MACOS_NOTARY_TEAM_ID: ${{ secrets.MACOS_NOTARY_TEAM_ID }}
+          MACOS_NOTARY_PASSWORD: ${{ secrets.MACOS_NOTARY_PASSWORD }}
+        run: |
+          values=(
+            "$MACOS_SIGNING_CERTIFICATE_BASE64"
+            "$MACOS_SIGNING_CERTIFICATE_PASSWORD"
+            "$MACOS_SIGNING_IDENTITY"
+            "$MACOS_NOTARY_APPLE_ID"
+            "$MACOS_NOTARY_TEAM_ID"
+            "$MACOS_NOTARY_PASSWORD"
+          )
+          configured=0
+          for value in "${values[@]}"; do
+            [[ -n "$value" ]] && configured=$((configured + 1))
+          done
+          if [[ $configured -eq 0 ]]; then
+            echo 'macOS signing credentials are not configured; the app remains unsigned.'
+            exit 0
+          fi
+          if [[ $configured -ne ${#values[@]} ]]; then
+            echo 'All macOS signing and notarization secrets must be configured.' >&2
+            exit 1
+          fi
+
+          keychain="$RUNNER_TEMP/rockion-signing.keychain-db"
+          certificate="$RUNNER_TEMP/rockion-signing.p12"
+          submission="$RUNNER_TEMP/rockion-notarization.zip"
+          keychain_password="$(openssl rand -hex 24)"
+          cleanup() {
+            security delete-keychain "$keychain" >/dev/null 2>&1 || true
+            rm -f "$certificate" "$submission"
+          }
+          trap cleanup EXIT
+
+          printf '%s' "$MACOS_SIGNING_CERTIFICATE_BASE64" | openssl base64 -d -A > "$certificate"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$certificate" -k "$keychain" \
+            -P "$MACOS_SIGNING_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security list-keychains -d user -s "$keychain" login.keychain-db
+          security set-key-partition-list -S apple-tool:,apple: -s \
+            -k "$keychain_password" "$keychain"
+
+          codesign --force --deep --options runtime --timestamp \
+            --sign "$MACOS_SIGNING_IDENTITY" "build/bin/${{ matrix.output }}.app"
+          codesign --verify --deep --strict --verbose=2 "build/bin/${{ matrix.output }}.app"
+          ditto -c -k --keepParent "build/bin/${{ matrix.output }}.app" "$submission"
+          xcrun notarytool submit "$submission" --wait \
+            --apple-id "$MACOS_NOTARY_APPLE_ID" \
+            --team-id "$MACOS_NOTARY_TEAM_ID" \
+            --password "$MACOS_NOTARY_PASSWORD"
+          xcrun stapler staple "build/bin/${{ matrix.output }}.app"
+          xcrun stapler validate "build/bin/${{ matrix.output }}.app"
       - name: Package macOS app
         if: startsWith(matrix.name, 'macos-')
         run: |

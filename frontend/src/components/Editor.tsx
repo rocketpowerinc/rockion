@@ -12,9 +12,12 @@ import { editorExtensions } from "../editor/extensions";
 import { api, onVaultChanged, type Note } from "../api";
 import PagePicker, { type PageRef } from "./PagePicker";
 import EmojiPicker from "./EmojiPicker";
+import type { WritingLanguage } from "../writingLanguage";
+import { refreshSpellcheck } from "../editor/Spellcheck";
 
 interface Props {
   note: Note | null;
+  writingLanguage: WritingLanguage;
   pages?: PageRef[];
   onDirtySaved?: () => void;
   onOpenLink?: (path: string) => void;
@@ -51,7 +54,16 @@ function firstHeadingTitle(markdown: string): string {
 }
 
 const Editor = forwardRef<EditorHandle, Props>(function Editor(
-  { note, pages, onDirtySaved, onOpenLink, onSetIcon, onNoteUpdated, onNoteRenamed },
+  {
+    note,
+    writingLanguage,
+    pages,
+    onDirtySaved,
+    onOpenLink,
+    onSetIcon,
+    onNoteUpdated,
+    onNoteRenamed,
+  },
   ref
 ) {
   const saveTimer = useRef<number | null>(null);
@@ -90,7 +102,11 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
     extensions: editorExtensions,
     content: "",
     editorProps: {
-      attributes: { class: "rk-prose" },
+      attributes: {
+        class: "rk-prose",
+        lang: writingLanguage,
+        spellcheck: "false",
+      },
       handlePaste: (_view, event) => handleImagePaste(event),
       handleDrop: (_view, event) => handleImageDrop(event),
     },
@@ -109,6 +125,12 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
       }, TITLE_SYNC_MS);
     },
   });
+
+  useEffect(() => {
+    if (!editor) return;
+    editor.view.dom.setAttribute("lang", writingLanguage);
+    void refreshSpellcheck(editor, writingLanguage);
+  }, [editor, writingLanguage]);
 
   const markdownNow = useCallback(
     () => editor?.storage?.markdown?.getMarkdown?.() ?? editor?.getText() ?? "",

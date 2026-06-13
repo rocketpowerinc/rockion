@@ -14,6 +14,10 @@ import {
   type VaultInfo,
 } from "./api";
 import { setPageIcons } from "./editor/pageIcons";
+import {
+  normalizeWritingLanguage,
+  type WritingLanguage,
+} from "./writingLanguage";
 
 export default function App() {
   const [vault, setVault] = useState<VaultInfo | null>(null);
@@ -30,6 +34,13 @@ export default function App() {
     if (saved === "light" || saved === "dark") return saved;
     return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   });
+  const [writingLanguage, setWritingLanguage] = useState<WritingLanguage>(() => {
+    try {
+      return normalizeWritingLanguage(localStorage.getItem("rockion-writing-language"));
+    } catch {
+      return "en-US";
+    }
+  });
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -40,6 +51,15 @@ export default function App() {
       /* localStorage unavailable */
     }
   }, [theme]);
+
+  useEffect(() => {
+    document.documentElement.lang = writingLanguage;
+    try {
+      localStorage.setItem("rockion-writing-language", writingLanguage);
+    } catch {
+      /* localStorage unavailable */
+    }
+  }, [writingLanguage]);
 
   const toggleTheme = useCallback(
     () => setTheme((current) => (current === "dark" ? "light" : "dark")),
@@ -241,17 +261,22 @@ export default function App() {
         tree={tree}
         error={error}
         theme={theme}
+        writingLanguage={writingLanguage}
         activePath={note?.path ?? null}
         onOpen={openNote}
         onNewNote={newNote}
         onOpenVault={openVault}
         onToggleTheme={toggleTheme}
+        onToggleWritingLanguage={() =>
+          setWritingLanguage((current) => (current === "en-US" ? "fr-FR" : "en-US"))
+        }
         onCheckForUpdate={checkForUpdate}
       />
       <main className="main">
         <Editor
           ref={editorRef}
           note={note}
+          writingLanguage={writingLanguage}
           pages={pages}
           onDirtySaved={refreshTree}
           onOpenLink={openNote}

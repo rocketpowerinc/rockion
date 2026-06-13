@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 
@@ -173,6 +174,134 @@ func (ix *Indexer) RemovePath(rel string) error {
 	return ix.removePath(rel)
 }
 
+// ApplyRename removes stale index rows for the old path and reindexes only the
+// moved notes plus notes whose links were rewritten.
+func (ix *Indexer) ApplyRename(oldRel, newRel string, isDir bool, rewritten []string) error {
+	ix.mu.Lock()
+	defer ix.mu.Unlock()
+
+	if err := ix.removePath(oldRel); err != nil {
+		return err
+	}
+
+	paths := map[string]struct{}{}
+	if isDir {
+		files, err := ix.v.MarkdownFiles()
+		if err != nil {
+			return err
+		}
+		prefix := filepath.ToSlash(filepath.Clean(newRel)) + "/"
+		for _, path := range files {
+			if strings.HasPrefix(path, prefix) {
+				paths[path] = struct{}{}
+			}
+		}
+	} else {
+		paths[filepath.ToSlash(filepath.Clean(newRel))] = struct{}{}
+	}
+	for _, path := range rewritten {
+		paths[filepath.ToSlash(filepath.Clean(path))] = struct{}{}
+	}
+
+	ordered := make([]string, 0, len(paths))
+	for path := range paths {
+		ordered = append(ordered, path)
+	}
+	sort.Strings(ordered)
+	for _, path := range ordered {
+		if err := ix.indexFile(path); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// RenameCandidates returns indexed source notes that may need rewriting when a
+// note or folder moves. Notes inside a moved folder are always included because
+// their relative links must be recalculated from the new source directory.
+func (ix *Indexer) RenameCandidates(oldRel string, isDir bool) ([]string, error) {
+	ix.mu.Lock()
+	defer ix.mu.Unlock()
+
+	oldRel = filepath.ToSlash(filepath.Clean(oldRel))
+	oldStem := strings.TrimSuffix(oldRel, filepath.Ext(oldRel))
+	oldBase := filepath.Base(filepath.FromSlash(oldRel))
+	oldBaseStem := strings.TrimSuffix(oldBase, filepath.Ext(oldBase))
+	candidates := map[string]struct{}{}
+	if !isDir {
+		// A moved note's own relative links may change even when it does not
+		// link back to the renamed path.
+		candidates[oldRel] = struct{}{}
+	}
+
+	rows, err := ix.db.Query(`
+		SELECT DISTINCT n.path, l.target_path
+		FROM links l
+		JOIN notes n ON n.id = l.source_id`)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var source, target string
+		if err := rows.Scan(&source, &target); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		target = filepath.ToSlash(filepath.Clean(target))
+		matches := target == oldRel ||
+			target == oldStem ||
+			target == oldBase ||
+			target == oldBaseStem
+		if isDir {
+			matches = matches ||
+				strings.HasPrefix(target, oldRel+"/") ||
+				strings.HasPrefix(target, oldStem+"/")
+		}
+		if matches {
+			candidates[filepath.ToSlash(filepath.Clean(source))] = struct{}{}
+		}
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	if isDir {
+		prefix := oldRel + "/"
+		noteRows, err := ix.db.Query(
+			`SELECT path FROM notes WHERE substr(path, 1, length(?)) = ?`,
+			prefix,
+			prefix,
+		)
+		if err != nil {
+			return nil, err
+		}
+		for noteRows.Next() {
+			var source string
+			if err := noteRows.Scan(&source); err != nil {
+				noteRows.Close()
+				return nil, err
+			}
+			candidates[filepath.ToSlash(filepath.Clean(source))] = struct{}{}
+		}
+		if err := noteRows.Close(); err != nil {
+			return nil, err
+		}
+		if err := noteRows.Err(); err != nil {
+			return nil, err
+		}
+	}
+
+	ordered := make([]string, 0, len(candidates))
+	for path := range candidates {
+		ordered = append(ordered, path)
+	}
+	sort.Strings(ordered)
+	return ordered, nil
+}
+
 func (ix *Indexer) removePath(rel string) error {
 	rel = filepath.ToSlash(filepath.Clean(rel))
 	tx, err := ix.db.Begin()
@@ -181,11 +310,11 @@ func (ix *Indexer) removePath(rel string) error {
 	}
 	defer tx.Rollback()
 	for _, query := range []string{
-		`DELETE FROM notes_fts WHERE path = ? OR substr(path, 1, ?) = ?`,
-		`DELETE FROM notes WHERE path = ? OR substr(path, 1, ?) = ?`,
+		`DELETE FROM notes_fts WHERE path = ? OR substr(path, 1, length(?)) = ?`,
+		`DELETE FROM notes WHERE path = ? OR substr(path, 1, length(?)) = ?`,
 	} {
 		prefix := rel + "/"
-		if _, err := tx.Exec(query, rel, len(prefix), prefix); err != nil {
+		if _, err := tx.Exec(query, rel, prefix, prefix); err != nil {
 			return err
 		}
 	}

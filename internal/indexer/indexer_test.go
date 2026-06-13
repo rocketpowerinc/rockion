@@ -3,6 +3,7 @@ package indexer
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"rockion/internal/db"
@@ -79,7 +80,13 @@ func TestRebuildIndexesAllSupportedExtensionsAndMetadata(t *testing.T) {
 
 func TestRemovePathDropsFolderSubtreeAndFTS(t *testing.T) {
 	v, d, ix := openIndexerTest(t)
-	for _, name := range []string{"folder/a.md", "folder/nested/b.md", "keep.md"} {
+	for _, name := range []string{
+		"folder/a.md",
+		"folder/nested/b.md",
+		"日本語/a.md",
+		"日本語/nested/b.md",
+		"keep.md",
+	} {
 		if err := v.Write(name, "# "+name+"\n"); err != nil {
 			t.Fatal(err)
 		}
@@ -88,6 +95,9 @@ func TestRemovePathDropsFolderSubtreeAndFTS(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := ix.RemovePath("folder"); err != nil {
+		t.Fatal(err)
+	}
+	if err := ix.RemovePath("日本語"); err != nil {
 		t.Fatal(err)
 	}
 	var notes, fts int
@@ -99,5 +109,53 @@ func TestRemovePathDropsFolderSubtreeAndFTS(t *testing.T) {
 	}
 	if notes != 1 || fts != 1 {
 		t.Fatalf("stale subtree rows remain: notes=%d fts=%d", notes, fts)
+	}
+}
+
+func TestApplyRenameUpdatesOnlyMovedAndRewrittenNotes(t *testing.T) {
+	v, d, ix := openIndexerTest(t)
+	if err := v.Write("target.md", "# Target\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := v.Write("source.md", "[Target](target.md)\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := v.Write("untouched.md", "# Untouched\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := ix.Rebuild(); err != nil {
+		t.Fatal(err)
+	}
+	if err := v.Rename("target.md", "renamed.md"); err != nil {
+		t.Fatal(err)
+	}
+	candidates, err := ix.RenameCandidates("target.md", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantCandidates := []string{"source.md", "target.md"}
+	if !reflect.DeepEqual(candidates, wantCandidates) {
+		t.Fatalf("rename candidates = %#v, want %#v", candidates, wantCandidates)
+	}
+	rewritten, err := v.RewriteLinksAfterRename("target.md", "renamed.md", false, candidates)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ix.ApplyRename("target.md", "renamed.md", false, rewritten); err != nil {
+		t.Fatal(err)
+	}
+
+	var oldCount, newCount, untouchedCount int
+	if err := d.QueryRow(`SELECT count(*) FROM notes WHERE path = 'target.md'`).Scan(&oldCount); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.QueryRow(`SELECT count(*) FROM notes WHERE path = 'renamed.md'`).Scan(&newCount); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.QueryRow(`SELECT count(*) FROM notes WHERE path = 'untouched.md'`).Scan(&untouchedCount); err != nil {
+		t.Fatal(err)
+	}
+	if oldCount != 0 || newCount != 1 || untouchedCount != 1 {
+		t.Fatalf("unexpected index state: old=%d new=%d untouched=%d", oldCount, newCount, untouchedCount)
 	}
 }

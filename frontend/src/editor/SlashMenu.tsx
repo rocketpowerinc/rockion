@@ -6,6 +6,7 @@ import {
   useState,
 } from "react";
 import type { SlashItem } from "./slashItems";
+import { shouldHandleSlashMenuKey } from "./slashMenuKeys.mjs";
 
 export interface SlashMenuRef {
   onKeyDown: (props: { event: KeyboardEvent }) => boolean;
@@ -34,6 +35,9 @@ export const SlashMenu = forwardRef<SlashMenuRef, Props>((props, ref) => {
 
   useImperativeHandle(ref, () => ({
     onKeyDown: ({ event }) => {
+      // When "/text" matches no command, leave Enter and arrow keys to the
+      // editor so the slash-prefixed text behaves like an ordinary paragraph.
+      if (!shouldHandleSlashMenuKey(event.key, props.items.length)) return false;
       if (event.key === "ArrowUp") {
         setSelected((s) => (s + props.items.length - 1) % props.items.length);
         return true;

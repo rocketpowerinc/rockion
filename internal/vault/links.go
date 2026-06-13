@@ -15,21 +15,23 @@ var (
 // RewriteLinksAfterRename preserves internal link targets when a note or folder
 // moves. It also recalculates every relative link inside moved notes because the
 // source directory changed.
-func (v *Vault) RewriteLinksAfterRename(oldRel, newRel string, isDir bool) error {
+func (v *Vault) RewriteLinksAfterRename(
+	oldRel, newRel string,
+	isDir bool,
+	originalSources []string,
+) ([]string, error) {
 	oldRel = filepath.ToSlash(filepath.Clean(oldRel))
 	newRel = filepath.ToSlash(filepath.Clean(newRel))
-	files, err := v.MarkdownFiles()
-	if err != nil {
-		return err
-	}
-	for _, currentSource := range files {
-		originalSource, sourceMoved := mapRenamedPath(currentSource, newRel, oldRel, isDir)
+	rewritten := []string{}
+	for _, originalSource := range originalSources {
+		originalSource = filepath.ToSlash(filepath.Clean(originalSource))
+		currentSource, sourceMoved := mapRenamedPath(originalSource, oldRel, newRel, isDir)
 		if !sourceMoved {
-			originalSource = currentSource
+			currentSource = originalSource
 		}
 		note, err := v.Read(currentSource)
 		if err != nil {
-			return err
+			return rewritten, err
 		}
 		updated := rewriteMarkdownLinks(
 			note.Markdown,
@@ -42,12 +44,13 @@ func (v *Vault) RewriteLinksAfterRename(oldRel, newRel string, isDir bool) error
 		)
 		updated = rewriteWikilinks(updated, oldRel, newRel, isDir)
 		if updated != note.Markdown {
-			if err := v.Write(currentSource, updated); err != nil {
-				return err
+			if err := v.WriteExpected(currentSource, updated, note.Version); err != nil {
+				return rewritten, err
 			}
+			rewritten = append(rewritten, currentSource)
 		}
 	}
-	return nil
+	return rewritten, nil
 }
 
 func rewriteMarkdownLinks(

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -227,7 +228,12 @@ func TestRenameMigratesLinksAndIcons(t *testing.T) {
 	if err := v.RenameIconPath("target.md", "renamed.md", false); err != nil {
 		t.Fatal(err)
 	}
-	if err := v.RewriteLinksAfterRename("target.md", "renamed.md", false); err != nil {
+	if _, err := v.RewriteLinksAfterRename(
+		"target.md",
+		"renamed.md",
+		false,
+		[]string{"source.md"},
+	); err != nil {
 		t.Fatal(err)
 	}
 	source, err := v.Read("source.md")
@@ -272,7 +278,12 @@ func TestFolderMoveRecalculatesRelativeLinks(t *testing.T) {
 	if err := v.Rename("old", "archive/deep"); err != nil {
 		t.Fatal(err)
 	}
-	if err := v.RewriteLinksAfterRename("old", "archive/deep", true); err != nil {
+	if _, err := v.RewriteLinksAfterRename(
+		"old",
+		"archive/deep",
+		true,
+		[]string{"old/source.md"},
+	); err != nil {
 		t.Fatal(err)
 	}
 	source, err := v.Read("archive/deep/source.md")
@@ -281,5 +292,68 @@ func TestFolderMoveRecalculatesRelativeLinks(t *testing.T) {
 	}
 	if !strings.Contains(source.Markdown, "[Target](../../target.md)") {
 		t.Fatalf("relative link was not recalculated: %q", source.Markdown)
+	}
+}
+
+func TestCreateIsExclusive(t *testing.T) {
+	v := openTestVault(t)
+	const attempts = 8
+	var wg sync.WaitGroup
+	results := make(chan error, attempts)
+	for range attempts {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := v.Create("", "Only Once")
+			results <- err
+		}()
+	}
+	wg.Wait()
+	close(results)
+
+	successes := 0
+	for err := range results {
+		if err == nil {
+			successes++
+		}
+	}
+	if successes != 1 {
+		t.Fatalf("exclusive create succeeded %d times, want 1", successes)
+	}
+	note, err := v.Read("Only Once.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if note.Markdown != "# Only Once\n\n" {
+		t.Fatalf("created note was corrupted: %q", note.Markdown)
+	}
+}
+
+func TestPlanTitleRenameHandlesCollisionsAndCaseChanges(t *testing.T) {
+	v := openTestVault(t)
+	if err := v.Write("hello.md", "# hello\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := v.Write("Target.md", "# Target\n"); err != nil {
+		t.Fatal(err)
+	}
+
+	casePath, changed, err := v.PlanTitleRename("hello.md", "Hello")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !changed || casePath != "Hello.md" {
+		t.Fatalf("case-only plan = %q, %v; want Hello.md, true", casePath, changed)
+	}
+	if err := v.Rename("hello.md", casePath); err != nil {
+		t.Fatal(err)
+	}
+
+	collisionPath, changed, err := v.PlanTitleRename("Hello.md", "Target")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !changed || collisionPath != "Target 2.md" {
+		t.Fatalf("collision plan = %q, %v; want Target 2.md, true", collisionPath, changed)
 	}
 }

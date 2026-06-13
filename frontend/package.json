@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "test": "node --test tests/*.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -24,8 +25,11 @@
     "@tiptap/react": "^2.4.0",
     "@tiptap/starter-kit": "^2.4.0",
     "@tiptap/suggestion": "^2.4.0",
+    "dictionary-en": "^4.0.0",
+    "dictionary-fr": "^3.0.0",
     "highlight.js": "^11.9.0",
     "lowlight": "^3.1.0",
+    "nspell": "^2.1.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tiptap-extension-global-drag-handle": "^0.1.18",
@@ -35,6 +39,7 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^6.0.2",
+    "markdown-it": "^14.1.0",
     "typescript": "^5.5.3",
     "vite": "^8.0.16"
   }

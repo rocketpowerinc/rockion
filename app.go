@@ -182,8 +182,8 @@ func (a *App) ReadNote(path string) (model.Note, error) {
 }
 
 func (a *App) WriteNote(path, markdown, expectedVersion string) (model.Note, error) {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	if err := a.requireVault(); err != nil {
 		return model.Note{}, err
 	}
@@ -204,8 +204,8 @@ func (a *App) WriteNote(path, markdown, expectedVersion string) (model.Note, err
 }
 
 func (a *App) CreateNote(dir, title string) (model.Note, error) {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	if err := a.requireVault(); err != nil {
 		return model.Note{}, err
 	}
@@ -220,14 +220,22 @@ func (a *App) CreateNote(dir, title string) (model.Note, error) {
 }
 
 func (a *App) RenamePath(oldPath, newPath string) error {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.renamePathLocked(oldPath, newPath)
+}
+
+func (a *App) renamePathLocked(oldPath, newPath string) error {
 	if err := a.requireVault(); err != nil {
 		return err
 	}
 	isDir, err := a.vault.IsDir(oldPath)
 	if err != nil {
 		return err
+	}
+	linkCandidates, err := a.indexer.RenameCandidates(oldPath, isDir)
+	if err != nil {
+		return fmt.Errorf("find links to rewrite: %w", err)
 	}
 	if err := a.vault.Rename(oldPath, newPath); err != nil {
 		return err
@@ -236,42 +244,45 @@ func (a *App) RenamePath(oldPath, newPath string) error {
 	if err := a.vault.RenameIconPath(oldPath, newPath, isDir); err != nil {
 		followUpErrs = append(followUpErrs, fmt.Errorf("rename icon metadata: %w", err))
 	}
-	if err := a.vault.RewriteLinksAfterRename(oldPath, newPath, isDir); err != nil {
-		followUpErrs = append(followUpErrs, fmt.Errorf("rewrite links: %w", err))
+	rewritten, rewriteErr := a.vault.RewriteLinksAfterRename(
+		oldPath,
+		newPath,
+		isDir,
+		linkCandidates,
+	)
+	if rewriteErr != nil {
+		followUpErrs = append(followUpErrs, fmt.Errorf("rewrite links: %w", rewriteErr))
 	}
-	if err := a.indexer.Rebuild(); err != nil {
-		followUpErrs = append(followUpErrs, fmt.Errorf("rebuild index: %w", err))
+	if err := a.indexer.ApplyRename(oldPath, newPath, isDir, rewritten); err != nil {
+		followUpErrs = append(followUpErrs, fmt.Errorf("update index: %w", err))
 	}
 	return errors.Join(followUpErrs...)
 }
 
 // RenameToTitle renames a note so its filename matches the given title,
-// appending " N" if that name is already taken. It reuses the same path/link/
-// index follow-ups as RenamePath and returns the (possibly moved) note. If the
-// filename already matches, the note is returned unchanged.
+// appending " N" if that name is already taken. It returns the moved note.
 func (a *App) RenameToTitle(path, title string) (model.Note, error) {
-	a.mu.RLock()
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	if err := a.requireVault(); err != nil {
-		a.mu.RUnlock()
 		return model.Note{}, err
 	}
 	newRel, changed, err := a.vault.PlanTitleRename(path, title)
-	a.mu.RUnlock()
 	if err != nil {
 		return model.Note{}, err
 	}
-	if !changed {
-		return a.ReadNote(path)
+	if changed {
+		if err := a.renamePathLocked(path, newRel); err != nil {
+			return model.Note{}, err
+		}
+		path = newRel
 	}
-	if err := a.RenamePath(path, newRel); err != nil {
-		return model.Note{}, err
-	}
-	return a.ReadNote(newRel)
+	return a.vault.Read(path)
 }
 
 func (a *App) DeletePath(path string) error {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	if err := a.requireVault(); err != nil {
 		return err
 	}
@@ -312,8 +323,8 @@ func (a *App) Backlinks(path string) ([]model.SearchHit, error) {
 
 // SaveImage stores image bytes in assets/ and returns the vault-relative path.
 func (a *App) SaveImage(name string, data []byte) (string, error) {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	if err := a.requireVault(); err != nil {
 		return "", err
 	}
@@ -322,8 +333,8 @@ func (a *App) SaveImage(name string, data []byte) (string, error) {
 
 // SetNoteIcon sets (or clears, if icon == "") the emoji icon for a note.
 func (a *App) SetNoteIcon(path, icon string) error {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	if err := a.requireVault(); err != nil {
 		return err
 	}

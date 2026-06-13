@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 interface Props {
-  onSubmit: (title: string) => void;
+  onSubmit: (title: string) => Promise<void>;
   onClose: () => void;
 }
 
@@ -10,6 +10,8 @@ interface Props {
 // silently failed to create pages there.
 export default function NewPageModal({ onSubmit, onClose }: Props) {
   const [title, setTitle] = useState("Untitled");
+  const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -20,12 +22,20 @@ export default function NewPageModal({ onSubmit, onClose }: Props) {
     return () => clearTimeout(t);
   }, []);
 
-  const submit = () => {
-    if (title.trim()) onSubmit(title);
+  const submit = async () => {
+    if (!title.trim() || submittingRef.current) return;
+    submittingRef.current = true;
+    setSubmitting(true);
+    try {
+      await onSubmit(title);
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
   };
 
   return (
-    <div className="switcher-overlay" onClick={onClose}>
+    <div className="switcher-overlay" onClick={() => !submitting && onClose()}>
       <div className="switcher new-page" onClick={(e) => e.stopPropagation()}>
         <input
           ref={inputRef}
@@ -36,19 +46,19 @@ export default function NewPageModal({ onSubmit, onClose }: Props) {
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
-              submit();
+              void submit();
             } else if (e.key === "Escape") {
               e.preventDefault();
-              onClose();
+              if (!submitting) onClose();
             }
           }}
         />
         <div className="new-page-actions">
-          <button className="ghost" onClick={onClose}>
+          <button className="ghost" disabled={submitting} onClick={onClose}>
             Cancel
           </button>
-          <button className="primary" onClick={submit}>
-            Create
+          <button className="primary" disabled={submitting} onClick={() => void submit()}>
+            {submitting ? "Creating…" : "Create"}
           </button>
         </div>
       </div>

@@ -1,16 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import type { TreeNode } from "../api";
+import {
+  writingLanguageLabel,
+  type WritingLanguage,
+} from "../writingLanguage";
 
 interface Props {
   vaultName: string;
   tree: TreeNode[];
   error?: string | null;
   theme: "light" | "dark";
+  writingLanguage: WritingLanguage;
   activePath: string | null;
   onOpen: (path: string) => void;
   onNewNote: (dir: string) => void;
   onOpenVault: () => void;
   onToggleTheme: () => void;
+  onToggleWritingLanguage: () => void;
   onCheckForUpdate: () => Promise<void>;
 }
 
@@ -19,11 +25,13 @@ export default function Sidebar({
   tree,
   error,
   theme,
+  writingLanguage,
   activePath,
   onOpen,
   onNewNote,
   onOpenVault,
   onToggleTheme,
+  onToggleWritingLanguage,
   onCheckForUpdate,
 }: Props) {
   const items = Array.isArray(tree) ? tree : [];
@@ -116,6 +124,18 @@ export default function Sidebar({
               <span>Theme</span>
               <span className="settings-menu-hint">
                 {theme === "dark" ? "Switch to light" : "Switch to dark"}
+              </span>
+            </button>
+            <button
+              role="menuitem"
+              onClick={() => {
+                onToggleWritingLanguage();
+                setSettingsOpen(false);
+              }}
+            >
+              <span>Writing Language</span>
+              <span className="settings-menu-hint">
+                {writingLanguageLabel(writingLanguage)}
               </span>
             </button>
           </div>

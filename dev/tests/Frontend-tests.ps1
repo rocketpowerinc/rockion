@@ -62,6 +62,7 @@ try {
     Invoke-CheckedCommand 'Full dependency audit' {
         & npm audit --audit-level=moderate
     }
+    Invoke-CheckedCommand 'Frontend regression tests' { & npm test }
     Invoke-CheckedCommand 'Frontend production build' { & npm run build }
 } finally {
     Pop-Location

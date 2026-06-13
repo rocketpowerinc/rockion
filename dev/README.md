@@ -73,3 +73,18 @@ Useful options:
 
 After all target builds and checksum generation pass, GitHub publishes the
 release and its generated artifacts automatically.
+
+## Optional platform signing
+
+Release artifacts are checksum-verified by every maintained installer. To add
+native operating-system trust, configure these GitHub repository secrets:
+
+- Windows: `WINDOWS_SIGNING_CERTIFICATE_BASE64`,
+  `WINDOWS_SIGNING_CERTIFICATE_PASSWORD`
+- macOS: `MACOS_SIGNING_CERTIFICATE_BASE64`,
+  `MACOS_SIGNING_CERTIFICATE_PASSWORD`, `MACOS_SIGNING_IDENTITY`,
+  `MACOS_NOTARY_APPLE_ID`, `MACOS_NOTARY_TEAM_ID`,
+  `MACOS_NOTARY_PASSWORD`
+
+When no values are configured, the workflow logs that the relevant artifact is
+unsigned. A partially configured secret set fails the release.

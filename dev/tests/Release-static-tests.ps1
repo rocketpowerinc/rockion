@@ -106,7 +106,12 @@ foreach ($requiredText in @(
     'Prepare embedded frontend directory',
     'wails generate module -nocolour',
     'FORCE_JAVASCRIPT_ACTIONS_TO_NODE24',
-    'SHA256SUMS.txt'
+    'SHA256SUMS.txt',
+    'WINDOWS_SIGNING_CERTIFICATE_BASE64',
+    'MACOS_SIGNING_CERTIFICATE_BASE64',
+    'signtool verify',
+    'xcrun notarytool submit',
+    'xcrun stapler validate'
 )) {
     if (-not $workflow.Contains($requiredText)) {
         Add-Failure "Release workflow is missing required configuration: $requiredText"
@@ -248,6 +253,56 @@ if ($releaseCoordinator.Contains('git ls-remote --exit-code')) {
 }
 if ($releaseCoordinator.Contains('workflow run anduinos-preflight.yml')) {
     Add-Failure 'Release coordinator must not build the AnduinOS package twice; the preflight is standalone.'
+}
+foreach ($requiredText in @(
+    '.*\.pem$',
+    '.*\.keystore$',
+    '.*\.kdbx$',
+    '$SecretPatterns',
+    'private key',
+    'GitHub fine-grained token',
+    'Refusing to commit staged content that resembles a secret'
+)) {
+    if (-not $releaseCoordinator.Contains($requiredText)) {
+        Add-Failure "Release coordinator is missing secret screening behavior: $requiredText"
+    }
+}
+
+$installerChecks = @(
+    @{
+        Path = 'dev\linux\install-latest.sh'
+        Required = @('SHA256SUMS.txt', 'sha256sum', 'SHA-256 verified.', 'apt-get install')
+        VerifyMarker = 'SHA-256 verified.'
+        ExecuteMarker = 'apt-get install'
+    },
+    @{
+        Path = 'dev\macos\install-latest.sh'
+        Required = @('SHA256SUMS.txt', 'shasum -a 256', 'SHA-256 verified.', 'unzip -oq')
+        VerifyMarker = 'SHA-256 verified.'
+        ExecuteMarker = 'unzip -oq'
+    },
+    @{
+        Path = 'dev\windows\install-latest.ps1'
+        Required = @('SHA256SUMS.txt', 'Get-FileHash', 'SHA-256 verified.', 'Start-Process')
+        VerifyMarker = 'SHA-256 verified.'
+        ExecuteMarker = 'Start-Process'
+    }
+)
+foreach ($installerCheck in $installerChecks) {
+    $installerPath = Join-Path $RepoRoot $installerCheck.Path
+    if (-not (Test-Path -LiteralPath $installerPath)) {
+        Add-Failure "Verified installer script is missing: $($installerCheck.Path)"
+        continue
+    }
+    $installer = Get-Content -Raw -LiteralPath $installerPath
+    foreach ($requiredText in $installerCheck.Required) {
+        if (-not $installer.Contains($requiredText)) {
+            Add-Failure "$($installerCheck.Path) is missing verification behavior: $requiredText"
+        }
+    }
+    if ($installer.IndexOf($installerCheck.VerifyMarker) -gt $installer.IndexOf($installerCheck.ExecuteMarker)) {
+        Add-Failure "$($installerCheck.Path) executes the artifact before checksum verification."
+    }
 }
 
 $anduinosCoordinatorPath = Join-Path $RepoRoot 'dev\windows-test-anduinos-package.ps1'

@@ -10,14 +10,14 @@ Single Go binary (Wails) wrapping a React + TipTap editor.
 
 ## Install in one command
 
-Each `…/releases/latest/download/<asset>` URL always points at the newest release,
-so these one-liners fetch and install the latest build. Re-run any of them to update.
+Each command downloads the requested asset and `SHA256SUMS.txt`, verifies the
+asset, and only then installs or runs it. Re-run the command to update.
 
 **AnduinOS / Ubuntu 24.04 (x64)** — downloads to `/tmp` (so apt's `_apt` sandbox
 can read it) and installs, pulling in dependencies.
 
 ```bash
-curl -fSL -o /tmp/rockion-anduinos-amd64.deb https://github.com/rocketpowerinc/rockion/releases/latest/download/rockion-anduinos-amd64.deb && sudo apt install -y /tmp/rockion-anduinos-amd64.deb
+d="$(mktemp -d /tmp/rockion-install.XXXXXX)" && cd "$d" && curl -fSLO https://github.com/rocketpowerinc/rockion/releases/latest/download/rockion-anduinos-amd64.deb && curl -fSLO https://github.com/rocketpowerinc/rockion/releases/latest/download/SHA256SUMS.txt && grep '  rockion-anduinos-amd64.deb$' SHA256SUMS.txt | sha256sum -c - && chmod 0644 rockion-anduinos-amd64.deb && sudo apt install -y "$d/rockion-anduinos-amd64.deb"
 ```
 
 This package targets the Ubuntu 24.04 WebKitGTK 4.1 ABI used by AnduinOS; it will
@@ -28,13 +28,13 @@ distributions are outside the release compatibility guarantee.
 prompt if it appears; SmartScreen may warn since the build is unsigned.
 
 ```powershell
-$ProgressPreference='SilentlyContinue'; $o="$env:TEMP\rockion-installer.exe"; Invoke-WebRequest 'https://github.com/rocketpowerinc/rockion/releases/latest/download/rockion-windows-amd64-installer.exe' -OutFile $o; Start-Process -FilePath $o -ArgumentList '/S' -Wait; Remove-Item $o
+$ProgressPreference='SilentlyContinue'; $d=Join-Path $env:TEMP "rockion-install-$([guid]::NewGuid().ToString('N'))"; New-Item -ItemType Directory $d|Out-Null; $a='rockion-windows-amd64-installer.exe'; $b='https://github.com/rocketpowerinc/rockion/releases/latest/download'; Invoke-WebRequest "$b/$a" -OutFile "$d/$a"; Invoke-WebRequest "$b/SHA256SUMS.txt" -OutFile "$d/SHA256SUMS.txt"; $e=((Get-Content "$d/SHA256SUMS.txt"|Where-Object {$_ -match "^([0-9a-fA-F]{64})\s+\*?$([regex]::Escape($a))$"}|Select-Object -First 1)-split '\s+')[0]; if(!$e -or (Get-FileHash "$d/$a" -Algorithm SHA256).Hash -ne $e){throw 'Checksum verification failed'}; Start-Process "$d/$a" -ArgumentList '/S' -Wait; Remove-Item $d -Recurse -Force
 ```
 
 **Windows x64 — portable (no install, download + run):**
 
 ```powershell
-$ProgressPreference='SilentlyContinue'; $o="$env:LOCALAPPDATA\rockion.exe"; Invoke-WebRequest 'https://github.com/rocketpowerinc/rockion/releases/latest/download/rockion-windows-amd64.exe' -OutFile $o; Start-Process $o
+$ProgressPreference='SilentlyContinue'; $d=Join-Path $env:TEMP "rockion-install-$([guid]::NewGuid().ToString('N'))"; New-Item -ItemType Directory $d|Out-Null; $a='rockion-windows-amd64.exe'; $b='https://github.com/rocketpowerinc/rockion/releases/latest/download'; Invoke-WebRequest "$b/$a" -OutFile "$d/$a"; Invoke-WebRequest "$b/SHA256SUMS.txt" -OutFile "$d/SHA256SUMS.txt"; $e=((Get-Content "$d/SHA256SUMS.txt"|Where-Object {$_ -match "^([0-9a-fA-F]{64})\s+\*?$([regex]::Escape($a))$"}|Select-Object -First 1)-split '\s+')[0]; if(!$e -or (Get-FileHash "$d/$a" -Algorithm SHA256).Hash -ne $e){throw 'Checksum verification failed'}; Move-Item "$d/$a" "$env:LOCALAPPDATA\rockion.exe" -Force; Remove-Item $d -Recurse -Force; Start-Process "$env:LOCALAPPDATA\rockion.exe"
 ```
 
 **macOS (Apple Silicon only)** — unzips into `/Applications`, strips the Gatekeeper
@@ -42,11 +42,13 @@ quarantine (the app is unsigned), and launches it. Prefix `sudo unzip` if
 `/Applications` isn't writable.
 
 ```bash
-curl -fSL -o /tmp/rockion-macos-arm64.zip https://github.com/rocketpowerinc/rockion/releases/latest/download/rockion-macos-arm64.zip && unzip -oq /tmp/rockion-macos-arm64.zip -d /Applications && xattr -dr com.apple.quarantine /Applications/Rockion.app && open /Applications/Rockion.app
+d="$(mktemp -d /tmp/rockion-install.XXXXXX)" && cd "$d" && curl -fSLO https://github.com/rocketpowerinc/rockion/releases/latest/download/rockion-macos-arm64.zip && curl -fSLO https://github.com/rocketpowerinc/rockion/releases/latest/download/SHA256SUMS.txt && expected="$(awk '$2=="rockion-macos-arm64.zip"{print $1}' SHA256SUMS.txt)" && test "$(shasum -a 256 rockion-macos-arm64.zip | awk '{print $1}')" = "$expected" && unzip -oq rockion-macos-arm64.zip -d /Applications && xattr -dr com.apple.quarantine /Applications/Rockion.app && open /Applications/Rockion.app
 ```
 
 > These mirror the maintained scripts in `dev/linux/install-latest.sh`,
 > `dev/windows/install-latest.ps1`, and `dev/macos/install-latest.sh`.
+> Release builds support Windows Authenticode signing and Apple signing/notarization
+> when the corresponding repository secrets are configured.
 
 ## Uninstall in one command
 

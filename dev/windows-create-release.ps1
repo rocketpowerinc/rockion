@@ -216,8 +216,16 @@ Invoke-Native 'Staging release source changes...' { & git add --all }
 $StagedFiles = @(& git diff --cached --name-only)
 $ForbiddenPatterns = @(
     '(^|/).*\.key$',
+    '(^|/).*\.pem$',
     '(^|/).*\.pfx$',
     '(^|/).*\.p12$',
+    '(^|/).*\.der$',
+    '(^|/).*\.jks$',
+    '(^|/).*\.keystore$',
+    '(^|/).*\.kdbx$',
+    '(^|/).*\.ovpn$',
+    '(^|/)(id_rsa|id_ed25519)(?:\.pub)?$',
+    '(^|/)(credentials?|secrets?|tokens?)(?:\.[^/]+)?$',
     '(^|/)\.env(?:\.|$)',
     '(^|/)\.codex-tmp/',
     '(^|/)\.release/',
@@ -235,6 +243,37 @@ $ForbiddenFiles = @(
 if ($ForbiddenFiles.Count -gt 0) {
     Write-Host '[ERROR] Refusing to commit generated artifacts or possible secrets:' -ForegroundColor Red
     $ForbiddenFiles | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
+    & git reset --mixed HEAD
+    exit 1
+}
+
+$SecretPatterns = @(
+    @{ Name = 'private key'; Pattern = ('-----BEGIN ' + '(?:RSA |EC |OPENSSH )?PRIVATE KEY-----') },
+    @{ Name = 'AWS access key'; Pattern = '\bAKIA[0-9A-Z]{16}\b' },
+    @{ Name = 'GitHub token'; Pattern = ('\bgh' + '[pousr]_[A-Za-z0-9]{30,}\b') },
+    @{ Name = 'GitHub fine-grained token'; Pattern = ('\bgithub_' + 'pat_[A-Za-z0-9_]{30,}\b') },
+    @{ Name = 'Slack token'; Pattern = ('\bxox' + '[baprs]-[A-Za-z0-9-]{20,}\b') },
+    @{ Name = 'OpenAI-style secret'; Pattern = ('\bsk-' + '[A-Za-z0-9_-]{20,}\b') }
+)
+$SecretFindings = [System.Collections.Generic.List[string]]::new()
+foreach ($path in $StagedFiles) {
+    $numstat = @(& git diff --cached --numstat -- $path)
+    if ($numstat.Count -eq 0 -or $numstat[0] -match '^-\s+-\s+') {
+        continue
+    }
+    $content = (& git show ":$path" 2>$null | Out-String)
+    if ($LASTEXITCODE -ne 0) {
+        continue
+    }
+    foreach ($secretPattern in $SecretPatterns) {
+        if ($content -match $secretPattern.Pattern) {
+            $SecretFindings.Add("$path ($($secretPattern.Name))")
+        }
+    }
+}
+if ($SecretFindings.Count -gt 0) {
+    Write-Host '[ERROR] Refusing to commit staged content that resembles a secret:' -ForegroundColor Red
+    $SecretFindings | Sort-Object -Unique | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
     & git reset --mixed HEAD
     exit 1
 }

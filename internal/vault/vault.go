@@ -272,11 +272,11 @@ func (v *Vault) Create(dir, title string) (model.Note, error) {
 	if err != nil {
 		return model.Note{}, err
 	}
-	if _, err := os.Stat(full); err == nil {
-		return model.Note{}, fmt.Errorf("note already exists: %s", rel)
-	}
 	body := "# " + title + "\n\n"
-	if err := v.Write(rel, body); err != nil {
+	if err := createFileExclusive(full, []byte(body), 0o644); err != nil {
+		if errors.Is(err, os.ErrExist) {
+			return model.Note{}, fmt.Errorf("note already exists: %s", rel)
+		}
 		return model.Note{}, err
 	}
 	return v.Read(rel)
@@ -305,6 +305,14 @@ func (v *Vault) PlanTitleRename(oldRel, title string) (string, bool, error) {
 		dir = ""
 	}
 	oldSlash := filepath.ToSlash(oldRel)
+	oldFull, err := v.resolve(oldRel, false)
+	if err != nil {
+		return "", false, err
+	}
+	oldInfo, err := os.Stat(oldFull)
+	if err != nil {
+		return "", false, err
+	}
 	makeRel := func(name string) string {
 		return filepath.ToSlash(filepath.Join(dir, name+ext))
 	}
@@ -317,10 +325,13 @@ func (v *Vault) PlanTitleRename(oldRel, title string) (string, bool, error) {
 		if err != nil {
 			return "", false, err
 		}
-		if _, statErr := os.Stat(full); os.IsNotExist(statErr) {
+		candidateInfo, statErr := os.Stat(full)
+		if os.IsNotExist(statErr) {
 			return candidate, true, nil
 		} else if statErr != nil {
 			return "", false, statErr
+		} else if os.SameFile(oldInfo, candidateInfo) {
+			return candidate, candidate != oldSlash, nil
 		}
 		candidate = makeRel(fmt.Sprintf("%s %d", base, i))
 		if candidate == oldSlash {
@@ -357,13 +368,21 @@ func (v *Vault) Rename(oldRel, newRel string) error {
 			return err
 		}
 	}
-	if _, err := os.Lstat(to); err == nil {
-		return fmt.Errorf("destination already exists: %s", newRel)
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return err
+	toInfo, toErr := os.Lstat(to)
+	caseOnlyRename := false
+	if toErr == nil {
+		caseOnlyRename = os.SameFile(info, toInfo)
+		if !caseOnlyRename {
+			return fmt.Errorf("destination already exists: %s", newRel)
+		}
+	} else if !errors.Is(toErr, os.ErrNotExist) {
+		return toErr
 	}
 	if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
 		return err
+	}
+	if caseOnlyRename {
+		return renameCaseOnly(from, to)
 	}
 	return os.Rename(from, to)
 }
@@ -545,6 +564,52 @@ func titleFor(rel string, fm map[string]any, body string) string {
 
 func atomicWriteFile(path string, data []byte, perm os.FileMode) (err error) {
 	return atomicWriteFileChecked(path, data, perm, "")
+}
+
+func createFileExclusive(path string, data []byte, perm os.FileMode) (err error) {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, perm)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = file.Close()
+		if err != nil {
+			_ = os.Remove(path)
+		}
+	}()
+	if _, err = file.Write(data); err != nil {
+		return err
+	}
+	if err = file.Sync(); err != nil {
+		return err
+	}
+	return file.Close()
+}
+
+func renameCaseOnly(from, to string) error {
+	temp, err := os.CreateTemp(filepath.Dir(from), "."+filepath.Base(from)+".rename-*")
+	if err != nil {
+		return err
+	}
+	tempPath := temp.Name()
+	if err := temp.Close(); err != nil {
+		_ = os.Remove(tempPath)
+		return err
+	}
+	if err := os.Remove(tempPath); err != nil {
+		return err
+	}
+	if err := os.Rename(from, tempPath); err != nil {
+		return err
+	}
+	if err := os.Rename(tempPath, to); err != nil {
+		_ = os.Rename(tempPath, from)
+		return err
+	}
+	return nil
 }
 
 func atomicWriteFileChecked(path string, data []byte, perm os.FileMode, expectedVersion string) (err error) {

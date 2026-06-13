@@ -40,15 +40,12 @@ Single Go binary (Wails) wrapping a React + TipTap editor.
 Grab a prebuilt binary from the [Releases](https://github.com/rocketpowerinc/rockion/releases) page:
 
 - **Windows x64** - `rockion-windows-amd64-installer.exe` or portable `.exe`
-- **Windows ARM64** - `rockion-windows-arm64-installer.exe` or portable `.exe`
-- **macOS Intel** - `rockion-macos-amd64.zip`
 - **macOS Apple Silicon** - `rockion-macos-arm64.zip`
-- **Linux x64** - `rockion-linux-x86_64.AppImage`
-- **Linux ARM64** - `rockion-linux-aarch64.AppImage`
+- **Ubuntu 26.04 x64** - `rockion-linux-x86_64.AppImage`
 
-Linux releases are self-contained AppImages built on Ubuntu 22.04 for a
-conservative glibc baseline. Both architectures are startup-tested on Ubuntu
-22.04, Ubuntu 24.04, Ubuntu 26.04, Debian 12, and Fedora 42 before publication.
+The Linux release is a self-contained x86_64 AppImage built on Ubuntu 22.04
+for a conservative glibc baseline and startup-tested on Ubuntu 26.04 before
+publication.
 
 ```bash
 chmod +x rockion-linux-x86_64.AppImage
@@ -108,10 +105,11 @@ Run the Windows release coordinator:
 
 It updates version metadata and the changelog, runs the full Go/frontend/security
 suite, creates the release commit and tag, builds a local Windows smoke artifact,
-then pushes the tag. GitHub Actions builds native Windows x64/ARM64, macOS
-Intel/Apple Silicon, and Linux x64/ARM64 packages with SHA-256 checksums.
+and runs the Ubuntu AppImage preflight. It then pushes the tag, and GitHub
+Actions builds Windows x64, macOS Apple Silicon, and an Ubuntu 26.04 x64
+AppImage with SHA-256 checksums.
 
-After all six platform builds and checksum generation succeed, the resulting
+After all three platform builds and checksum generation succeed, the resulting
 GitHub release is published automatically. See [dev/README.md](./dev/README.md)
 for local-only and no-wait options.
 

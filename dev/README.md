@@ -14,7 +14,7 @@ The suite checks:
 
 - Go formatting, module integrity, tests, vetting, and known vulnerabilities.
 - Reproducible frontend installation, production build, and dependency audit.
-- JSON metadata, PowerShell syntax, Git whitespace, and the six-target release
+- JSON metadata, PowerShell syntax, Git whitespace, and the three-target release
   workflow.
 
 Use `-SkipInstall` only when `frontend/node_modules` is already synchronized
@@ -30,9 +30,8 @@ Commit and push the branch you want to test, then run:
 ```
 
 This starts `.github/workflows/appimage-preflight.yml`, which only builds the
-Linux x64 and ARM64 AppImages. It launches them on Ubuntu 22.04, 24.04, 26.04,
-Debian 12, and Fedora 42. It does not build Windows or macOS packages, update
-version metadata, create a tag, or publish a release.
+Linux x64 AppImage and launches it on Ubuntu 26.04. It does not build Windows
+or macOS packages, update version metadata, create a tag, or publish a release.
 
 Use `-Ref branch-name` to test another pushed branch or `-NoWait` to start the
 workflow without watching it finish.
@@ -45,18 +44,18 @@ workflow without watching it finish.
 
 The script prompts for a semantic version, updates Rockion's version metadata
 and changelog, runs the full test suite, creates a release commit and annotated
-tag, then pushes them. Pushing the tag starts `.github/workflows/release.yml`.
+tag, then pushes them. Before creating the tag, it runs the Ubuntu AppImage
+preflight. Pushing the tag starts `.github/workflows/release.yml`.
 
 GitHub Actions builds these native packages:
 
-- Windows x64 and ARM64
-- macOS Intel and Apple Silicon
-- Linux x64 and ARM64
+- Windows x64
+- macOS Apple Silicon
+- Ubuntu 26.04 x64 AppImage
 
-Linux packages are x86_64 and ARM64 AppImages built on Ubuntu 22.04. The
-packaging script bundles GTK, WebKitGTK, its helper processes, and runtime data.
-Both AppImages must pass startup tests on Ubuntu 22.04, 24.04, 26.04, Debian 12,
-and Fedora 42 before the release is published.
+The Linux package is an x86_64 AppImage built on Ubuntu 22.04. The packaging
+script bundles GTK, WebKitGTK, its helper processes, and runtime data. The
+AppImage must pass its Ubuntu 26.04 startup test before publication.
 
 Wails desktop packages depend on native platform toolchains. The Windows script
 therefore coordinates the release instead of attempting to cross-compile

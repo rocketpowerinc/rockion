@@ -38,10 +38,12 @@ func TestExpectedAssetName(t *testing.T) {
 		want string
 	}{
 		{"windows", "amd64", "installer", "rockion-windows-amd64-installer.exe"},
-		{"windows", "arm64", "portable", "rockion-windows-arm64.exe"},
+		{"windows", "amd64", "portable", "rockion-windows-amd64.exe"},
+		{"windows", "arm64", "portable", ""},
 		{"darwin", "arm64", "manual", "rockion-macos-arm64.zip"},
+		{"darwin", "amd64", "manual", ""},
 		{"linux", "amd64", "manual", "rockion-linux-x86_64.AppImage"},
-		{"linux", "arm64", "manual", "rockion-linux-aarch64.AppImage"},
+		{"linux", "arm64", "manual", ""},
 		{"linux", "386", "manual", ""},
 	}
 	for _, test := range tests {

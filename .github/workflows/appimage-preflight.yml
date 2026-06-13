@@ -15,26 +15,8 @@ concurrency:
 
 jobs:
   build:
-    name: Build AppImage (${{ matrix.name }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: linux-x64
-            os: ubuntu-22.04
-            platform: linux/amd64
-            arch: amd64
-            output: rockion-linux-amd64
-            appimage: rockion-linux-x86_64.AppImage
-            artifact: rockion-linux-x86_64
-          - name: linux-arm64
-            os: ubuntu-22.04-arm
-            platform: linux/arm64
-            arch: arm64
-            output: rockion-linux-arm64
-            appimage: rockion-linux-aarch64.AppImage
-            artifact: rockion-linux-aarch64
+    name: Build AppImage (linux-x64)
+    runs-on: ubuntu-22.04
 
     steps:
       - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
@@ -58,11 +40,11 @@ jobs:
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
       - name: Build Linux application
-        run: wails build -platform ${{ matrix.platform }} -clean -trimpath -o ${{ matrix.output }}
+        run: wails build -platform linux/amd64 -clean -trimpath -o rockion-linux-amd64
       - name: Verify Linux build linkage
         shell: bash
         run: |
-          binary="build/bin/${{ matrix.output }}"
+          binary="build/bin/rockion-linux-amd64"
           links="$(ldd "$binary")"
           printf '%s\n' "$links"
           grep -Fq 'libwebkit2gtk-4.0.so.37' <<<"$links"
@@ -73,14 +55,14 @@ jobs:
       - name: Package Linux AppImage
         shell: bash
         env:
-          ARCH: ${{ matrix.arch }}
-          BINARY: build/bin/${{ matrix.output }}
-          OUTPUT: build/bin/${{ matrix.appimage }}
+          ARCH: amd64
+          BINARY: build/bin/rockion-linux-amd64
+          OUTPUT: build/bin/rockion-linux-x86_64.AppImage
         run: bash ./dev/linux/package-appimage.sh
       - name: Verify and launch AppImage on Ubuntu 22.04
         shell: bash
         run: |
-          image="build/bin/${{ matrix.appimage }}"
+          image="build/bin/rockion-linux-x86_64.AppImage"
           chmod +x "$image"
           rm -rf squashfs-root
           "$image" --appimage-extract >/dev/null
@@ -105,40 +87,20 @@ jobs:
       - name: Upload AppImage
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ${{ matrix.artifact }}
-          path: build/bin/${{ matrix.appimage }}
+          name: rockion-linux-x86_64
+          path: build/bin/rockion-linux-x86_64.AppImage
           if-no-files-found: error
           retention-days: 7
 
   ubuntu-compatibility:
-    name: Test AppImage (${{ matrix.name }})
+    name: Test AppImage (ubuntu-26.04-x64)
     needs: build
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: ubuntu-24.04-x64
-            os: ubuntu-24.04
-            artifact: rockion-linux-x86_64
-            image: rockion-linux-x86_64.AppImage
-          - name: ubuntu-24.04-arm64
-            os: ubuntu-24.04-arm
-            artifact: rockion-linux-aarch64
-            image: rockion-linux-aarch64.AppImage
-          - name: ubuntu-26.04-x64
-            os: ubuntu-26.04
-            artifact: rockion-linux-x86_64
-            image: rockion-linux-x86_64.AppImage
-          - name: ubuntu-26.04-arm64
-            os: ubuntu-26.04-arm
-            artifact: rockion-linux-aarch64
-            image: rockion-linux-aarch64.AppImage
+    runs-on: ubuntu-26.04
     steps:
       - name: Download AppImage
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: ${{ matrix.artifact }}
+          name: rockion-linux-x86_64
           path: package
       - name: Install smoke-test dependencies
         run: |
@@ -147,7 +109,7 @@ jobs:
       - name: Launch AppImage
         shell: bash
         run: |
-          image="package/${{ matrix.image }}"
+          image="package/rockion-linux-x86_64.AppImage"
           chmod +x "$image"
           set +e
           APPIMAGE_EXTRACT_AND_RUN=1 timeout 15s xvfb-run -a "$image" > rockion-smoke.log 2>&1
@@ -155,87 +117,6 @@ jobs:
           set -e
           cat rockion-smoke.log
           if [[ $status -ne 0 && $status -ne 124 ]]; then
-            echo "Rockion failed its ${{ matrix.name }} startup smoke test with status $status." >&2
+            echo "Rockion failed its Ubuntu 26.04 startup smoke test with status $status." >&2
             exit "$status"
           fi
-
-  distro-compatibility:
-    name: Test AppImage (${{ matrix.name }})
-    needs: build
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: debian-12-x64
-            os: ubuntu-24.04
-            container: debian:12
-            family: debian
-            artifact: rockion-linux-x86_64
-            image: rockion-linux-x86_64.AppImage
-          - name: debian-12-arm64
-            os: ubuntu-24.04-arm
-            container: debian:12
-            family: debian
-            artifact: rockion-linux-aarch64
-            image: rockion-linux-aarch64.AppImage
-          - name: fedora-42-x64
-            os: ubuntu-24.04
-            container: fedora:42
-            family: fedora
-            artifact: rockion-linux-x86_64
-            image: rockion-linux-x86_64.AppImage
-          - name: fedora-42-arm64
-            os: ubuntu-24.04-arm
-            container: fedora:42
-            family: fedora
-            artifact: rockion-linux-aarch64
-            image: rockion-linux-aarch64.AppImage
-    steps:
-      - name: Download AppImage
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: ${{ matrix.artifact }}
-          path: package
-      - name: Launch AppImage in distribution container
-        shell: bash
-        run: |
-          chmod +x "package/${{ matrix.image }}"
-          docker run --rm --interactive \
-            --volume "$PWD/package:/package:ro" \
-            --env APPIMAGE_EXTRACT_AND_RUN=1 \
-            --env WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1 \
-            "${{ matrix.container }}" \
-            bash -s -- "/package/${{ matrix.image }}" "${{ matrix.family }}" <<'SCRIPT'
-          set -euo pipefail
-          image="$1"
-          family="$2"
-          case "$family" in
-            debian)
-              apt-get update
-              DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libegl1 libgl1 libgles2 xauth xvfb
-              ;;
-            fedora)
-              dnf install -y libglvnd-egl libglvnd-gles libglvnd-glx xorg-x11-server-Xvfb xorg-x11-xauth
-              ;;
-            *)
-              echo "Unknown Linux family: $family" >&2
-              exit 1
-              ;;
-          esac
-
-          Xvfb :99 -screen 0 1280x720x24 > /tmp/xvfb.log 2>&1 &
-          xvfb_pid=$!
-          trap 'kill "$xvfb_pid" 2>/dev/null || true' EXIT
-          sleep 2
-
-          set +e
-          DISPLAY=:99 timeout 15s "$image" > /tmp/rockion-smoke.log 2>&1
-          status=$?
-          set -e
-          cat /tmp/rockion-smoke.log
-          if [[ $status -ne 0 && $status -ne 124 ]]; then
-            echo "Rockion AppImage failed with status $status." >&2
-            exit "$status"
-          fi
-          SCRIPT

@@ -3,29 +3,21 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-arch="${ARCH:?ARCH must be amd64 or arm64}"
+arch="${ARCH:?ARCH must be amd64}"
 binary="${BINARY:-$repo_root/build/bin/rockion-linux-$arch}"
 output="${OUTPUT:?OUTPUT must name the AppImage to create}"
 work_root="${WORK_ROOT:-$repo_root/build/appimage-$arch}"
 tools_dir="$work_root/tools"
 appdir="$work_root/Rockion.AppDir"
 
-case "$arch" in
-  amd64)
-    appimage_arch="x86_64"
-    linuxdeploy_sha="514d4ffe2a2f757369b41863a4f63fbbb222c429652803ebc081cb16ba21ac25"
-    apprun_sha="f30140a43a0a59e46db21bdefdf749b9e9f2c6946e92afabbacf98b8ae73fb4f"
-    ;;
-  arm64)
-    appimage_arch="aarch64"
-    linuxdeploy_sha="6d2f140cc8c3b07831b1011922ed453b34f7e90d21a4bfbc65e1ec99ca71b8f3"
-    apprun_sha="072f17c0895a85c490282fe5395c5007e5fc75da727e553b3b8fb680feb11578"
-    ;;
-  *)
-    echo "Unsupported AppImage architecture: $arch" >&2
-    exit 1
-    ;;
-esac
+if [[ "$arch" != "amd64" ]]; then
+  echo "Unsupported AppImage architecture: $arch" >&2
+  exit 1
+fi
+
+appimage_arch="x86_64"
+linuxdeploy_sha="514d4ffe2a2f757369b41863a4f63fbbb222c429652803ebc081cb16ba21ac25"
+apprun_sha="f30140a43a0a59e46db21bdefdf749b9e9f2c6946e92afabbacf98b8ae73fb4f"
 
 gtk_plugin_commit="3b67a1d1c1b0c8268f57f2bce40fe2d33d409cea"
 gtk_plugin_sha="b0f4cbc684a0103a9651f0955b635eaea0096b3a66c0f5a2c2aa337960375171"

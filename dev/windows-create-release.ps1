@@ -268,13 +268,13 @@ Invoke-Native "Pushing branch $Branch..." { & git push origin $Branch }
 
 $ExistingPreflightJson = & gh run list `
     --repo $Repository `
-    --workflow release.yml `
+    --workflow appimage-preflight.yml `
     --branch $Branch `
     --event workflow_dispatch `
     --limit 20 `
     --json databaseId 2>$null
 if ($LASTEXITCODE -ne 0) {
-    Stop-Release 'Could not list existing release preflight runs.'
+    Stop-Release 'Could not list existing AppImage preflight runs.'
 }
 $ExistingPreflightRunIds = @()
 if ($ExistingPreflightJson) {
@@ -285,8 +285,8 @@ if ($ExistingPreflightJson) {
     )
 }
 
-Invoke-Native 'Starting untagged release preflight workflow...' {
-    & gh workflow run release.yml --repo $Repository --ref $Branch
+Invoke-Native 'Starting Ubuntu AppImage preflight workflow...' {
+    & gh workflow run appimage-preflight.yml --repo $Repository --ref $Branch
 }
 
 $ReleaseCommit = (& git rev-parse HEAD).Trim()
@@ -299,7 +299,7 @@ $PreflightRunId = $null
 for ($attempt = 0; $attempt -lt 24 -and -not $PreflightRunId; $attempt++) {
     $json = & gh run list `
         --repo $Repository `
-        --workflow release.yml `
+        --workflow appimage-preflight.yml `
         --branch $Branch `
         --event workflow_dispatch `
         --limit 10 `
@@ -319,10 +319,10 @@ for ($attempt = 0; $attempt -lt 24 -and -not $PreflightRunId; $attempt++) {
 }
 
 if (-not $PreflightRunId) {
-    Stop-Release 'Could not locate the untagged release preflight workflow run.'
+    Stop-Release 'Could not locate the AppImage preflight workflow run.'
 }
 
-Invoke-Native "Watching untagged release preflight run $PreflightRunId..." {
+Invoke-Native "Watching Ubuntu AppImage preflight run $PreflightRunId..." {
     & gh run watch $PreflightRunId --repo $Repository --exit-status
 }
 

@@ -281,22 +281,25 @@ func installMode() string {
 }
 
 func expectedAssetName(goos, arch, mode string) string {
-	if arch != "amd64" && arch != "arm64" {
-		return ""
-	}
 	switch goos {
 	case "windows":
-		if mode == "installer" {
-			return "rockion-windows-" + arch + "-installer.exe"
+		if arch != "amd64" {
+			return ""
 		}
-		return "rockion-windows-" + arch + ".exe"
+		if mode == "installer" {
+			return "rockion-windows-amd64-installer.exe"
+		}
+		return "rockion-windows-amd64.exe"
 	case "darwin":
-		return "rockion-macos-" + arch + ".zip"
+		if arch == "arm64" {
+			return "rockion-macos-arm64.zip"
+		}
+		return ""
 	case "linux":
 		if arch == "amd64" {
 			return "rockion-linux-x86_64.AppImage"
 		}
-		return "rockion-linux-aarch64.AppImage"
+		return ""
 	default:
 		return ""
 	}

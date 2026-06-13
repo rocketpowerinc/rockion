@@ -82,11 +82,8 @@ $workflowPath = Join-Path $RepoRoot '.github\workflows\release.yml'
 $workflow = Get-Content -Raw -LiteralPath $workflowPath
 $requiredTargets = @(
     'windows/amd64',
-    'windows/arm64',
-    'darwin/amd64',
     'darwin/arm64',
-    'linux/amd64',
-    'linux/arm64'
+    'linux/amd64'
 )
 foreach ($target in $requiredTargets) {
     if (-not $workflow.Contains("platform: $target")) {
@@ -94,32 +91,18 @@ foreach ($target in $requiredTargets) {
     }
 }
 foreach ($requiredText in @(
-    'windows-11-arm',
-    'macos-15-intel',
     'ubuntu-22.04',
-    'ubuntu-22.04-arm',
-    'ubuntu-24.04',
-    'ubuntu-24.04-arm',
     'ubuntu-26.04',
-    'ubuntu-26.04-arm',
-    'debian:12',
-    'fedora:42',
     'libwebkit2gtk-4.1-dev',
     'patchelf python3 xauth xvfb',
     '-tags webkit2_41',
     'rockion-linux-x86_64.AppImage',
-    'rockion-linux-aarch64.AppImage',
     'bash ./dev/linux/package-appimage.sh',
     'Verify Linux build linkage',
     'Verify Linux AppImage contents',
-    'Test Linux package',
-    'linux-distro-compatibility',
+    'Test AppImage (ubuntu-26.04-x64)',
     'APPIMAGE_EXTRACT_AND_RUN=1',
-    'docker run --rm --interactive',
     'libegl1 libgl1 libgles2',
-    'libglvnd-egl libglvnd-gles libglvnd-glx',
-    'workflow_dispatch:',
-    "if: startsWith(github.ref, 'refs/tags/v')",
     'squashfs-root/usr/bin/WebKitNetworkProcess',
     'squashfs-root/usr/lib/libharfbuzz.so.0',
     'xvfb-run',
@@ -135,6 +118,25 @@ foreach ($requiredText in @(
 )) {
     if (-not $workflow.Contains($requiredText)) {
         Add-Failure "Release workflow is missing required configuration: $requiredText"
+    }
+}
+foreach ($forbiddenText in @(
+    'platform: windows/arm64',
+    'platform: darwin/amd64',
+    'platform: linux/arm64',
+    'windows-11-arm',
+    'macos-15-intel',
+    'ubuntu-22.04-arm',
+    'ubuntu-24.04-arm',
+    'ubuntu-26.04-arm',
+    'debian:12',
+    'fedora:42',
+    'rockion-linux-aarch64.AppImage',
+    'linux-distro-compatibility',
+    'docker run --rm --interactive'
+)) {
+    if ($workflow.Contains($forbiddenText)) {
+        Add-Failure "Release workflow contains removed target configuration: $forbiddenText"
     }
 }
 if ($workflow.Contains('libwebkit2gtk-4.0-dev')) {
@@ -153,8 +155,11 @@ foreach ($legacyAsset in @(
 if ($workflow.Contains('draft: true')) {
     Add-Failure 'Release workflow must publish completed releases, not drafts.'
 }
+if ($workflow.Contains('workflow_dispatch:')) {
+    Add-Failure 'Release workflow must only run for release tags; use the AppImage preflight workflow for manual checks.'
+}
 if ($Failures.Count -eq 0) {
-    Write-OK 'All six release targets, AppImages, compatibility gates, and checksums are configured.'
+    Write-OK 'Windows x64, macOS ARM64, and Ubuntu 26.04 x64 AppImage releases are configured.'
 }
 
 $appImageWorkflowPath = Join-Path $RepoRoot '.github\workflows\appimage-preflight.yml'
@@ -164,20 +169,12 @@ if (-not (Test-Path -LiteralPath $appImageWorkflowPath)) {
     $appImageWorkflow = Get-Content -Raw -LiteralPath $appImageWorkflowPath
     foreach ($requiredText in @(
         'workflow_dispatch:',
-        'Build AppImage',
+        'Build AppImage (linux-x64)',
         'linux/amd64',
-        'linux/arm64',
         'ubuntu-22.04',
-        'ubuntu-22.04-arm',
-        'ubuntu-24.04',
-        'ubuntu-24.04-arm',
         'ubuntu-26.04',
-        'ubuntu-26.04-arm',
-        'debian:12',
-        'fedora:42',
         'bash ./dev/linux/package-appimage.sh',
-        'APPIMAGE_EXTRACT_AND_RUN=1',
-        'docker run --rm --interactive'
+        'APPIMAGE_EXTRACT_AND_RUN=1'
     )) {
         if (-not $appImageWorkflow.Contains($requiredText)) {
             Add-Failure "AppImage preflight workflow is missing required configuration: $requiredText"
@@ -188,6 +185,14 @@ if (-not (Test-Path -LiteralPath $appImageWorkflowPath)) {
         'windows/arm64',
         'darwin/amd64',
         'darwin/arm64',
+        'linux/arm64',
+        'ubuntu-22.04-arm',
+        'ubuntu-24.04-arm',
+        'ubuntu-26.04-arm',
+        'debian:12',
+        'fedora:42',
+        'rockion-linux-aarch64.AppImage',
+        'docker run --rm --interactive',
         'action-gh-release',
         'Publish release'
     )) {
@@ -251,9 +256,9 @@ foreach ($requiredText in @(
     'git ls-remote --refs --tags origin',
     '$attempt -le 3',
     'Git reported:',
-    'gh workflow run release.yml',
+    'gh workflow run appimage-preflight.yml',
     '--event workflow_dispatch',
-    'Watching untagged release preflight run',
+    'Watching Ubuntu AppImage preflight run',
     'No new release changes to commit; reusing the current HEAD',
     '$ExistingPreflightRunIds -notcontains $_.databaseId'
 )) {
@@ -264,7 +269,7 @@ foreach ($requiredText in @(
 if ($releaseCoordinator.Contains('git ls-remote --exit-code')) {
     Add-Failure 'Release coordinator must not depend on the special git ls-remote --exit-code status for missing tags.'
 }
-$preflightIndex = $releaseCoordinator.IndexOf('Watching untagged release preflight run')
+$preflightIndex = $releaseCoordinator.IndexOf('Watching Ubuntu AppImage preflight run')
 $tagPushIndex = $releaseCoordinator.IndexOf('Pushing tag $Tag')
 if ($preflightIndex -lt 0 -or $tagPushIndex -lt 0 -or $preflightIndex -gt $tagPushIndex) {
     Add-Failure 'Release coordinator must complete the untagged preflight before pushing the release tag.'

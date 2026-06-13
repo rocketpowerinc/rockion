@@ -128,4 +128,4 @@ if ($LASTEXITCODE -ne 0) {
     Stop-Preflight "AppImage preflight run $RunId failed."
 }
 
-Write-Host 'Both AppImages passed all supported Linux compatibility tests.' -ForegroundColor Green
+Write-Host 'The x64 AppImage passed its Ubuntu 26.04 compatibility test.' -ForegroundColor Green

@@ -812,6 +812,17 @@ button.primary,
   align-items: flex-start;
   gap: 8px;
 }
+/* Center the checkbox on the first text line instead of pinning it to the top.
+   The label is sized to exactly one line (1.6em) and offset by the paragraph's
+   top margin (0.4em), so the checkbox's center lands on the text's center
+   regardless of the browser's intrinsic checkbox height. */
+.rk-prose ul[data-type="taskList"] li > label {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  height: 1.6em;
+  margin-top: 0.4em;
+}
 .rk-prose blockquote {
   border-left: 3px solid var(--border);
   margin: 0.6em 0;
@@ -1052,7 +1063,10 @@ button.primary,
   width: 18px;
   height: 18px;
   margin-right: 4px;
-  vertical-align: -4px;
+  /* Center the icon box on the text's x-height. "middle" uses the box geometry,
+     so emoji (a text child) and uploaded images (an <img> child) align the same
+     way — a fixed px nudge tracked the emoji's own baseline and sat too low. */
+  vertical-align: middle;
   font-size: 14px;
   line-height: 1;
   cursor: pointer;

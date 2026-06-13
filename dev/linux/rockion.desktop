@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Rockion
+Comment=A local-first Markdown editor
+Exec=rockion
+Icon=rockion
+Categories=Office;Utility;TextEditor;
+Terminal=false
+StartupWMClass=Rockion
+MimeType=text/markdown;text/plain;

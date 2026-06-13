@@ -92,7 +92,7 @@ func (a *App) CheckForUpdates() (UpdateInfo, error) {
 // InstallUpdate downloads and verifies the newest release. Windows installer
 // builds launch the new installer after Rockion exits; portable builds replace
 // their executable with a detached helper. Other platforms open the release
-// page because their current archives are not signed native installers.
+// page because automatic installation is currently Windows-only.
 func (a *App) InstallUpdate() (UpdateInfo, error) {
 	a.updateMu.Lock()
 	defer a.updateMu.Unlock()
@@ -293,7 +293,10 @@ func expectedAssetName(goos, arch, mode string) string {
 	case "darwin":
 		return "rockion-macos-" + arch + ".zip"
 	case "linux":
-		return "rockion-linux-" + arch + ".tar.gz"
+		if arch == "amd64" {
+			return "rockion-linux-x86_64.AppImage"
+		}
+		return "rockion-linux-aarch64.AppImage"
 	default:
 		return ""
 	}

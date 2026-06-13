@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   test:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
         with:
@@ -35,7 +35,7 @@ jobs:
       - name: Install Linux test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libgtk-3-dev libwebkit2gtk-4.0-dev
+          sudo apt-get install -y --no-install-recommends libgtk-3-dev libwebkit2gtk-4.1-dev
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
@@ -52,6 +52,6 @@ jobs:
         working-directory: frontend
         run: npm run build
       - name: Test Go
-        run: go test -race ./...
+        run: go test -race -tags webkit2_41 ./...
       - name: Vet Go
-        run: go vet ./...
+        run: go vet -tags webkit2_41 ./...

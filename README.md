@@ -43,8 +43,26 @@ Grab a prebuilt binary from the [Releases](https://github.com/rocketpowerinc/roc
 - **Windows ARM64** - `rockion-windows-arm64-installer.exe` or portable `.exe`
 - **macOS Intel** - `rockion-macos-amd64.zip`
 - **macOS Apple Silicon** - `rockion-macos-arm64.zip`
-- **Linux x64** - `rockion-linux-amd64.tar.gz`
-- **Linux ARM64** - `rockion-linux-arm64.tar.gz`
+- **Linux x64** - `rockion-linux-x86_64.AppImage`
+- **Linux ARM64** - `rockion-linux-aarch64.AppImage`
+
+Linux releases are self-contained AppImages built on Ubuntu 22.04 for a
+conservative glibc baseline. Both architectures are startup-tested on Ubuntu
+22.04, Ubuntu 24.04, Ubuntu 26.04, Debian 12, and Fedora 42 before publication.
+
+```bash
+chmod +x rockion-linux-x86_64.AppImage
+./rockion-linux-x86_64.AppImage
+```
+
+If FUSE is unavailable, use AppImage's extraction fallback:
+
+```bash
+APPIMAGE_EXTRACT_AND_RUN=1 ./rockion-linux-x86_64.AppImage
+```
+
+AppImages bundle Rockion's GTK/WebKit runtime, but Linux portability still
+depends on a compatible kernel, glibc, graphics stack, and display server.
 
 See the [CHANGELOG](./CHANGELOG.md) for what's in each release.
 
@@ -57,7 +75,7 @@ download, verify, and apply the matching update directly.
 - **Go** 1.26.4
 - **Node** 20.19+ or 22.12+
 - **Wails CLI v2.12.0**: `go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0`
-- Platform deps for Wails (WebView2 on Windows, WebKit on Linux). Run `wails doctor` to check.
+- Platform deps for Wails development (WebView2 on Windows, WebKitGTK on Linux). Run `wails doctor` to check.
 
 ## Develop
 

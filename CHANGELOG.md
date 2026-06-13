@@ -9,6 +9,9 @@ All notable changes to Rockion are documented here. This project adheres to
 - Added a cross-platform sidebar settings menu for updates, vault selection, and theme switching.
 - Added secure update checks and verified Windows installer/portable updates.
 
+### Fixed
+- Replace raw Linux archives with self-contained x86_64 and ARM64 AppImages tested across Ubuntu, Debian, and Fedora.
+
 ## [0.1.4] - 2026-06-12
 
 ## [0.1.3] - 2026-06-12

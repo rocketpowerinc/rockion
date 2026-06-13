@@ -37,6 +37,11 @@ GitHub Actions builds these native packages:
 - macOS Intel and Apple Silicon
 - Linux x64 and ARM64
 
+Linux packages are x86_64 and ARM64 AppImages built on Ubuntu 22.04. The
+packaging script bundles GTK, WebKitGTK, its helper processes, and runtime data.
+Both AppImages must pass startup tests on Ubuntu 22.04, 24.04, 26.04, Debian 12,
+and Fedora 42 before the release is published.
+
 Wails desktop packages depend on native platform toolchains. The Windows script
 therefore coordinates the release instead of attempting to cross-compile
 macOS and Linux GUI packages on Windows.

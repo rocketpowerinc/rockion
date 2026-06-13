@@ -96,7 +96,26 @@ foreach ($target in $requiredTargets) {
 foreach ($requiredText in @(
     'windows-11-arm',
     'macos-15-intel',
+    'ubuntu-22.04',
     'ubuntu-22.04-arm',
+    'ubuntu-24.04',
+    'ubuntu-24.04-arm',
+    'ubuntu-26.04',
+    'ubuntu-26.04-arm',
+    'debian:12',
+    'fedora:42',
+    'libwebkit2gtk-4.1-dev',
+    '-tags webkit2_41',
+    'rockion-linux-x86_64.AppImage',
+    'rockion-linux-aarch64.AppImage',
+    'bash ./dev/linux/package-appimage.sh',
+    'Verify Linux build linkage',
+    'Verify Linux AppImage contents',
+    'Test Linux package',
+    'linux-distro-compatibility',
+    'APPIMAGE_EXTRACT_AND_RUN=1',
+    'xvfb-run',
+    'linux-compatibility',
     'choco install nsis',
     'makensis.exe',
     'GITHUB_PATH',
@@ -110,11 +129,41 @@ foreach ($requiredText in @(
         Add-Failure "Release workflow is missing required configuration: $requiredText"
     }
 }
+if ($workflow.Contains('libwebkit2gtk-4.0-dev')) {
+    if (-not $workflow.Contains('Package Linux AppImage')) {
+        Add-Failure 'WebKitGTK 4.0 may only be used as a bundled AppImage compatibility baseline.'
+    }
+}
+foreach ($legacyAsset in @(
+    'build/bin/rockion-linux-amd64.tar.gz',
+    'build/bin/rockion-linux-arm64.tar.gz'
+)) {
+    if ($workflow.Contains($legacyAsset)) {
+        Add-Failure "Release workflow still publishes legacy Linux archive: $legacyAsset"
+    }
+}
 if ($workflow.Contains('draft: true')) {
     Add-Failure 'Release workflow must publish completed releases, not drafts.'
 }
 if ($Failures.Count -eq 0) {
-    Write-OK 'All six release targets and checksums are configured.'
+    Write-OK 'All six release targets, AppImages, compatibility gates, and checksums are configured.'
+}
+
+$appImageScript = Get-Content -Raw -LiteralPath (Join-Path $RepoRoot 'dev\linux\package-appimage.sh')
+foreach ($requiredText in @(
+    'linuxdeploy_sha=',
+    'apprun_sha=',
+    'gtk_plugin_sha=',
+    'download_verified',
+    'WebKitWebProcess',
+    'WebKitNetworkProcess',
+    'libwebkit2gtkinjectedbundle.so',
+    '--plugin gtk',
+    '--output appimage'
+)) {
+    if (-not $appImageScript.Contains($requiredText)) {
+        Add-Failure "AppImage packaging script is missing required configuration: $requiredText"
+    }
 }
 
 if (-not (Test-Path -LiteralPath (Join-Path $RepoRoot 'frontend\dist\.gitkeep'))) {

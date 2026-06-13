@@ -5,6 +5,8 @@ All notable changes to Rockion are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-06-12
+
 ### Added
 - Added a cross-platform sidebar settings menu for updates, vault selection, and theme switching.
 - Added secure update checks and verified Windows installer/portable updates.
@@ -75,3 +77,4 @@ First release. A working local-first markdown editor: Notion-style UI over plain
 [0.1.2]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.2
 [0.1.3]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.3
 [0.1.4]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.4
+[0.1.5]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.5

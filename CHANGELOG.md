@@ -5,6 +5,8 @@ All notable changes to Rockion are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-06-12
+
 ### Fixed
 - Replace the Debian 12 package with an AnduinOS amd64 package linked against WebKitGTK 4.1.
 - Build the Linux package once per release; keep the standalone AnduinOS preflight optional.
@@ -101,3 +103,4 @@ First release. A working local-first markdown editor: Notion-style UI over plain
 [0.1.6]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.6
 [0.1.7]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.7
 [0.1.8]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.8
+[0.1.9]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.9

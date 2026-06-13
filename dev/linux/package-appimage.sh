@@ -32,6 +32,7 @@ gtk_plugin_sha="b0f4cbc684a0103a9651f0955b635eaea0096b3a66c0f5a2c2aa337960375171
 linuxdeploy="$tools_dir/linuxdeploy-$appimage_arch.AppImage"
 gtk_plugin="$tools_dir/linuxdeploy-plugin-gtk.sh"
 apprun="$appdir/AppRun"
+webkit_hook="$appdir/apprun-hooks/rockion-webkit.sh"
 
 download_verified() {
   local url="$1"
@@ -70,22 +71,50 @@ download_verified \
   "$gtk_plugin_sha"
 chmod 0755 "$linuxdeploy" "$apprun" "$gtk_plugin"
 
-required_webkit_files=(
-  WebKitWebProcess
-  WebKitNetworkProcess
-  libwebkit2gtkinjectedbundle.so
-)
-for required_file in "${required_webkit_files[@]}"; do
-  mapfile -t matches < <(find /usr -type f -name "$required_file" -print)
-  if [[ "${#matches[@]}" -eq 0 ]]; then
-    echo "Required WebKitGTK runtime file was not found: $required_file" >&2
+find_single_file() {
+  local name="$1"
+  local -a matches=()
+  mapfile -t matches < <(find /usr -type f -name "$name" -print)
+  if [[ "${#matches[@]}" -ne 1 ]]; then
+    echo "Expected exactly one $name file; found ${#matches[@]}." >&2
+    printf '  %s\n' "${matches[@]}" >&2
     exit 1
   fi
-  for source in "${matches[@]}"; do
-    target_dir="$appdir$(dirname "$source")"
-    mkdir -p "$target_dir"
-    install -m 0755 "$source" "$target_dir/$required_file"
-  done
+  printf '%s\n' "${matches[0]}"
+}
+
+find_library() {
+  local name="$1"
+  local path
+  path="$(ldconfig -p | awk -v library="$name" '$1 == library { print $NF; exit }')"
+  if [[ -z "$path" || ! -f "$path" ]]; then
+    echo "Required runtime library was not found: $name" >&2
+    exit 1
+  fi
+  printf '%s\n' "$path"
+}
+
+webkit_web_process="$(find_single_file WebKitWebProcess)"
+webkit_network_process="$(find_single_file WebKitNetworkProcess)"
+webkit_injected_bundle="$(find_single_file libwebkit2gtkinjectedbundle.so)"
+webkit_exec_dir="$(dirname "$webkit_network_process")"
+if [[ "$(dirname "$webkit_web_process")" != "$webkit_exec_dir" ]]; then
+  echo 'WebKitGTK helper executables were found in different directories.' >&2
+  exit 1
+fi
+
+# linuxdeploy's baseline excludes common font libraries. Force these into the
+# AppImage so minimal supported distributions do not supply them implicitly.
+forced_library_names=(
+  libexpat.so.1
+  libfontconfig.so.1
+  libfreetype.so.6
+  libfribidi.so.0
+  libharfbuzz.so.0
+)
+forced_library_args=()
+for library_name in "${forced_library_names[@]}"; do
+  forced_library_args+=(--library "$(find_library "$library_name")")
 done
 
 output="$(cd "$(dirname "$output")" && pwd)/$(basename "$output")"
@@ -100,7 +129,51 @@ LDAI_OUTPUT="$output_name" \
 LDAI_NO_APPSTREAM=1 \
   "$linuxdeploy" --appimage-extract-and-run \
     --appdir "$appdir" \
-    --plugin gtk \
+    --executable "$webkit_web_process" \
+    --executable "$webkit_network_process" \
+    --library "$webkit_injected_bundle" \
+    "${forced_library_args[@]}" \
+    --plugin gtk
+
+mapfile -t webkit_libraries < <(
+  find "$appdir/usr/lib" -type f -name 'libwebkit2gtk-4.0.so.37*' -print
+)
+if [[ "${#webkit_libraries[@]}" -eq 0 ]]; then
+  echo 'Bundled WebKitGTK library was not found in the AppDir.' >&2
+  exit 1
+fi
+for library in "${webkit_libraries[@]}"; do
+  python3 "$repo_root/dev/linux/patch-webkit-helper-path.py" \
+    "$library" "$webkit_exec_dir" "usr/bin"
+done
+
+mkdir -p "$(dirname "$webkit_hook")"
+cat > "$webkit_hook" <<'HOOK'
+#!/usr/bin/env bash
+export WEBKIT_INJECTED_BUNDLE_PATH="$APPDIR/usr/lib/libwebkit2gtkinjectedbundle.so"
+HOOK
+chmod 0755 "$webkit_hook"
+
+for required_file in \
+  "$appdir/usr/bin/WebKitWebProcess" \
+  "$appdir/usr/bin/WebKitNetworkProcess" \
+  "$appdir/usr/lib/libwebkit2gtkinjectedbundle.so" \
+  "$appdir/usr/lib/libfontconfig.so.1" \
+  "$appdir/usr/lib/libfreetype.so.6" \
+  "$appdir/usr/lib/libfribidi.so.0" \
+  "$appdir/usr/lib/libharfbuzz.so.0"; do
+  if [[ ! -e "$required_file" ]]; then
+    echo "Required AppImage runtime file was not bundled: $required_file" >&2
+    exit 1
+  fi
+done
+
+PATH="$tools_dir:$PATH" \
+OUTPUT="$output_name" \
+LDAI_OUTPUT="$output_name" \
+LDAI_NO_APPSTREAM=1 \
+  "$linuxdeploy" --appimage-extract-and-run \
+    --appdir "$appdir" \
     --output appimage
 popd >/dev/null
 
@@ -109,6 +182,27 @@ if [[ ! -f "$generated" ]]; then
   echo "linuxdeploy did not create the expected AppImage: $generated" >&2
   exit 1
 fi
+
+validation_root="$work_root/validation"
+rm -rf "$validation_root"
+mkdir -p "$validation_root"
+(
+  cd "$validation_root"
+  "$generated" --appimage-extract >/dev/null
+)
+mapfile -t packaged_webkit_libraries < <(
+  find "$validation_root/squashfs-root/usr/lib" \
+    -type f -name 'libwebkit2gtk-4.0.so.37*' -print
+)
+if [[ "${#packaged_webkit_libraries[@]}" -eq 0 ]]; then
+  echo 'Bundled WebKitGTK library was not found in the completed AppImage.' >&2
+  exit 1
+fi
+for library in "${packaged_webkit_libraries[@]}"; do
+  python3 "$repo_root/dev/linux/patch-webkit-helper-path.py" \
+    --verify "$library" "$webkit_exec_dir" "usr/bin"
+done
+
 mv "$generated" "$output"
 chmod 0755 "$output"
 

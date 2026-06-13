@@ -240,22 +240,95 @@ if ($ForbiddenFiles.Count -gt 0) {
 }
 
 Invoke-Native 'Checking staged whitespace...' { & git diff --cached --check }
-Invoke-Native "Creating release commit for $Tag..." {
-    & git commit -m "release: prepare $Tag"
-}
-Invoke-Native "Creating annotated tag $Tag..." {
-    & git tag -a $Tag -m "Rockion $Tag"
+& git diff --cached --quiet
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "No new release changes to commit; reusing the current HEAD for $Tag." -ForegroundColor Yellow
+} else {
+    Invoke-Native "Creating release commit for $Tag..." {
+        & git commit -m "release: prepare $Tag"
+    }
 }
 
 if (-not $ShouldPublish) {
+    Invoke-Native "Creating annotated tag $Tag..." {
+        & git tag -a $Tag -m "Rockion $Tag"
+    }
     Write-Host
     Write-Host "$Tag is committed and tagged locally. Publishing was skipped." -ForegroundColor Yellow
     Write-Host "Push later with: git push origin $Branch; git push origin $Tag" -ForegroundColor Yellow
     exit 0
 }
 
+if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+    Stop-Release 'GitHub CLI is required to validate release builds before tagging.'
+}
+
 Write-Host
 Invoke-Native "Pushing branch $Branch..." { & git push origin $Branch }
+
+$ExistingPreflightJson = & gh run list `
+    --repo $Repository `
+    --workflow release.yml `
+    --branch $Branch `
+    --event workflow_dispatch `
+    --limit 20 `
+    --json databaseId 2>$null
+if ($LASTEXITCODE -ne 0) {
+    Stop-Release 'Could not list existing release preflight runs.'
+}
+$ExistingPreflightRunIds = @()
+if ($ExistingPreflightJson) {
+    $ExistingPreflightRunIds = @(
+        $ExistingPreflightJson |
+            ConvertFrom-Json |
+            ForEach-Object { $_.databaseId }
+    )
+}
+
+Invoke-Native 'Starting untagged release preflight workflow...' {
+    & gh workflow run release.yml --repo $Repository --ref $Branch
+}
+
+$ReleaseCommit = (& git rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or -not $ReleaseCommit) {
+    Stop-Release 'Could not determine the release commit SHA.'
+}
+
+Write-Host 'Waiting for GitHub Actions to register the preflight workflow...' -ForegroundColor Gray
+$PreflightRunId = $null
+for ($attempt = 0; $attempt -lt 24 -and -not $PreflightRunId; $attempt++) {
+    $json = & gh run list `
+        --repo $Repository `
+        --workflow release.yml `
+        --branch $Branch `
+        --event workflow_dispatch `
+        --limit 10 `
+        --json databaseId,headSha 2>$null
+    if ($LASTEXITCODE -eq 0 -and $json) {
+        $run = @($json | ConvertFrom-Json) |
+            Where-Object {
+                $_.headSha -eq $ReleaseCommit -and
+                $ExistingPreflightRunIds -notcontains $_.databaseId
+            } |
+            Select-Object -First 1
+        $PreflightRunId = $run.databaseId
+    }
+    if (-not $PreflightRunId) {
+        Start-Sleep -Seconds 5
+    }
+}
+
+if (-not $PreflightRunId) {
+    Stop-Release 'Could not locate the untagged release preflight workflow run.'
+}
+
+Invoke-Native "Watching untagged release preflight run $PreflightRunId..." {
+    & gh run watch $PreflightRunId --repo $Repository --exit-status
+}
+
+Invoke-Native "Creating annotated tag $Tag..." {
+    & git tag -a $Tag -m "Rockion $Tag"
+}
 Invoke-Native "Pushing tag $Tag..." { & git push origin $Tag }
 
 $ActionsURL = "https://github.com/$Repository/actions/workflows/release.yml"
@@ -263,10 +336,6 @@ Write-Host
 Write-Host "Release workflow started: $ActionsURL" -ForegroundColor Green
 
 if ($NoWait) {
-    exit 0
-}
-if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
-    Write-Host '[WARN] GitHub CLI is unavailable; not waiting for the release workflow.' -ForegroundColor Yellow
     exit 0
 }
 

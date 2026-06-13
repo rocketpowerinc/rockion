@@ -5,6 +5,10 @@ All notable changes to Rockion are documented here. This project adheres to
 
 ## [Unreleased]
 
+### Fixed
+- Bundle WebKitGTK helper processes and font dependencies inside Linux AppImages, and resolve helpers from the AppImage at runtime.
+- Validate release commits through an untagged GitHub Actions preflight before creating release tags.
+
 ## [0.1.7] - 2026-06-12
 
 ### Fixed

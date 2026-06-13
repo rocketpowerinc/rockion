@@ -21,6 +21,22 @@ Use `-SkipInstall` only when `frontend/node_modules` is already synchronized
 with `package-lock.json`. Use `-SkipVulnerabilityScan` only for offline local
 development, never for a release.
 
+## Test AppImages without releasing
+
+Commit and push the branch you want to test, then run:
+
+```powershell
+.\dev\windows-test-appimages.ps1
+```
+
+This starts `.github/workflows/appimage-preflight.yml`, which only builds the
+Linux x64 and ARM64 AppImages. It launches them on Ubuntu 22.04, 24.04, 26.04,
+Debian 12, and Fedora 42. It does not build Windows or macOS packages, update
+version metadata, create a tag, or publish a release.
+
+Use `-Ref branch-name` to test another pushed branch or `-NoWait` to start the
+workflow without watching it finish.
+
 ## Create a release
 
 ```powershell

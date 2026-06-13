@@ -42,9 +42,15 @@ jobs:
       - name: Verify AnduinOS linkage
         shell: bash
         run: |
+          needed="$(readelf -d build/bin/rockion)"
+          printf '%s\n' "$needed"
+          grep -Fq 'libwebkit2gtk-4.1.so.0' <<<"$needed"
+          if grep -Fq 'libwebkit2gtk-4.0.so.37' <<<"$needed"; then
+            echo 'Rockion was linked against the unsupported WebKitGTK 4.0 ABI.' >&2
+            exit 1
+          fi
           links="$(ldd build/bin/rockion)"
           printf '%s\n' "$links"
-          grep -Fq 'libwebkit2gtk-4.1.so.0' <<<"$links"
           if grep -Fq 'not found' <<<"$links"; then
             echo 'Rockion has unresolved AnduinOS runtime dependencies.' >&2
             exit 1
@@ -85,8 +91,17 @@ jobs:
       - name: Launch Rockion
         shell: bash
         run: |
+          binary="$(readlink -f "$(command -v rockion)")"
+          dpkg-query -W -f='${Package} ${Version} ${Architecture}\n' rockion
+          needed="$(readelf -d "$binary")"
+          printf '%s\n' "$needed"
+          grep -Fq 'libwebkit2gtk-4.1.so.0' <<<"$needed"
+          if grep -Fq 'libwebkit2gtk-4.0.so.37' <<<"$needed"; then
+            echo 'The installed package contains a WebKitGTK 4.0-linked binary.' >&2
+            exit 1
+          fi
           set +e
-          timeout 15s xvfb-run -a rockion > rockion-smoke.log 2>&1
+          timeout 15s xvfb-run -a "$binary" > rockion-smoke.log 2>&1
           status=$?
           set -e
           cat rockion-smoke.log

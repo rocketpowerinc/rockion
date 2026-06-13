@@ -21,17 +21,18 @@ Use `-SkipInstall` only when `frontend/node_modules` is already synchronized
 with `package-lock.json`. Use `-SkipVulnerabilityScan` only for offline local
 development, never for a release.
 
-## Test AppImages without releasing
+## Test the Debian package without releasing
 
 Commit and push the branch you want to test, then run:
 
 ```powershell
-.\dev\windows-test-appimages.ps1
+.\dev\windows-test-debian-package.ps1
 ```
 
-This starts `.github/workflows/appimage-preflight.yml`, which only builds the
-Linux x64 AppImage and launches it on Ubuntu 26.04. It does not build Windows
-or macOS packages, update version metadata, create a tag, or publish a release.
+This starts `.github/workflows/debian-preflight.yml`, which builds the amd64
+`.deb`, installs it in a clean Debian 12 container, and launches Rockion. It
+does not build Windows or macOS packages, update version metadata, create a tag,
+or publish a release.
 
 Use `-Ref branch-name` to test another pushed branch or `-NoWait` to start the
 workflow without watching it finish.
@@ -44,18 +45,18 @@ workflow without watching it finish.
 
 The script prompts for a semantic version, updates Rockion's version metadata
 and changelog, runs the full test suite, creates a release commit and annotated
-tag, then pushes them. Before creating the tag, it runs the Ubuntu AppImage
+tag, then pushes them. Before creating the tag, it runs the Debian 12 package
 preflight. Pushing the tag starts `.github/workflows/release.yml`.
 
 GitHub Actions builds these native packages:
 
 - Windows x64
 - macOS Apple Silicon
-- Ubuntu 26.04 x64 AppImage
+- Debian 12 amd64 package
 
-The Linux package is an x86_64 AppImage built on Ubuntu 22.04. The packaging
-script bundles GTK, WebKitGTK, its helper processes, and runtime data. The
-AppImage must pass its Ubuntu 26.04 startup test before publication.
+The Linux package is built inside Debian 12 and declares GTK and WebKitGTK as
+system package dependencies. It must install and launch in a clean Debian 12
+container before publication.
 
 Wails desktop packages depend on native platform toolchains. The Windows script
 therefore coordinates the release instead of attempting to cross-compile

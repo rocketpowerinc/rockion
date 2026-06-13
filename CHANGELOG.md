@@ -8,10 +8,9 @@ All notable changes to Rockion are documented here. This project adheres to
 ## [0.1.8] - 2026-06-12
 
 ### Fixed
-- Bundle WebKitGTK helper processes and font dependencies inside Linux AppImages, and resolve helpers from the AppImage at runtime.
-- Launch the AppImage from its mounted application directory so WebKit can start its bundled helper processes.
-- Validate the Ubuntu AppImage through an untagged GitHub Actions preflight before creating release tags.
-- Simplify releases to Windows x64, macOS Apple Silicon, and an x64 AppImage tested on Ubuntu 26.04.
+- Replace Linux AppImage packaging with a native amd64 `.deb` built and tested on Debian 12.
+- Validate Debian package installation and startup before creating release tags.
+- Limit releases to Windows x64, macOS Apple Silicon, and Debian 12 amd64.
 
 ## [0.1.7] - 2026-06-12
 

@@ -42,7 +42,7 @@ func TestExpectedAssetName(t *testing.T) {
 		{"windows", "arm64", "portable", ""},
 		{"darwin", "arm64", "manual", "rockion-macos-arm64.zip"},
 		{"darwin", "amd64", "manual", ""},
-		{"linux", "amd64", "manual", "rockion-linux-x86_64.AppImage"},
+		{"linux", "amd64", "manual", "rockion-linux-amd64.deb"},
 		{"linux", "arm64", "manual", ""},
 		{"linux", "386", "manual", ""},
 	}

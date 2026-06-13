@@ -62,7 +62,7 @@ jobs:
           node -e "const w=require('./wails.json'); if(w.info.productVersion !== '$version') process.exit(1)"
           grep -Fq "## [$version]" CHANGELOG.md
 
-  build:
+  build-native:
     name: Build (${{ matrix.name }})
     needs: verify
     runs-on: ${{ matrix.os }}
@@ -88,15 +88,6 @@ jobs:
             build_args: ""
             artifact: rockion-macos-arm64
             files: build/bin/rockion-macos-arm64.zip
-          - name: linux-x64
-            os: ubuntu-22.04
-            platform: linux/amd64
-            arch: amd64
-            output: rockion-linux-amd64
-            build_args: ""
-            appimage: rockion-linux-x86_64.AppImage
-            artifact: rockion-linux-x86_64
-            files: build/bin/rockion-linux-x86_64.AppImage
 
     steps:
       - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
@@ -111,13 +102,6 @@ jobs:
           node-version: "20"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - name: Install Linux build dependencies
-        if: startsWith(matrix.name, 'linux-')
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            binutils curl file libgirepository1.0-dev libgtk-3-dev \
-            librsvg2-dev libwebkit2gtk-4.0-dev patchelf python3 xauth xvfb
       - name: Install Windows packaging dependencies
         if: startsWith(matrix.name, 'windows-')
         shell: pwsh
@@ -134,67 +118,6 @@ jobs:
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
       - name: Build
         run: wails build -platform ${{ matrix.platform }} -clean -trimpath -o ${{ matrix.output }} ${{ matrix.build_args }}
-      - name: Verify Linux build linkage
-        if: startsWith(matrix.name, 'linux-')
-        shell: bash
-        run: |
-          binary="build/bin/${{ matrix.output }}"
-          links="$(ldd "$binary")"
-          printf '%s\n' "$links"
-          grep -Fq 'libwebkit2gtk-4.0.so.37' <<<"$links"
-          if grep -Fq 'not found' <<<"$links"; then
-            echo 'Linux binary has unresolved shared-library dependencies.' >&2
-            exit 1
-          fi
-      - name: Smoke-test Linux build on Ubuntu 22.04
-        if: startsWith(matrix.name, 'linux-')
-        shell: bash
-        run: |
-          binary="build/bin/${{ matrix.output }}"
-          set +e
-          timeout 15s xvfb-run -a "$binary" > rockion-smoke.log 2>&1
-          status=$?
-          set -e
-          cat rockion-smoke.log
-          if [[ $status -ne 0 && $status -ne 124 ]]; then
-            echo "Rockion failed its Ubuntu 22.04 startup smoke test with status $status." >&2
-            exit "$status"
-          fi
-      - name: Package Linux AppImage
-        if: startsWith(matrix.name, 'linux-')
-        shell: bash
-        env:
-          ARCH: ${{ matrix.arch }}
-          BINARY: build/bin/${{ matrix.output }}
-          OUTPUT: build/bin/${{ matrix.appimage }}
-        run: bash ./dev/linux/package-appimage.sh
-      - name: Verify Linux AppImage contents
-        if: startsWith(matrix.name, 'linux-')
-        shell: bash
-        run: |
-          image="build/bin/${{ matrix.appimage }}"
-          chmod +x "$image"
-          rm -rf squashfs-root
-          "$image" --appimage-extract >/dev/null
-          test -x squashfs-root/usr/bin/WebKitWebProcess
-          test -x squashfs-root/usr/bin/WebKitNetworkProcess
-          test -f squashfs-root/usr/lib/libwebkit2gtkinjectedbundle.so
-          test -f squashfs-root/usr/lib/libfontconfig.so.1
-          test -f squashfs-root/usr/lib/libfreetype.so.6
-          test -f squashfs-root/usr/lib/libfribidi.so.0
-          test -f squashfs-root/usr/lib/libharfbuzz.so.0
-          grep -Fqx 'cd "$APPDIR"' squashfs-root/apprun-hooks/rockion-webkit.sh
-          find squashfs-root -name libwebkit2gtk-4.0.so.37 -print -quit | grep -q .
-
-          set +e
-          APPIMAGE_EXTRACT_AND_RUN=1 timeout 15s xvfb-run -a "$image" > rockion-appimage-smoke.log 2>&1
-          status=$?
-          set -e
-          cat rockion-appimage-smoke.log
-          if [[ $status -ne 0 && $status -ne 124 ]]; then
-            echo "Rockion AppImage failed its Ubuntu 22.04 startup smoke test with status $status." >&2
-            exit "$status"
-          fi
       - name: Normalize Windows installer name
         if: startsWith(matrix.name, 'windows-')
         shell: pwsh
@@ -218,52 +141,104 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  linux-compatibility:
-    name: Test AppImage (ubuntu-26.04-x64)
-    needs: build
-    runs-on: ubuntu-26.04
+  build-debian:
+    name: Build Debian 12 package (amd64)
+    needs: verify
+    runs-on: ubuntu-24.04
+    container: debian:12
     steps:
-      - name: Download Linux package
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: rockion-linux-x86_64
-          path: package
-      - name: Install AppImage smoke-test dependencies
+      - name: Install action and build prerequisites
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libegl1 libgl1 libgles2 xauth xvfb
-      - name: Verify and launch Linux AppImage
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates curl git build-essential pkg-config \
+            libgtk-3-dev libwebkit2gtk-4.0-dev dpkg-dev
+      - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version: "1.26.4"
+          cache: true
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
+      - name: Build Linux application
+        run: wails build -platform linux/amd64 -clean -trimpath -o rockion
+      - name: Verify Debian linkage
         shell: bash
         run: |
-          image="package/rockion-linux-x86_64.AppImage"
-          chmod +x "$image"
-          rm -rf squashfs-root
-          "$image" --appimage-extract >/dev/null
-          test -x squashfs-root/usr/bin/WebKitWebProcess
-          test -x squashfs-root/usr/bin/WebKitNetworkProcess
-          test -f squashfs-root/usr/lib/libwebkit2gtkinjectedbundle.so
-          test -f squashfs-root/usr/lib/libfontconfig.so.1
-          test -f squashfs-root/usr/lib/libfreetype.so.6
-          test -f squashfs-root/usr/lib/libfribidi.so.0
-          test -f squashfs-root/usr/lib/libharfbuzz.so.0
-          grep -Fqx 'cd "$APPDIR"' squashfs-root/apprun-hooks/rockion-webkit.sh
-          find squashfs-root -name libwebkit2gtk-4.0.so.37 -print -quit | grep -q .
+          links="$(ldd build/bin/rockion)"
+          printf '%s\n' "$links"
+          grep -Fq 'libwebkit2gtk-4.0.so.37' <<<"$links"
+          if grep -Fq 'not found' <<<"$links"; then
+            echo 'Rockion has unresolved Debian runtime dependencies.' >&2
+            exit 1
+          fi
+      - name: Package Debian application
+        env:
+          BINARY: build/bin/rockion
+          OUTPUT: build/bin/rockion-linux-amd64.deb
+        run: bash ./dev/linux/package-deb.sh
+      - name: Verify Debian package metadata
+        run: |
+          dpkg-deb --info build/bin/rockion-linux-amd64.deb
+          dpkg-deb --contents build/bin/rockion-linux-amd64.deb
+          test "$(dpkg-deb -f build/bin/rockion-linux-amd64.deb Architecture)" = amd64
+          test "$(dpkg-deb -f build/bin/rockion-linux-amd64.deb Package)" = rockion
+      - name: Upload Debian package
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rockion-linux-amd64
+          path: build/bin/rockion-linux-amd64.deb
+          if-no-files-found: error
+          retention-days: 7
 
+  test-debian:
+    name: Install and launch on Debian 12 (amd64)
+    needs: build-debian
+    runs-on: ubuntu-24.04
+    container: debian:12
+    steps:
+      - name: Install action prerequisites
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates
+      - name: Download Debian package
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: rockion-linux-amd64
+          path: package
+      - name: Install Debian package
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            ./package/rockion-linux-amd64.deb xvfb xauth passwd
+          useradd --create-home --shell /bin/bash rockion-test
+      - name: Launch Rockion
+        shell: bash
+        run: |
           set +e
-          APPIMAGE_EXTRACT_AND_RUN=1 timeout 15s xvfb-run -a "$image" > rockion-smoke.log 2>&1
+          runuser -u rockion-test -- \
+            timeout 15s xvfb-run -a rockion > rockion-smoke.log 2>&1
           status=$?
           set -e
           cat rockion-smoke.log
           if [[ $status -ne 0 && $status -ne 124 ]]; then
-            echo "Rockion failed its Ubuntu 26.04 startup smoke test with status $status." >&2
+            echo "Rockion failed its Debian 12 startup test with status $status." >&2
             exit "$status"
           fi
 
   publish:
     name: Publish release
     needs:
-      - build
-      - linux-compatibility
+      - build-native
+      - build-debian
+      - test-debian
     runs-on: ubuntu-22.04
     permissions:
       contents: write

@@ -24,7 +24,7 @@ function Get-RepositorySlug {
 }
 
 if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
-    Stop-Preflight 'This AppImage preflight coordinator must be run from Windows.'
+    Stop-Preflight 'This Debian package preflight coordinator must run on Windows.'
 }
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -70,23 +70,23 @@ if ($RemoteCommit -ne $LocalCommit) {
 $Repository = Get-RepositorySlug
 $ExistingRunJson = & gh run list `
     --repo $Repository `
-    --workflow appimage-preflight.yml `
+    --workflow debian-preflight.yml `
     --branch $Branch `
     --event workflow_dispatch `
     --limit 20 `
     --json databaseId 2>$null
 if ($LASTEXITCODE -ne 0) {
-    Stop-Preflight 'Could not list existing AppImage preflight runs.'
+    Stop-Preflight 'Could not list existing Debian package preflight runs.'
 }
 $ExistingRunIds = @()
 if ($ExistingRunJson) {
     $ExistingRunIds = @($ExistingRunJson | ConvertFrom-Json | ForEach-Object { $_.databaseId })
 }
 
-Write-Host 'Starting Linux AppImage preflight...' -ForegroundColor Cyan
-& gh workflow run appimage-preflight.yml --repo $Repository --ref $Branch
+Write-Host 'Starting Debian 12 package preflight...' -ForegroundColor Cyan
+& gh workflow run debian-preflight.yml --repo $Repository --ref $Branch
 if ($LASTEXITCODE -ne 0) {
-    Stop-Preflight 'Could not start the AppImage preflight workflow.'
+    Stop-Preflight 'Could not start the Debian package preflight workflow.'
 }
 
 Write-Host 'Waiting for GitHub Actions to register the workflow...' -ForegroundColor Gray
@@ -94,7 +94,7 @@ $RunId = $null
 for ($attempt = 0; $attempt -lt 24 -and -not $RunId; $attempt++) {
     $json = & gh run list `
         --repo $Repository `
-        --workflow appimage-preflight.yml `
+        --workflow debian-preflight.yml `
         --branch $Branch `
         --event workflow_dispatch `
         --limit 10 `
@@ -114,18 +114,18 @@ for ($attempt = 0; $attempt -lt 24 -and -not $RunId; $attempt++) {
 }
 
 if (-not $RunId) {
-    Stop-Preflight 'Could not locate the AppImage preflight workflow run.'
+    Stop-Preflight 'Could not locate the Debian package preflight workflow run.'
 }
 
 $RunURL = "https://github.com/$Repository/actions/runs/$RunId"
-Write-Host "AppImage preflight: $RunURL" -ForegroundColor Cyan
+Write-Host "Debian package preflight: $RunURL" -ForegroundColor Cyan
 if ($NoWait) {
     exit 0
 }
 
 & gh run watch $RunId --repo $Repository --exit-status
 if ($LASTEXITCODE -ne 0) {
-    Stop-Preflight "AppImage preflight run $RunId failed."
+    Stop-Preflight "Debian package preflight run $RunId failed."
 }
 
-Write-Host 'The x64 AppImage passed its Ubuntu 26.04 compatibility test.' -ForegroundColor Green
+Write-Host 'The amd64 package installed and launched successfully on Debian 12.' -ForegroundColor Green

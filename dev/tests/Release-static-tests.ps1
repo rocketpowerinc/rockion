@@ -80,34 +80,23 @@ if ($Failures.Count -eq 0) {
 Write-Host '[CHECK] Release target matrix' -ForegroundColor Gray
 $workflowPath = Join-Path $RepoRoot '.github\workflows\release.yml'
 $workflow = Get-Content -Raw -LiteralPath $workflowPath
-$requiredTargets = @(
-    'windows/amd64',
-    'darwin/arm64',
-    'linux/amd64'
-)
-foreach ($target in $requiredTargets) {
-    if (-not $workflow.Contains("platform: $target")) {
-        Add-Failure "Release workflow is missing $target."
-    }
-}
 foreach ($requiredText in @(
-    'ubuntu-22.04',
-    'ubuntu-26.04',
+    'platform: windows/amd64',
+    'platform: darwin/arm64',
+    'container: debian:12',
+    'wails build -platform linux/amd64',
+    'libwebkit2gtk-4.0-dev',
     'libwebkit2gtk-4.1-dev',
-    'patchelf python3 xauth xvfb',
     '-tags webkit2_41',
-    'rockion-linux-x86_64.AppImage',
-    'bash ./dev/linux/package-appimage.sh',
-    'Verify Linux build linkage',
-    'Verify Linux AppImage contents',
-    'Test AppImage (ubuntu-26.04-x64)',
-    'APPIMAGE_EXTRACT_AND_RUN=1',
-    'libegl1 libgl1 libgles2',
-    'squashfs-root/usr/bin/WebKitNetworkProcess',
-    'squashfs-root/usr/lib/libharfbuzz.so.0',
-    "grep -Fqx 'cd `"`$APPDIR`"' squashfs-root/apprun-hooks/rockion-webkit.sh",
+    'rockion-linux-amd64.deb',
+    'bash ./dev/linux/package-deb.sh',
+    'dpkg-deb --info',
+    'Install and launch on Debian 12 (amd64)',
+    'apt-get install -y \',
+    'runuser -u rockion-test',
     'xvfb-run',
-    'linux-compatibility',
+    'build-debian',
+    'test-debian',
     'choco install nsis',
     'makensis.exe',
     'GITHUB_PATH',
@@ -127,12 +116,11 @@ foreach ($forbiddenText in @(
     'platform: linux/arm64',
     'windows-11-arm',
     'macos-15-intel',
-    'ubuntu-22.04-arm',
-    'ubuntu-24.04-arm',
-    'ubuntu-26.04-arm',
-    'debian:12',
+    'AppImage',
+    'appimage',
+    'linuxdeploy',
+    'ubuntu-26.04',
     'fedora:42',
-    'rockion-linux-aarch64.AppImage',
     'linux-distro-compatibility',
     'docker run --rm --interactive'
 )) {
@@ -140,45 +128,35 @@ foreach ($forbiddenText in @(
         Add-Failure "Release workflow contains removed target configuration: $forbiddenText"
     }
 }
-if ($workflow.Contains('libwebkit2gtk-4.0-dev')) {
-    if (-not $workflow.Contains('Package Linux AppImage')) {
-        Add-Failure 'WebKitGTK 4.0 may only be used as a bundled AppImage compatibility baseline.'
-    }
-}
-foreach ($legacyAsset in @(
-    'build/bin/rockion-linux-amd64.tar.gz',
-    'build/bin/rockion-linux-arm64.tar.gz'
-)) {
-    if ($workflow.Contains($legacyAsset)) {
-        Add-Failure "Release workflow still publishes legacy Linux archive: $legacyAsset"
-    }
-}
 if ($workflow.Contains('draft: true')) {
     Add-Failure 'Release workflow must publish completed releases, not drafts.'
 }
 if ($workflow.Contains('workflow_dispatch:')) {
-    Add-Failure 'Release workflow must only run for release tags; use the AppImage preflight workflow for manual checks.'
+    Add-Failure 'Release workflow must only run for release tags; use the Debian package preflight for manual checks.'
 }
 if ($Failures.Count -eq 0) {
-    Write-OK 'Windows x64, macOS ARM64, and Ubuntu 26.04 x64 AppImage releases are configured.'
+    Write-OK 'Windows x64, macOS ARM64, and Debian 12 amd64 releases are configured.'
 }
 
-$appImageWorkflowPath = Join-Path $RepoRoot '.github\workflows\appimage-preflight.yml'
-if (-not (Test-Path -LiteralPath $appImageWorkflowPath)) {
-    Add-Failure 'The standalone AppImage preflight workflow is missing.'
+$debianWorkflowPath = Join-Path $RepoRoot '.github\workflows\debian-preflight.yml'
+if (-not (Test-Path -LiteralPath $debianWorkflowPath)) {
+    Add-Failure 'The standalone Debian package preflight workflow is missing.'
 } else {
-    $appImageWorkflow = Get-Content -Raw -LiteralPath $appImageWorkflowPath
+    $debianWorkflow = Get-Content -Raw -LiteralPath $debianWorkflowPath
     foreach ($requiredText in @(
         'workflow_dispatch:',
-        'Build AppImage (linux-x64)',
-        'linux/amd64',
-        'ubuntu-22.04',
-        'ubuntu-26.04',
-        'bash ./dev/linux/package-appimage.sh',
-        'APPIMAGE_EXTRACT_AND_RUN=1'
+        'Build Debian 12 package (amd64)',
+        'container: debian:12',
+        'wails build -platform linux/amd64',
+        'libwebkit2gtk-4.0-dev',
+        'bash ./dev/linux/package-deb.sh',
+        'rockion-linux-amd64.deb',
+        'Install and launch on Debian 12 (amd64)',
+        'runuser -u rockion-test',
+        'xvfb-run -a rockion'
     )) {
-        if (-not $appImageWorkflow.Contains($requiredText)) {
-            Add-Failure "AppImage preflight workflow is missing required configuration: $requiredText"
+        if (-not $debianWorkflow.Contains($requiredText)) {
+            Add-Failure "Debian package preflight workflow is missing required configuration: $requiredText"
         }
     }
     foreach ($forbiddenText in @(
@@ -187,62 +165,48 @@ if (-not (Test-Path -LiteralPath $appImageWorkflowPath)) {
         'darwin/amd64',
         'darwin/arm64',
         'linux/arm64',
-        'ubuntu-22.04-arm',
-        'ubuntu-24.04-arm',
-        'ubuntu-26.04-arm',
-        'debian:12',
-        'fedora:42',
-        'rockion-linux-aarch64.AppImage',
+        'AppImage',
+        'appimage',
+        'linuxdeploy',
         'docker run --rm --interactive',
         'action-gh-release',
         'Publish release'
     )) {
-        if ($appImageWorkflow.Contains($forbiddenText)) {
-            Add-Failure "AppImage preflight must not build or publish non-Linux releases: $forbiddenText"
+        if ($debianWorkflow.Contains($forbiddenText)) {
+            Add-Failure "Debian preflight contains removed or non-Linux release behavior: $forbiddenText"
         }
     }
 }
 
-$appImageScript = Get-Content -Raw -LiteralPath (Join-Path $RepoRoot 'dev\linux\package-appimage.sh')
-foreach ($requiredText in @(
-    'linuxdeploy_sha=',
-    'apprun_sha=',
-    'gtk_plugin_sha=',
-    'download_verified',
-    'WebKitWebProcess',
-    'WebKitNetworkProcess',
-    'libwebkit2gtkinjectedbundle.so',
-    'libfontconfig.so.1',
-    'libfreetype.so.6',
-    'libfribidi.so.0',
-    'libharfbuzz.so.0',
-    '--executable "$webkit_web_process"',
-    '--executable "$webkit_network_process"',
-    'patch-webkit-helper-path.py',
-    'WEBKIT_INJECTED_BUNDLE_PATH',
-    'cd "$APPDIR"',
-    '--plugin gtk',
-    '--output appimage'
-)) {
-    if (-not $appImageScript.Contains($requiredText)) {
-        Add-Failure "AppImage packaging script is missing required configuration: $requiredText"
-    }
-}
-
-$webkitPatcherPath = Join-Path $RepoRoot 'dev\linux\patch-webkit-helper-path.py'
-if (-not (Test-Path -LiteralPath $webkitPatcherPath)) {
-    Add-Failure 'WebKit helper-path patcher is missing.'
+$debScriptPath = Join-Path $RepoRoot 'dev\linux\package-deb.sh'
+if (-not (Test-Path -LiteralPath $debScriptPath)) {
+    Add-Failure 'The Debian packaging script is missing.'
 } else {
-    $webkitPatcher = Get-Content -Raw -LiteralPath $webkitPatcherPath
+    $debScript = Get-Content -Raw -LiteralPath $debScriptPath
     foreach ($requiredText in @(
-        'data.count(old)',
-        'data.replace(old, replacement)',
-        'if args.verify:',
-        'temporary.replace(args.library)'
+        'Architecture: amd64',
+        'libgtk-3-0',
+        'libwebkit2gtk-4.0-37',
+        'xdg-utils',
+        'dpkg-deb --root-owner-group --build',
+        '/usr/bin/rockion',
+        '/usr/share/applications/rockion.desktop',
+        '/usr/share/icons/hicolor/1024x1024/apps/rockion.png'
     )) {
-        if (-not $webkitPatcher.Contains($requiredText)) {
-            Add-Failure "WebKit helper-path patcher is missing required behavior: $requiredText"
+        if (-not $debScript.Contains($requiredText)) {
+            Add-Failure "Debian packaging script is missing required configuration: $requiredText"
         }
+    }
+}
+
+foreach ($removedPath in @(
+    '.github\workflows\appimage-preflight.yml',
+    'dev\linux\package-appimage.sh',
+    'dev\linux\patch-webkit-helper-path.py',
+    'dev\windows-test-appimages.ps1'
+)) {
+    if (Test-Path -LiteralPath (Join-Path $RepoRoot $removedPath)) {
+        Add-Failure "Removed AppImage file still exists: $removedPath"
     }
 }
 
@@ -258,9 +222,9 @@ foreach ($requiredText in @(
     'git ls-remote --refs --tags origin',
     '$attempt -le 3',
     'Git reported:',
-    'gh workflow run appimage-preflight.yml',
+    'gh workflow run debian-preflight.yml',
     '--event workflow_dispatch',
-    'Watching Ubuntu AppImage preflight run',
+    'Watching Debian package preflight run',
     'No new release changes to commit; reusing the current HEAD',
     '$ExistingPreflightRunIds -notcontains $_.databaseId'
 )) {
@@ -271,19 +235,19 @@ foreach ($requiredText in @(
 if ($releaseCoordinator.Contains('git ls-remote --exit-code')) {
     Add-Failure 'Release coordinator must not depend on the special git ls-remote --exit-code status for missing tags.'
 }
-$preflightIndex = $releaseCoordinator.IndexOf('Watching Ubuntu AppImage preflight run')
+$preflightIndex = $releaseCoordinator.IndexOf('Watching Debian package preflight run')
 $tagPushIndex = $releaseCoordinator.IndexOf('Pushing tag $Tag')
 if ($preflightIndex -lt 0 -or $tagPushIndex -lt 0 -or $preflightIndex -gt $tagPushIndex) {
     Add-Failure 'Release coordinator must complete the untagged preflight before pushing the release tag.'
 }
 
-$appImageCoordinatorPath = Join-Path $RepoRoot 'dev\windows-test-appimages.ps1'
-if (-not (Test-Path -LiteralPath $appImageCoordinatorPath)) {
-    Add-Failure 'The Windows AppImage preflight coordinator is missing.'
+$debianCoordinatorPath = Join-Path $RepoRoot 'dev\windows-test-debian-package.ps1'
+if (-not (Test-Path -LiteralPath $debianCoordinatorPath)) {
+    Add-Failure 'The Windows Debian package preflight coordinator is missing.'
 } else {
-    $appImageCoordinator = Get-Content -Raw -LiteralPath $appImageCoordinatorPath
+    $debianCoordinator = Get-Content -Raw -LiteralPath $debianCoordinatorPath
     foreach ($requiredText in @(
-        'gh workflow run appimage-preflight.yml',
+        'gh workflow run debian-preflight.yml',
         '--event workflow_dispatch',
         '$_.headSha -eq $LocalCommit',
         'gh run watch $RunId',
@@ -291,8 +255,8 @@ if (-not (Test-Path -LiteralPath $appImageCoordinatorPath)) {
         'git ls-remote --heads origin',
         '$ExistingRunIds -notcontains $_.databaseId'
     )) {
-        if (-not $appImageCoordinator.Contains($requiredText)) {
-            Add-Failure "AppImage preflight coordinator is missing required behavior: $requiredText"
+        if (-not $debianCoordinator.Contains($requiredText)) {
+            Add-Failure "Debian package preflight coordinator is missing required behavior: $requiredText"
         }
     }
     foreach ($forbiddenText in @(
@@ -300,8 +264,8 @@ if (-not (Test-Path -LiteralPath $appImageCoordinatorPath)) {
         'gh release',
         'npm version'
     )) {
-        if ($appImageCoordinator.Contains($forbiddenText)) {
-            Add-Failure "AppImage preflight coordinator must not modify release state: $forbiddenText"
+        if ($debianCoordinator.Contains($forbiddenText)) {
+            Add-Failure "Debian package preflight coordinator must not modify release state: $forbiddenText"
         }
     }
 }

@@ -41,25 +41,17 @@ Grab a prebuilt binary from the [Releases](https://github.com/rocketpowerinc/roc
 
 - **Windows x64** - `rockion-windows-amd64-installer.exe` or portable `.exe`
 - **macOS Apple Silicon** - `rockion-macos-arm64.zip`
-- **Ubuntu 26.04 x64** - `rockion-linux-x86_64.AppImage`
+- **Debian 12 x64** - `rockion-linux-amd64.deb`
 
-The Linux release is a self-contained x86_64 AppImage built on Ubuntu 22.04
-for a conservative glibc baseline and startup-tested on Ubuntu 26.04 before
-publication.
-
-```bash
-chmod +x rockion-linux-x86_64.AppImage
-./rockion-linux-x86_64.AppImage
-```
-
-If FUSE is unavailable, use AppImage's extraction fallback:
+The Linux release is an amd64 Debian package built and startup-tested on
+Debian 12. GTK and WebKitGTK are installed through Debian package dependencies.
 
 ```bash
-APPIMAGE_EXTRACT_AND_RUN=1 ./rockion-linux-x86_64.AppImage
+sudo apt install ./rockion-linux-amd64.deb
 ```
 
-AppImages bundle Rockion's GTK/WebKit runtime, but Linux portability still
-depends on a compatible kernel, glibc, graphics stack, and display server.
+This package targets Debian 12 on x86_64 systems. Other Debian-based
+distributions are not part of the release compatibility guarantee.
 
 See the [CHANGELOG](./CHANGELOG.md) for what's in each release.
 
@@ -105,9 +97,9 @@ Run the Windows release coordinator:
 
 It updates version metadata and the changelog, runs the full Go/frontend/security
 suite, creates the release commit and tag, builds a local Windows smoke artifact,
-and runs the Ubuntu AppImage preflight. It then pushes the tag, and GitHub
-Actions builds Windows x64, macOS Apple Silicon, and an Ubuntu 26.04 x64
-AppImage with SHA-256 checksums.
+and runs the Debian 12 package preflight. It then pushes the tag, and GitHub
+Actions builds Windows x64, macOS Apple Silicon, and a Debian 12 amd64 package
+with SHA-256 checksums.
 
 After all three platform builds and checksum generation succeed, the resulting
 GitHub release is published automatically. See [dev/README.md](./dev/README.md)

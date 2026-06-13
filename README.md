@@ -8,6 +8,46 @@ Single Go binary (Wails) wrapping a React + TipTap editor.
 
 > See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full design.
 
+## Install in one command
+
+Each `…/releases/latest/download/<asset>` URL always points at the newest release,
+so these one-liners fetch and install the latest build. Re-run any of them to update.
+
+**AnduinOS / Ubuntu 24.04 (x64)** — downloads to `/tmp` (so apt's `_apt` sandbox
+can read it) and installs, pulling in dependencies.
+
+```bash
+curl -fSL -o /tmp/rockion-anduinos-amd64.deb https://github.com/rocketpowerinc/rockion/releases/latest/download/rockion-anduinos-amd64.deb && sudo apt install -y /tmp/rockion-anduinos-amd64.deb
+```
+
+This package targets the Ubuntu 24.04 WebKitGTK 4.1 ABI used by AnduinOS; it will
+not install on Ubuntu 22.04 or older (which ship WebKitGTK 4.0). Other Linux
+distributions are outside the release compatibility guarantee.
+
+**Windows x64 — installer (silent, persistent)** — PowerShell. Approve the UAC
+prompt if it appears; SmartScreen may warn since the build is unsigned.
+
+```powershell
+$ProgressPreference='SilentlyContinue'; $o="$env:TEMP\rockion-installer.exe"; Invoke-WebRequest 'https://github.com/rocketpowerinc/rockion/releases/latest/download/rockion-windows-amd64-installer.exe' -OutFile $o; Start-Process -FilePath $o -ArgumentList '/S' -Wait; Remove-Item $o
+```
+
+**Windows x64 — portable (no install, download + run):**
+
+```powershell
+$ProgressPreference='SilentlyContinue'; $o="$env:LOCALAPPDATA\rockion.exe"; Invoke-WebRequest 'https://github.com/rocketpowerinc/rockion/releases/latest/download/rockion-windows-amd64.exe' -OutFile $o; Start-Process $o
+```
+
+**macOS (Apple Silicon only)** — unzips into `/Applications`, strips the Gatekeeper
+quarantine (the app is unsigned), and launches it. Prefix `sudo unzip` if
+`/Applications` isn't writable.
+
+```bash
+curl -fSL -o /tmp/rockion-macos-arm64.zip https://github.com/rocketpowerinc/rockion/releases/latest/download/rockion-macos-arm64.zip && unzip -oq /tmp/rockion-macos-arm64.zip -d /Applications && xattr -dr com.apple.quarantine /Applications/Rockion.app && open /Applications/Rockion.app
+```
+
+> These mirror the maintained scripts in `dev/linux/install-latest.sh`,
+> `dev/windows/install-latest.ps1`, and `dev/macos/install-latest.sh`.
+
 ## Features
 
 **Editing**
@@ -37,21 +77,11 @@ Single Go binary (Wails) wrapping a React + TipTap editor.
 
 ## Download
 
-Grab a prebuilt binary from the [Releases](https://github.com/rocketpowerinc/rockion/releases) page:
+Prefer to grab a file by hand? The [Releases](https://github.com/rocketpowerinc/rockion/releases) page has:
 
-- **Windows x64** - `rockion-windows-amd64-installer.exe` or portable `.exe`
+- **Windows x64** - `rockion-windows-amd64-installer.exe` or portable `rockion-windows-amd64.exe`
 - **macOS Apple Silicon** - `rockion-macos-arm64.zip`
 - **AnduinOS x64** - `rockion-anduinos-amd64.deb`
-
-The Linux release is an amd64 package built against the Ubuntu 24.04
-WebKitGTK 4.1 ABI used by AnduinOS.
-
-```bash
-sudo apt install ./rockion-anduinos-amd64.deb
-```
-
-This package targets AnduinOS on x86_64 systems. Other Linux distributions are
-not part of the release compatibility guarantee.
 
 See the [CHANGELOG](./CHANGELOG.md) for what's in each release.
 

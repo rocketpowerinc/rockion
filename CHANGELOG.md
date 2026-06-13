@@ -5,6 +5,12 @@ All notable changes to Rockion are documented here. This project adheres to
 
 ## [Unreleased]
 
+### Fixed
+- Install the Windows app into a single `C:\Program Files\Rockion\` folder (was the doubled
+  `C:\Program Files\Rockion\Rockion\`) and name the installed executable `Rockion.exe`.
+- Name the macOS bundle `Rockion.app` (was lowercase `rockion.app`) so the Dock, Launchpad,
+  and Finder all show "Rockion" with a capital R.
+
 ## [0.1.10] - 2026-06-13
 
 ### Fixed

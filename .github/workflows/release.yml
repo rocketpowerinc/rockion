@@ -229,7 +229,7 @@ jobs:
             exit 1
           fi
           set +e
-          timeout 15s xvfb-run -a "$binary" > rockion-smoke.log 2>&1
+          timeout 15s xvfb-run -a rockion > rockion-smoke.log 2>&1
           status=$?
           set -e
           cat rockion-smoke.log

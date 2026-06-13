@@ -5,6 +5,8 @@ All notable changes to Rockion are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-06-13
+
 ### Fixed
 - Ship the Linux app icon at standard hicolor sizes (64–512px) plus a `/usr/share/pixmaps`
   fallback, and refresh the icon/desktop caches on install, so Rockion shows its icon in the
@@ -110,3 +112,4 @@ First release. A working local-first markdown editor: Notion-style UI over plain
 [0.1.7]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.7
 [0.1.8]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.8
 [0.1.9]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.9
+[0.1.10]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.10

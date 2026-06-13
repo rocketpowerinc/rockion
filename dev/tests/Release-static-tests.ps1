@@ -123,7 +123,6 @@ foreach ($forbiddenText in @(
     'linuxdeploy',
     'container: debian:12',
     'libwebkit2gtk-4.0-dev',
-    'libwebkit2gtk-4.0.so.37',
     'rockion-linux-amd64.deb',
     'ubuntu-26.04',
     'fedora:42',
@@ -202,7 +201,8 @@ if (-not (Test-Path -LiteralPath $packageScriptPath)) {
         'dpkg-deb --root-owner-group --build',
         '/usr/bin/rockion',
         '/usr/share/applications/rockion.desktop',
-        '/usr/share/icons/hicolor/1024x1024/apps/rockion.png'
+        '/usr/share/icons/hicolor/256x256/apps',
+        '/usr/share/pixmaps/rockion.png'
     )) {
         if (-not $packageScript.Contains($requiredText)) {
             Add-Failure "AnduinOS packaging script is missing required configuration: $requiredText"

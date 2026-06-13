@@ -16,3 +16,14 @@ export function isMarkdownAutoLink(value) {
 export function shouldAutoLink(value) {
   return !isMarkdownAutoLink(value);
 }
+
+const markdownFilenamePattern =
+  /(?:https?:\/\/)?[^\s<>()\[\]{}"'`]+\.md(?:[?#][^\s<>()\[\]{}"'`]*)?/gi;
+
+export function markdownFilenameRanges(text) {
+  const value = String(text ?? "");
+  return Array.from(value.matchAll(markdownFilenamePattern), (match) => ({
+    from: match.index ?? 0,
+    to: (match.index ?? 0) + match[0].length,
+  }));
+}

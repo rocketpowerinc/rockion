@@ -7,7 +7,11 @@ import { shouldHandleSlashMenuKey } from "../src/editor/slashMenuKeys.mjs";
 import nspell from "nspell";
 import englishDictionary from "dictionary-en";
 import frenchDictionary from "dictionary-fr";
-import { isMarkdownAutoLink, shouldAutoLink } from "../src/editor/linkPolicy.mjs";
+import {
+  isMarkdownAutoLink,
+  markdownFilenameRanges,
+  shouldAutoLink,
+} from "../src/editor/linkPolicy.mjs";
 
 test("plain markdown filenames are not fuzzy-linked", () => {
   const source = fs.readFileSync(new URL("../src/editor/extensions.ts", import.meta.url), "utf8");
@@ -27,6 +31,13 @@ test("plain markdown filenames are not fuzzy-linked", () => {
   for (const value of ["example.com", "https://example.org", "hello.net/path"]) {
     assert.equal(shouldAutoLink(value), true, value);
   }
+
+  assert.deepEqual(markdownFilenameRanges("before hello.md after"), [
+    { from: 7, to: 15 },
+  ]);
+  assert.deepEqual(markdownFilenameRanges("folder/my.file.md"), [
+    { from: 0, to: 17 },
+  ]);
 });
 
 test("links have a removable context menu", () => {

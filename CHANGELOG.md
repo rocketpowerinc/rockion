@@ -15,6 +15,8 @@ All notable changes to Rockion are documented here. This project adheres to
 - Restored automatic linking for recognized web addresses and domains while
   keeping `.md` filenames as plain text. Web links are light blue and include a
   right-click action to remove the link without deleting its text.
+- Remove any stale partial link mark from the complete `.md` filename when an
+  existing linked domain is edited into a Markdown path.
 ### Fixed
 - Install the Windows app into a single `C:\Program Files\Rockion\` folder (was the doubled
   `C:\Program Files\Rockion\Rockion\`) and name the installed executable `Rockion.exe`.

@@ -18,6 +18,7 @@ import { SafeImage } from "./SafeImage";
 import { Spellcheck } from "./Spellcheck";
 import { AutoLink } from "./AutoLink";
 import { LinkContextMenu } from "./LinkContextMenu";
+import { MarkdownLinkCleanup } from "./MarkdownLinkCleanup";
 
 // The full set of TipTap extensions that make up the Rockion editor.
 export const editorExtensions = [
@@ -38,6 +39,7 @@ export const editorExtensions = [
   TableCell,
   SafeImage,
   AutoLink,
+  MarkdownLinkCleanup,
   // Round-trips the document to/from GitHub-Flavored Markdown on disk.
   Markdown.configure({
     html: false,

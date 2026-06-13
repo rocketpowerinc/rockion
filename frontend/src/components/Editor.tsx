@@ -20,6 +20,7 @@ interface Props {
   onOpenLink?: (path: string) => void;
   onSetIcon?: (path: string, icon: string) => void;
   onNoteUpdated?: (note: Note) => void;
+  onNoteRenamed?: (note: Note) => void;
 }
 
 export interface EditorHandle {
@@ -32,9 +33,25 @@ interface Conflict {
 }
 
 const AUTOSAVE_MS = 600;
+// A title-rename waits a bit longer than autosave so it fires once the title
+// has settled, not on every keystroke.
+const TITLE_SYNC_MS = 1200;
+
+// The note's title is the first non-empty line, and only when it's an ATX H1
+// ("# Title"). Anything else (frontmatter, a paragraph) yields no title, so the
+// file is left alone.
+function firstHeadingTitle(markdown: string): string {
+  for (const raw of markdown.split("\n")) {
+    const line = raw.trim();
+    if (line === "") continue;
+    const m = line.match(/^#\s+(.+)$/);
+    return m ? m[1].trim() : "";
+  }
+  return "";
+}
 
 const Editor = forwardRef<EditorHandle, Props>(function Editor(
-  { note, pages, onDirtySaved, onOpenLink, onSetIcon, onNoteUpdated },
+  { note, pages, onDirtySaved, onOpenLink, onSetIcon, onNoteUpdated, onNoteRenamed },
   ref
 ) {
   const saveTimer = useRef<number | null>(null);
@@ -44,6 +61,12 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
   const conflictRef = useRef<Conflict | null>(null);
   const saveInFlight = useRef<Promise<boolean> | null>(null);
   const saveNowRef = useRef<() => Promise<boolean>>(async () => true);
+  const titleRef = useRef("");
+  const renameTimer = useRef<number | null>(null);
+  const renameInFlight = useRef<Promise<void> | null>(null);
+  const syncTitleRef = useRef<() => Promise<void>>(async () => {});
+  const onNoteRenamedRef = useRef(onNoteRenamed);
+  onNoteRenamedRef.current = onNoteRenamed;
   const [linkPickerOpen, setLinkPickerOpen] = useState(false);
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
   const [conflict, setConflict] = useState<Conflict | null>(null);
@@ -53,6 +76,13 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
     if (saveTimer.current !== null) {
       window.clearTimeout(saveTimer.current);
       saveTimer.current = null;
+    }
+  }, []);
+
+  const clearRenameTimer = useCallback(() => {
+    if (renameTimer.current !== null) {
+      window.clearTimeout(renameTimer.current);
+      renameTimer.current = null;
     }
   }, []);
 
@@ -72,6 +102,11 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
         saveTimer.current = null;
         void saveNowRef.current();
       }, AUTOSAVE_MS);
+      if (renameTimer.current !== null) window.clearTimeout(renameTimer.current);
+      renameTimer.current = window.setTimeout(() => {
+        renameTimer.current = null;
+        void syncTitleRef.current();
+      }, TITLE_SYNC_MS);
     },
   });
 
@@ -90,6 +125,12 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
       if (!dirty.current || conflictRef.current) return !conflictRef.current;
       if (!previousSucceeded) return false;
       return saveNowRef.current();
+    }
+    // A title-rename is moving the file; wait so we save to the new path, not
+    // the old (now-missing) one.
+    if (renameInFlight.current) {
+      await renameInFlight.current;
+      if (!dirty.current || conflictRef.current) return !conflictRef.current;
     }
 
     const path = currentPath.current;
@@ -138,6 +179,39 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
   saveNowRef.current = saveNow;
   useImperativeHandle(ref, () => ({ flushSave: saveNow }), [saveNow]);
 
+  // Rename the file on disk so it matches the title (first H1). Saves first so
+  // the move never loses pending text, then moves only when the title changed.
+  const syncTitle = useCallback(async () => {
+    clearRenameTimer();
+    const path = currentPath.current;
+    if (!editor || !path || conflictRef.current) return;
+    const saved = await saveNowRef.current();
+    if (!saved || currentPath.current !== path || conflictRef.current) return;
+    const desired = firstHeadingTitle(markdownNow());
+    if (!desired || desired === titleRef.current) return;
+    const op = (async () => {
+      try {
+        const renamed = await api.renameToTitle(path, desired);
+        if (currentPath.current !== path) return;
+        titleRef.current = desired;
+        version.current = renamed.version;
+        if (renamed.path !== path) {
+          currentPath.current = renamed.path;
+          onNoteRenamedRef.current?.(renamed);
+        }
+      } catch (error) {
+        setSaveError(`Couldn't rename the file to match the title: ${String(error)}`);
+      }
+    })();
+    renameInFlight.current = op;
+    try {
+      await op;
+    } finally {
+      if (renameInFlight.current === op) renameInFlight.current = null;
+    }
+  }, [clearRenameTimer, editor, markdownNow]);
+  syncTitleRef.current = syncTitle;
+
   // Insert an uploaded image at the cursor and persist to assets/.
   async function saveAndInsert(file: File) {
     if (file.size > 10 * 1024 * 1024) {
@@ -176,9 +250,19 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
   const loadNote = useCallback(
     (next: Note | null) => {
       if (!editor) return;
+      // Same note already loaded at the same version (e.g. our own title-rename
+      // just changed its path): don't reset the editor, which would drop the
+      // cursor/selection while the user is still typing the title.
+      if (next && next.path === currentPath.current && next.version === version.current) {
+        return;
+      }
       clearSaveTimer();
+      clearRenameTimer();
       currentPath.current = next?.path ?? null;
       version.current = next?.version ?? "";
+      // Seed with the note's current title so opening a note never triggers a
+      // rename; only an actual title edit does.
+      titleRef.current = firstHeadingTitle(next?.markdown ?? "");
       dirty.current = false;
       conflictRef.current = null;
       setConflict(null);
@@ -201,7 +285,7 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
         );
       }
     },
-    [clearSaveTimer, editor]
+    [clearRenameTimer, clearSaveTimer, editor]
   );
 
   // Parent navigation flushes first. This fallback still captures pending text
@@ -252,9 +336,10 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
     return () => {
       window.removeEventListener("beforeunload", flush);
       document.removeEventListener("visibilitychange", onVisibility);
+      clearRenameTimer();
       flush();
     };
-  }, []);
+  }, [clearRenameTimer]);
 
   // Open the page picker when the "/Link to page" command fires.
   useEffect(() => {

@@ -282,6 +282,53 @@ func (v *Vault) Create(dir, title string) (model.Note, error) {
 	return v.Read(rel)
 }
 
+// PlanTitleRename computes the vault-relative path a note should have so its
+// filename matches title, appending " N" when that name is already taken. It
+// returns changed=false (with the original path) when no move is needed — the
+// filename already matches, or the title has no usable text.
+func (v *Vault) PlanTitleRename(oldRel, title string) (string, bool, error) {
+	if err := requireUserPath(oldRel); err != nil {
+		return "", false, err
+	}
+	// A blank heading would sanitize to "Untitled"; treat it as "no change" so
+	// an empty title doesn't churn files to Untitled.md.
+	if strings.TrimSpace(title) == "" {
+		return oldRel, false, nil
+	}
+	base := sanitize(title)
+	ext := filepath.Ext(oldRel)
+	if ext == "" {
+		ext = ".md"
+	}
+	dir := filepath.ToSlash(filepath.Dir(oldRel))
+	if dir == "." {
+		dir = ""
+	}
+	oldSlash := filepath.ToSlash(oldRel)
+	makeRel := func(name string) string {
+		return filepath.ToSlash(filepath.Join(dir, name+ext))
+	}
+	candidate := makeRel(base)
+	if candidate == oldSlash {
+		return oldRel, false, nil
+	}
+	for i := 2; ; i++ {
+		full, err := v.resolve(candidate, true)
+		if err != nil {
+			return "", false, err
+		}
+		if _, statErr := os.Stat(full); os.IsNotExist(statErr) {
+			return candidate, true, nil
+		} else if statErr != nil {
+			return "", false, statErr
+		}
+		candidate = makeRel(fmt.Sprintf("%s %d", base, i))
+		if candidate == oldSlash {
+			return oldRel, false, nil
+		}
+	}
+}
+
 // Rename moves a note or folder.
 func (v *Vault) Rename(oldRel, newRel string) error {
 	if err := requireUserPath(oldRel); err != nil {

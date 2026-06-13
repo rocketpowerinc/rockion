@@ -245,6 +245,30 @@ func (a *App) RenamePath(oldPath, newPath string) error {
 	return errors.Join(followUpErrs...)
 }
 
+// RenameToTitle renames a note so its filename matches the given title,
+// appending " N" if that name is already taken. It reuses the same path/link/
+// index follow-ups as RenamePath and returns the (possibly moved) note. If the
+// filename already matches, the note is returned unchanged.
+func (a *App) RenameToTitle(path, title string) (model.Note, error) {
+	a.mu.RLock()
+	if err := a.requireVault(); err != nil {
+		a.mu.RUnlock()
+		return model.Note{}, err
+	}
+	newRel, changed, err := a.vault.PlanTitleRename(path, title)
+	a.mu.RUnlock()
+	if err != nil {
+		return model.Note{}, err
+	}
+	if !changed {
+		return a.ReadNote(path)
+	}
+	if err := a.RenamePath(path, newRel); err != nil {
+		return model.Note{}, err
+	}
+	return a.ReadNote(newRel)
+}
+
 func (a *App) DeletePath(path string) error {
 	a.mu.RLock()
 	defer a.mu.RUnlock()

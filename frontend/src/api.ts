@@ -63,6 +63,8 @@ export const api = {
     App.WriteNote(path, markdown, expectedVersion),
   createNote: (dir: string, title: string): Promise<Note> => App.CreateNote(dir, title),
   renamePath: (oldPath: string, newPath: string): Promise<void> => App.RenamePath(oldPath, newPath),
+  // Rename a note so its filename matches its title (first H1); returns the moved note.
+  renameToTitle: (path: string, title: string): Promise<Note> => App.RenameToTitle(path, title),
   deletePath: (path: string): Promise<void> => App.DeletePath(path),
   search: (query: string, limit = 50): Promise<SearchHit[]> => App.Search(query, limit),
   backlinks: (path: string): Promise<SearchHit[]> => App.Backlinks(path),

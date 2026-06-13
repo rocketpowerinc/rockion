@@ -3,6 +3,7 @@ import Sidebar from "./components/Sidebar";
 import Editor, { type EditorHandle } from "./components/Editor";
 import Backlinks from "./components/Backlinks";
 import QuickSwitcher from "./components/QuickSwitcher";
+import NewPageModal from "./components/NewPageModal";
 import {
   api,
   onBeforeClose,
@@ -19,6 +20,7 @@ export default function App() {
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [note, setNote] = useState<Note | null>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [newPageDir, setNewPageDir] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const editorRef = useRef<EditorHandle>(null);
   const closing = useRef(false);
@@ -149,20 +151,33 @@ export default function App() {
     }
   }, [flushEditor, note?.path]);
 
+  // Open the in-app new-page prompt. (Native window.prompt returns null on
+  // macOS under Wails, so a real modal is used instead.)
   const newNote = useCallback(
     async (dir: string) => {
       if (!(await flushEditor())) return;
-      const title = window.prompt("Note title", "Untitled");
-      if (!title) return;
+      setNewPageDir(dir);
+    },
+    [flushEditor]
+  );
+
+  const createPage = useCallback(
+    async (title: string) => {
+      const dir = newPageDir ?? "";
+      const trimmed = title.trim();
+      if (!trimmed) return;
       try {
-        const created = await api.createNote(dir, title);
+        const created = await api.createNote(dir, trimmed);
+        setNewPageDir(null);
         await refreshTree();
         setNote(created);
+        setError(null);
       } catch (e) {
+        // Keep the modal open so the user can pick a different title.
         setError(`Couldn't create note: ${String(e)}`);
       }
     },
-    [flushEditor, refreshTree]
+    [newPageDir, refreshTree]
   );
 
   // Global keyboard shortcuts.
@@ -244,6 +259,10 @@ export default function App() {
           onNoteUpdated={(updated) =>
             setNote((current) => (current?.path === updated.path ? updated : current))
           }
+          onNoteRenamed={(renamed) => {
+            setNote(renamed);
+            void refreshTree();
+          }}
         />
         <Backlinks path={note?.path ?? null} onOpen={openNote} />
       </main>
@@ -252,6 +271,9 @@ export default function App() {
         onClose={() => setSwitcherOpen(false)}
         onOpen={openNote}
       />
+      {newPageDir !== null && (
+        <NewPageModal onSubmit={createPage} onClose={() => setNewPageDir(null)} />
+      )}
     </div>
   );
 }

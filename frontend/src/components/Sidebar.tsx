@@ -129,13 +129,21 @@ export default function Sidebar({
           onClick={() => setSettingsOpen((open) => !open)}
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path
-              d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Zm8.2 4.8-1.7-1a7 7 0 0 0 0-.6l1.7-1a1 1 0 0 0 .4-1.3l-1.5-2.6a1 1 0 0 0-1.3-.4l-1.7 1a7 7 0 0 0-.6-.4V5a1 1 0 0 0-1-1h-3a1 1 0 0 0-1 1v2a7 7 0 0 0-.6.4l-1.7-1a1 1 0 0 0-1.3.4L3.4 9.4a1 1 0 0 0 .4 1.3l1.7 1a7 7 0 0 0 0 .6l-1.7 1a1 1 0 0 0-.4 1.3l1.5 2.6a1 1 0 0 0 1.3.4l1.7-1 .6.4v2a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-2l.6-.4 1.7 1a1 1 0 0 0 1.3-.4l1.5-2.6a1 1 0 0 0-.4-1.3Z"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinejoin="round"
-            />
+            <mask id="rk-gear-hole">
+              <rect width="24" height="24" fill="white" />
+              <circle cx="12" cy="12" r="3" fill="black" />
+            </mask>
+            <g fill="currentColor" mask="url(#rk-gear-hole)">
+              <circle cx="12" cy="12" r="7.4" />
+              <rect x="10.4" y="1.4" width="3.2" height="5" />
+              <rect x="10.4" y="1.4" width="3.2" height="5" transform="rotate(45 12 12)" />
+              <rect x="10.4" y="1.4" width="3.2" height="5" transform="rotate(90 12 12)" />
+              <rect x="10.4" y="1.4" width="3.2" height="5" transform="rotate(135 12 12)" />
+              <rect x="10.4" y="1.4" width="3.2" height="5" transform="rotate(180 12 12)" />
+              <rect x="10.4" y="1.4" width="3.2" height="5" transform="rotate(225 12 12)" />
+              <rect x="10.4" y="1.4" width="3.2" height="5" transform="rotate(270 12 12)" />
+              <rect x="10.4" y="1.4" width="3.2" height="5" transform="rotate(315 12 12)" />
+            </g>
           </svg>
         </button>
       </div>

@@ -48,11 +48,42 @@ curl -fSL -o /tmp/rockion-macos-arm64.zip https://github.com/rocketpowerinc/rock
 > These mirror the maintained scripts in `dev/linux/install-latest.sh`,
 > `dev/windows/install-latest.ps1`, and `dev/macos/install-latest.sh`.
 
+## Uninstall in one command
+
+**AnduinOS / Ubuntu 24.04 (x64)** — removes the package, its desktop entry, and icons:
+
+```bash
+sudo apt-get purge -y rockion
+```
+
+**Windows x64 — installer build** — PowerShell. Finds the registered uninstaller
+and runs it silently; approve the UAC prompt if it appears.
+
+```powershell
+$k='HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\RockionRockion'; if (Test-Path $k) { Start-Process cmd -ArgumentList '/c',(Get-ItemProperty $k).QuietUninstallString -Wait } else { 'Rockion is not installed.' }
+```
+
+**Windows x64 — portable build** — just delete the downloaded exe:
+
+```powershell
+Remove-Item "$env:LOCALAPPDATA\rockion.exe" -Force
+```
+
+**macOS (Apple Silicon):**
+
+```bash
+rm -rf /Applications/Rockion.app
+```
+
+> These mirror the maintained scripts in `dev/linux/uninstall.sh`,
+> `dev/windows/uninstall.ps1`, and `dev/macos/uninstall.sh`.
+
 ## Features
 
 **Editing**
 
 - TipTap editor that reads/writes GitHub-Flavored Markdown directly to disk, with debounced autosave (no save button).
+- **Title = filename** — edit a note's first `# Heading` and the `.md` file is renamed to match once you pause typing (clashes get a ` 2`, ` 3` suffix; links that point to the page are rewritten).
 - Notion-style `/` slash menu: headings, lists, to-dos, table, quote, **callout**, **link to page**, code block, divider.
 - **Block handles** — hover any block for a drag grip (reorder via drag) and a `+` button (insert a block below). Nested blocks (incl. callouts inside callouts) can be dragged out.
 - Click the empty area below the content to start a new block.
@@ -156,7 +187,9 @@ markdown.
 - `vault` — opens a folder, reads/writes notes, builds the sidebar tree. On read it splits YAML
   frontmatter from the body and derives a title (frontmatter `title` → first `# H1` → filename).
   Frontmatter is preserved byte-for-byte on save. Path handling rejects root targets, traversal,
-  symlinks, and unsupported note extensions.
+  symlinks, and unsupported note extensions. `PlanTitleRename` derives a collision-free filename
+  from a title (used by `RenameToTitle` so editing the first `# H1` renames the file and rewrites
+  inbound links).
 - `db` — opens `<vault>/.rockion/index.db` using **`modernc.org/sqlite`** (pure Go, no cgo → single
   static binary, easy cross-compile). Pragmas and schema are applied statement-by-statement.
 - `indexer` — walks `.md`, `.markdown`, and `.mdx` files, parsing `[[wikilinks]]`, `[md](links)`,

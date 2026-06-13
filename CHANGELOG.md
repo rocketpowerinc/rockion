@@ -11,6 +11,26 @@ All notable changes to Rockion are documented here. This project adheres to
 - Name the macOS bundle `Rockion.app` (was lowercase `rockion.app`) so the Dock, Launchpad,
   and Finder all show "Rockion" with a capital R.
 
+### Added
+- One-command uninstallers for AnduinOS, Windows, and macOS in the README, with matching
+  maintained scripts (`dev/linux/uninstall.sh`, `dev/windows/uninstall.ps1`, `dev/macos/uninstall.sh`).
+
+### Added
+- Editing a note's title (its first `# Heading`) now renames the file on disk to match,
+  shortly after you stop typing. Name clashes get a numeric suffix (`Ideas 2.md`), inbound
+  links are rewritten, and the cursor is preserved during the rename.
+
+### Changed
+- Redraw the sidebar settings icon as a solid, blocky 8-tooth gear (was a thin rounded outline).
+
+### Fixed
+- Stop auto-linking plain text like `notes.md`. `.md` is a real TLD, so the editor's
+  autolinker treated any `word.md` as a web address; autolink is now disabled (use
+  `/Link to page` or `[text](url)` to make links).
+- Creating a new page now works on macOS. The "+" button used the native `window.prompt`,
+  which returns `null` under Wails' macOS WebView, so it silently did nothing; replaced it
+  with an in-app new-page dialog that works on all platforms.
+
 ## [0.1.10] - 2026-06-13
 
 ### Fixed

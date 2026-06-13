@@ -35,7 +35,10 @@ export const editorExtensions = [
   TableHeader,
   TableCell,
   Image.configure({ inline: false, allowBase64: false }),
-  Link.configure({ openOnClick: false, autolink: true }),
+  // autolink is off: ".md" is a real TLD (Moldova), so linkify would turn any
+  // "word.md" into a web link — and internal page links are themselves *.md.
+  // Links are created explicitly via "/Link to page" or typed [text](url) markdown.
+  Link.configure({ openOnClick: false, autolink: false }),
   // Round-trips the document to/from GitHub-Flavored Markdown on disk.
   Markdown.configure({
     html: false,

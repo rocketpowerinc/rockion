@@ -30,6 +30,7 @@ const maxNoteBytes = 32 << 20
 type Vault struct {
 	Root      string
 	iconsMu   sync.Mutex
+	coversMu  sync.Mutex
 	sidebarMu sync.Mutex
 }
 

@@ -5,6 +5,9 @@ import Backlinks from "./components/Backlinks";
 import QuickSwitcher from "./components/QuickSwitcher";
 import NewPageModal from "./components/NewPageModal";
 import VaultTransferModal from "./components/VaultTransferModal";
+import Breadcrumbs, {
+  type BreadcrumbItem,
+} from "./components/Breadcrumbs";
 import {
   api,
   onBeforeClose,
@@ -26,6 +29,7 @@ export default function App() {
   const [pages, setPages] = useState<TreeNode[]>([]);
   const [favorites, setFavorites] = useState<TreeNode[]>([]);
   const [note, setNote] = useState<Note | null>(null);
+  const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [vaultTransfer, setVaultTransfer] = useState<
@@ -85,6 +89,20 @@ export default function App() {
       })),
     [pages]
   );
+
+  const breadcrumbs = useMemo<BreadcrumbItem[]>(() => {
+    const byPath = new Map(pageRefs.map((page) => [page.path, page]));
+    return navigationHistory.map((path, index) => {
+      const page = byPath.get(path);
+      const isCurrent = index === navigationHistory.length - 1 && note?.path === path;
+      return {
+        path,
+        title: isCurrent ? note.title : page?.title || path.split("/").pop() || path,
+        icon: isCurrent ? note.icon : page?.icon,
+        current: isCurrent,
+      };
+    });
+  }, [navigationHistory, note, pageRefs]);
 
   // Keep the page-link icon registry in sync so link icons resolve live.
   useEffect(() => {
@@ -156,6 +174,7 @@ export default function App() {
       const info = await api.pickVault();
       setVault(info);
       setNote(null);
+      setNavigationHistory([]);
       await refreshTree();
     } catch (e) {
       console.error("openVault failed:", e);
@@ -229,6 +248,7 @@ export default function App() {
       const info = await api.importVault(vaultTransfer.archivePath, password);
       setVault(info);
       setNote(null);
+      setNavigationHistory([]);
       setVaultTransfer(null);
       setError(null);
       await refreshTree();
@@ -236,11 +256,19 @@ export default function App() {
     [refreshTree, vaultTransfer]
   );
 
-  const openNote = useCallback(async (path: string) => {
+  const openNote = useCallback(async (path: string, historyIndex?: number) => {
     if (note?.path === path) return;
     if (!(await flushEditor())) return;
     try {
-      setNote(await api.readNote(path));
+      const opened = await api.readNote(path);
+      setNote(opened);
+      setNavigationHistory((current) => {
+        if (typeof historyIndex === "number") {
+          return current.slice(0, historyIndex + 1);
+        }
+        if (current[current.length - 1] === opened.path) return current;
+        return [...current, opened.path];
+      });
       setError(null);
     } catch (e) {
       setError(`Couldn't open note: ${String(e)}`);
@@ -261,6 +289,7 @@ export default function App() {
         setNewProjectOpen(false);
         await refreshTree();
         setNote(dashboard);
+        setNavigationHistory([dashboard.path]);
         setError(null);
       } catch (e) {
         setError(`Couldn't create project: ${String(e)}`);
@@ -347,6 +376,10 @@ export default function App() {
         onReorderFavorites={reorderFavorites}
       />
       <main className="main">
+        <Breadcrumbs
+          items={breadcrumbs}
+          onOpen={(index, path) => void openNote(path, index)}
+        />
         <Editor
           ref={editorRef}
           note={note}
@@ -361,7 +394,13 @@ export default function App() {
             setNote((current) => (current?.path === updated.path ? updated : current))
           }
           onNoteRenamed={(renamed) => {
+            const previousPath = note?.path;
             setNote(renamed);
+            if (previousPath && previousPath !== renamed.path) {
+              setNavigationHistory((current) =>
+                current.map((path) => (path === previousPath ? renamed.path : path))
+              );
+            }
             void refreshTree();
           }}
         />

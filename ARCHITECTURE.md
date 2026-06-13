@@ -58,6 +58,7 @@ without lag.
 | `search`   | Full-text search via SQLite FTS5; title/path search; backlink queries. |
 | `app.go` watcher | Recursive `fsnotify` watcher → per-path debounced reindex → frontend events. |
 | `vault` media | Validates decoded image bytes, caps size/dimensions, and writes into `assets/`. |
+| `vault` covers | Stores page cover metadata in `.rockion/covers.json`; validates generated styles, local assets, and Unsplash attribution fields. |
 
 ### Why these choices
 
@@ -130,6 +131,8 @@ DeleteManagedPage(dashboard, href, version string) (Note, error)
 Search(query string, limit int) ([]SearchHit, error)
 Backlinks(path string) ([]SearchHit, error)
 SaveImage(path string, data []byte) (string, error)  // returns vault-relative asset path
+SetNoteCover(path string, cover PageCover) (Note, error)
+CoverImageDataURL(path string) (string, error) // validated local cover for webview
 ```
 
 Project pages remain ordinary Markdown files. Rockion stores a stable
@@ -138,6 +141,13 @@ link query. This lets links follow title and filename changes without a
 proprietary dashboard format. Custom link labels remain unchanged. Removing a
 managed link in the editor restores it on save; deleting its linked page uses
 the dashboard link's context menu so the link and file are removed together.
+
+Page covers do not modify Markdown. Their metadata is stored in the exported
+vault under `.rockion/covers.json`, while uploaded cover images live in
+`assets/`. Solid colors and gradients are generated locally. A production
+Unsplash search must use a Rockion-controlled credential proxy, retain the
+returned CDN URL and tracking identifier, trigger the download endpoint when a
+cover is selected, and display photographer attribution.
 
 Events emitted Go → JS: `vault:changed` (file changed externally), `index:progress`.
 
@@ -182,6 +192,8 @@ TipTap (ProseMirror) is the editor core. The on-disk format is Markdown, so we n
 
 - **Cmd/Ctrl+P** quick switcher (fuzzy file open).
 - **Cmd/Ctrl+K** command palette.
+- A top breadcrumb history shows live page icons and titles; clicking an
+  earlier item truncates the trail and navigates back to that page.
 - Notion aesthetic: generous whitespace, hover handles, drag affordances, light/dark.
 
 ### State & saving

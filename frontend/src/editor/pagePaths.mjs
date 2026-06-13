@@ -59,6 +59,14 @@ export function managedPageIDFromHref(href) {
   }
 }
 
+export function isInternalNoteHref(href) {
+  const value = String(href || "");
+  if (!value || /^[a-z][a-z0-9+.-]*:/i.test(value)) return false;
+  if (value.startsWith("#") || value.startsWith("/")) return false;
+  const path = value.split(/[?#]/, 1)[0];
+  return /\.(md|markdown|mdx)$/i.test(path);
+}
+
 function safeDecode(value) {
   try {
     return decodeURIComponent(value);

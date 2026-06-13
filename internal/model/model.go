@@ -16,12 +16,24 @@ type TreeNode struct {
 	Children  []TreeNode `json:"children,omitempty"`
 }
 
+// PageCover describes a decorative page header. Local image values are
+// vault-relative asset paths; Unsplash values remain hotlinked CDN URLs.
+type PageCover struct {
+	Kind            string `json:"kind"`
+	Value           string `json:"value"`
+	Position        int    `json:"position"`
+	AttributionName string `json:"attributionName,omitempty"`
+	AttributionURL  string `json:"attributionUrl,omitempty"`
+	SourceURL       string `json:"sourceUrl,omitempty"`
+}
+
 // Note is a markdown file with parsed metadata.
 type Note struct {
 	Path        string         `json:"path"`
 	Title       string         `json:"title"`
 	PageID      string         `json:"pageId,omitempty"`
 	Icon        string         `json:"icon,omitempty"`
+	Cover       *PageCover     `json:"cover,omitempty"`
 	Markdown    string         `json:"markdown"`
 	Frontmatter map[string]any `json:"frontmatter,omitempty"`
 	ModifiedAt  int64          `json:"modifiedAt"`

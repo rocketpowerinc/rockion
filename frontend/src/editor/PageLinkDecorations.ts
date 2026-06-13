@@ -2,16 +2,29 @@ import { Extension } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { getPageIcon, isInternalNoteHref } from "./pageIcons";
+import { managedPageIDFromHref } from "./pagePaths.mjs";
 
-// Renders an icon + ↗ badge before each internal page link, and tags the link
-// with a class so it loses the underline. Pure decorations — the document and
-// the markdown on disk are untouched (the link stays a plain `[Title](path.md)`).
+// Renders a live icon before each internal page link. Ordinary embedded links
+// receive a ↗ badge; authoritative managed dashboard entries do not.
 export const PageLinkDecorations = Extension.create({
   name: "pageLinkDecorations",
   addProseMirrorPlugins() {
     return [
       new Plugin({
         key: new PluginKey("rockion-pagelink-deco"),
+        view(view) {
+          const refresh = () => {
+            view.dispatch(
+              view.state.tr.setMeta("rockion:page-icons-changed", true)
+            );
+          };
+          window.addEventListener("rockion:page-icons-changed", refresh);
+          return {
+            destroy() {
+              window.removeEventListener("rockion:page-icons-changed", refresh);
+            },
+          };
+        },
         props: {
           decorations(state) {
             const decos: Decoration[] = [];
@@ -30,12 +43,19 @@ export const PageLinkDecorations = Extension.create({
               const to = pos + node.nodeSize;
 
               if (internal && href) {
-                decos.push(Decoration.inline(from, to, { class: "page-link" }));
+                const managed = !!managedPageIDFromHref(href);
+                decos.push(
+                  Decoration.inline(from, to, {
+                    class: managed
+                      ? "page-link managed-page-link"
+                      : "page-link embedded-page-link",
+                  })
+                );
                 // Only one icon per contiguous link run.
                 const contiguous = href === prevHref && from === prevEnd;
                 if (!contiguous) {
                   decos.push(
-                    Decoration.widget(from, () => buildIcon(href), {
+                    Decoration.widget(from, () => buildIcon(href, managed), {
                       side: -1,
                       marks: [],
                     })
@@ -54,9 +74,11 @@ export const PageLinkDecorations = Extension.create({
   },
 });
 
-function buildIcon(href: string): HTMLElement {
+function buildIcon(href: string, managed: boolean): HTMLElement {
   const span = document.createElement("span");
-  span.className = "page-link-icon";
+  span.className = managed
+    ? "page-link-icon managed-page-link-icon"
+    : "page-link-icon embedded-page-link-icon";
   span.contentEditable = "false";
 
   const icon = getPageIcon(href);

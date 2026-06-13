@@ -237,7 +237,7 @@ and Rockion rebuilds it (you'd only lose page icons, which are cosmetic).
 rockion/
 ├── main.go  app.go           ← Wails entrypoint + bound API methods (JS-callable)
 ├── internal/
-│   ├── vault/                ← file read/write, tree, frontmatter, icons.json sidecar
+│   ├── vault/                ← files, frontmatter, icons/covers/sidebar metadata
 │   ├── db/                   ← SQLite index (modernc, pure Go) + schema
 │   ├── indexer/              ← incremental parse: links, tags, FTS
 │   ├── search/               ← FTS5 search + backlinks

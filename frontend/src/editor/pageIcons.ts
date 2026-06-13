@@ -2,17 +2,24 @@
 // App keeps this in sync with the vault; the page-link decorations read from it
 // so link icons are resolved live (never baked into the markdown on disk).
 
-import { resolvePageHref } from "./pagePaths.mjs";
+import {
+  isInternalNoteHref,
+  resolvePageHref,
+} from "./pagePaths.mjs";
+
+export { isInternalNoteHref };
 
 let registry: Record<string, string> = {};
 let currentPagePath = "";
 
 export function setPageIcons(map: Record<string, string>) {
   registry = map || {};
+  notifyPageIconsChanged();
 }
 
 export function setCurrentPagePath(path: string) {
   currentPagePath = path || "";
+  notifyPageIconsChanged();
 }
 
 export function getPageIcon(path: string): string {
@@ -30,10 +37,8 @@ function safeDecode(s: string): string {
   }
 }
 
-// True for relative links that point at another note in the vault.
-export function isInternalNoteHref(href: string): boolean {
-  if (!href) return false;
-  if (/^[a-z]+:/i.test(href)) return false; // http:, mailto:, etc.
-  if (href.startsWith("#") || href.startsWith("/")) return false;
-  return /\.(md|markdown|mdx)$/i.test(href);
+function notifyPageIconsChanged() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("rockion:page-icons-changed"));
+  }
 }

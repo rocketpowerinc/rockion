@@ -170,6 +170,11 @@ func (a *App) requireVault() error {
 	return nil
 }
 
+func (a *App) withCover(note model.Note) model.Note {
+	note.Cover = a.vault.Cover(note.Path)
+	return note
+}
+
 func (a *App) ListTree() ([]model.TreeNode, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -221,7 +226,11 @@ func (a *App) ReadNote(path string) (model.Note, error) {
 	if err := a.requireVault(); err != nil {
 		return model.Note{}, err
 	}
-	return a.vault.Read(path)
+	note, err := a.vault.Read(path)
+	if err != nil {
+		return model.Note{}, err
+	}
+	return a.withCover(note), nil
 }
 
 func (a *App) WriteNote(path, markdown, expectedVersion string) (model.Note, error) {
@@ -246,7 +255,7 @@ func (a *App) WriteNote(path, markdown, expectedVersion string) (model.Note, err
 	if err := a.indexer.IndexFile(path); err != nil {
 		runtime.LogErrorf(a.ctx, "index saved note failed: %v", err)
 	}
-	return saved, nil
+	return a.withCover(saved), nil
 }
 
 func (a *App) CreateSubPage(dashboardPath, title string) (model.Note, error) {
@@ -311,6 +320,9 @@ func (a *App) renamePathLocked(oldPath, newPath string) error {
 	if err := a.vault.RenameIconPath(oldPath, newPath, isDir); err != nil {
 		followUpErrs = append(followUpErrs, fmt.Errorf("rename icon metadata: %w", err))
 	}
+	if err := a.vault.RenameCoverPath(oldPath, newPath, isDir); err != nil {
+		followUpErrs = append(followUpErrs, fmt.Errorf("rename cover metadata: %w", err))
+	}
 	if err := a.vault.RenameFavoritePath(oldPath, newPath, isDir); err != nil {
 		followUpErrs = append(followUpErrs, fmt.Errorf("rename favorite metadata: %w", err))
 	}
@@ -346,7 +358,11 @@ func (a *App) RenameToTitle(path, title string) (model.Note, error) {
 		return model.Note{}, err
 	}
 	if strings.EqualFold(filepath.Base(filepath.FromSlash(path)), "dashboard.md") {
-		return a.vault.Read(path)
+		note, err := a.vault.Read(path)
+		if err != nil {
+			return model.Note{}, err
+		}
+		return a.withCover(note), nil
 	}
 	newRel, changed, err := a.vault.PlanTitleRename(path, title)
 	if err != nil {
@@ -368,7 +384,11 @@ func (a *App) RenameToTitle(path, title string) (model.Note, error) {
 			}
 		}
 	}
-	return a.vault.Read(path)
+	note, err := a.vault.Read(path)
+	if err != nil {
+		return model.Note{}, err
+	}
+	return a.withCover(note), nil
 }
 
 func (a *App) DeletePath(path string) error {
@@ -391,6 +411,9 @@ func (a *App) DeletePath(path string) error {
 	var followUpErrs []error
 	if err := a.vault.RemoveIconPath(path, isDir); err != nil {
 		followUpErrs = append(followUpErrs, fmt.Errorf("remove icon metadata: %w", err))
+	}
+	if err := a.vault.RemoveCoverPath(path, isDir); err != nil {
+		followUpErrs = append(followUpErrs, fmt.Errorf("remove cover metadata: %w", err))
 	}
 	if err := a.vault.RemoveFavoritePath(path, isDir); err != nil {
 		followUpErrs = append(followUpErrs, fmt.Errorf("remove favorite metadata: %w", err))
@@ -420,6 +443,9 @@ func (a *App) DeleteManagedPage(
 	if err := a.vault.RemoveIconPath(result.DeletedPath, false); err != nil {
 		followUpErrs = append(followUpErrs, fmt.Errorf("remove icon metadata: %w", err))
 	}
+	if err := a.vault.RemoveCoverPath(result.DeletedPath, false); err != nil {
+		followUpErrs = append(followUpErrs, fmt.Errorf("remove cover metadata: %w", err))
+	}
 	if err := a.vault.RemoveFavoritePath(result.DeletedPath, false); err != nil {
 		followUpErrs = append(followUpErrs, fmt.Errorf("remove favorite metadata: %w", err))
 	}
@@ -430,9 +456,9 @@ func (a *App) DeleteManagedPage(
 		followUpErrs = append(followUpErrs, fmt.Errorf("index updated dashboard: %w", err))
 	}
 	if err := errors.Join(followUpErrs...); err != nil {
-		return result.Dashboard, err
+		return a.withCover(result.Dashboard), err
 	}
-	return result.Dashboard, nil
+	return a.withCover(result.Dashboard), nil
 }
 
 func (a *App) Search(query string, limit int) ([]model.SearchHit, error) {
@@ -461,6 +487,33 @@ func (a *App) SaveImage(name string, data []byte) (string, error) {
 		return "", err
 	}
 	return a.vault.SaveImage(name, data)
+}
+
+// SetNoteCover stores a page cover in vault metadata without changing Markdown.
+func (a *App) SetNoteCover(path string, cover model.PageCover) (model.Note, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if err := a.requireVault(); err != nil {
+		return model.Note{}, err
+	}
+	if err := a.vault.SetCover(path, cover); err != nil {
+		return model.Note{}, err
+	}
+	note, err := a.vault.Read(path)
+	if err != nil {
+		return model.Note{}, err
+	}
+	return a.withCover(note), nil
+}
+
+// CoverImageDataURL returns the current page's validated local cover image.
+func (a *App) CoverImageDataURL(path string) (string, error) {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	if err := a.requireVault(); err != nil {
+		return "", err
+	}
+	return a.vault.CoverImageDataURL(path)
 }
 
 // SetNoteIcon sets (or clears, if icon == "") the emoji icon for a note.

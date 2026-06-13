@@ -15,10 +15,19 @@ import {
 import {
   managedPageHref,
   managedPageIDFromHref,
+  isInternalNoteHref,
   pageDirectory,
   relativePageHref,
   resolvePageHref,
 } from "../src/editor/pagePaths.mjs";
+import {
+  coverBackground,
+  coverGradients,
+} from "../src/editor/coverStyles.mjs";
+import {
+  emojiCatalog,
+  searchEmojis,
+} from "../src/editor/emojiCatalog.mjs";
 
 test("plain markdown filenames are not fuzzy-linked", () => {
   const source = fs.readFileSync(new URL("../src/editor/extensions.ts", import.meta.url), "utf8");
@@ -139,6 +148,8 @@ test("sub-pages use portable relative markdown links", () => {
   );
   assert.match(managed, /^New Page\.md\?/);
   assert.equal(managedPageIDFromHref(managed), "page-id");
+  assert.equal(isInternalNoteHref(managed), true);
+  assert.equal(isInternalNoteHref("New Page.md#section"), true);
 });
 
 test("the slash menu includes new sub-page creation", () => {
@@ -160,4 +171,88 @@ test("the sidebar plus button creates projects rather than root notes", () => {
   assert.match(sidebar, /onClick=\{onNewProject\}/);
   assert.match(app, /api\.createProject\(trimmed\)/);
   assert.doesNotMatch(app, /setNewPageDir/);
+});
+
+test("page covers allow generated and validated image backgrounds", () => {
+  assert.equal(
+    coverBackground({ kind: "color", value: "#336699" }),
+    "#336699"
+  );
+  assert.equal(
+    coverBackground({ kind: "gradient", value: "aurora" }),
+    coverGradients.aurora
+  );
+  assert.match(
+    coverBackground(
+      { kind: "image" },
+      "data:image/png;base64,iVBORw0KGgo="
+    ),
+    /^url\("data:image\/png;base64,/
+  );
+  assert.equal(
+    coverBackground({ kind: "unsplash", value: "https://example.com/tracker.jpg" }),
+    ""
+  );
+  assert.match(
+    coverBackground({
+      kind: "unsplash",
+      value: "https://images.unsplash.com/photo-example?ixid=tracking",
+    }),
+    /^url\("https:\/\/images\.unsplash\.com\//
+  );
+
+  const picker = fs.readFileSync(
+    new URL("../src/components/CoverPicker.tsx", import.meta.url),
+    "utf8"
+  );
+  assert.match(picker, /Choose an image/);
+  assert.match(picker, /Browse Unsplash/);
+  assert.match(picker, /Remove cover/);
+});
+
+test("page navigation renders icon-aware clickable breadcrumbs", () => {
+  const app = fs.readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
+  const breadcrumbs = fs.readFileSync(
+    new URL("../src/components/Breadcrumbs.tsx", import.meta.url),
+    "utf8"
+  );
+  const decorations = fs.readFileSync(
+    new URL("../src/editor/PageLinkDecorations.ts", import.meta.url),
+    "utf8"
+  );
+  const styles = fs.readFileSync(
+    new URL("../src/styles.css", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(app, /navigationHistory/);
+  assert.match(app, /<Breadcrumbs/);
+  assert.match(app, /openNote\(path,\s*index\)/);
+  assert.match(breadcrumbs, /aria-label="Page history"/);
+  assert.match(breadcrumbs, /breadcrumb-icon-img/);
+  assert.match(breadcrumbs, /onOpen\(index,\s*item\.path\)/);
+  assert.match(decorations, /rockion:page-icons-changed/);
+  assert.match(decorations, /managed-page-link-icon/);
+  assert.match(decorations, /embedded-page-link-icon/);
+  assert.match(styles, /\.embedded-page-link-icon::after/);
+  assert.doesNotMatch(styles, /\.page-link-icon::after/);
+});
+
+test("the icon picker has a searchable expanded emoji catalog", () => {
+  assert.ok(emojiCatalog.length > 100);
+  assert.deepEqual(
+    searchEmojis("house").map(([emoji]) => emoji),
+    ["🏠", "🏡"]
+  );
+  assert.ok(searchEmojis("code").some(([emoji]) => emoji === "💻"));
+  assert.ok(searchEmojis("money").some(([emoji]) => emoji === "💰"));
+  assert.equal(searchEmojis("not-a-real-icon").length, 0);
+
+  const picker = fs.readFileSync(
+    new URL("../src/components/EmojiPicker.tsx", import.meta.url),
+    "utf8"
+  );
+  assert.match(picker, /placeholder="Search icons, e\.g\. house"/);
+  assert.match(picker, /autoFocus/);
+  assert.match(picker, /matches\[0\]\[0\]/);
 });

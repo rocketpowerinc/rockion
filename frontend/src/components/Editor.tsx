@@ -9,7 +9,7 @@ import {
 } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { editorExtensions } from "../editor/extensions";
-import { api, onVaultChanged, type Note } from "../api";
+import { api, onVaultChanged, type Note, type PageCover } from "../api";
 import PagePicker, { type PageRef } from "./PagePicker";
 import EmojiPicker from "./EmojiPicker";
 import type { WritingLanguage } from "../writingLanguage";
@@ -21,6 +21,8 @@ import {
   resolvePageHref,
 } from "../editor/pagePaths.mjs";
 import { setCurrentPagePath } from "../editor/pageIcons";
+import CoverPicker from "./CoverPicker";
+import { coverBackground } from "../editor/coverStyles.mjs";
 
 interface Props {
   note: Note | null;
@@ -97,6 +99,8 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
   const [conflict, setConflict] = useState<Conflict | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [subPagePromptOpen, setSubPagePromptOpen] = useState(false);
+  const [coverPickerOpen, setCoverPickerOpen] = useState(false);
+  const [coverImageDataURL, setCoverImageDataURL] = useState("");
 
   const clearSaveTimer = useCallback(() => {
     if (saveTimer.current !== null) {
@@ -145,6 +149,23 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
     editor.view.dom.setAttribute("lang", writingLanguage);
     void refreshSpellcheck(editor, writingLanguage);
   }, [editor, writingLanguage]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setCoverImageDataURL("");
+    if (!note || note.cover?.kind !== "image") return () => {};
+    void api
+      .coverImageDataURL(note.path)
+      .then((dataURL) => {
+        if (!cancelled) setCoverImageDataURL(dataURL);
+      })
+      .catch((error) => {
+        if (!cancelled) setSaveError(`Couldn't load the page cover: ${String(error)}`);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [note?.cover?.kind, note?.cover?.value, note?.path]);
 
   const markdownNow = useCallback(
     () => editor?.storage?.markdown?.getMarkdown?.() ?? editor?.getText() ?? "",
@@ -261,6 +282,27 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
     } catch (error) {
       setSaveError(`Image import failed: ${String(error)}`);
     }
+  }
+
+  async function setPageCover(cover: PageCover) {
+    if (!note) return;
+    const updated = await api.setNoteCover(note.path, cover);
+    onNoteUpdated?.(updated);
+    setSaveError(null);
+  }
+
+  async function uploadPageCover(file: File) {
+    if (!note) return;
+    if (file.size > 10 * 1024 * 1024) {
+      throw new Error("Cover images must be 10 MB or smaller.");
+    }
+    const data = new Uint8Array(await file.arrayBuffer());
+    const asset = await api.saveImage(file.name, Array.from(data));
+    await setPageCover({
+      kind: "image",
+      value: asset,
+      position: 50,
+    });
   }
 
   function handleImagePaste(event: ClipboardEvent): boolean {
@@ -550,9 +592,52 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
     );
   }
 
+  const pageCoverBackground = coverBackground(note.cover, coverImageDataURL);
+
   return (
     <>
-      <div className="page-header">
+      {note.cover && pageCoverBackground && (
+        <div
+          className="page-cover"
+          style={{
+            background: pageCoverBackground,
+            backgroundPosition: `center ${note.cover.position ?? 50}%`,
+          }}
+        >
+          <div className="page-cover-actions">
+            <button type="button" onClick={() => setCoverPickerOpen(true)}>
+              Change cover
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                void setPageCover({ kind: "", value: "", position: 50 })
+              }
+            >
+              Remove
+            </button>
+          </div>
+          {note.cover.kind === "unsplash" &&
+            note.cover.attributionName &&
+            note.cover.attributionUrl && (
+              <button
+                className="page-cover-attribution"
+                onClick={() => api.openExternal(note.cover?.attributionUrl || "")}
+              >
+                Photo by {note.cover.attributionName} on Unsplash
+              </button>
+            )}
+        </div>
+      )}
+      <div className={`page-header ${note.cover ? "has-cover" : ""}`}>
+        {!note.cover && (
+          <button
+            className="add-cover-button"
+            onClick={() => setCoverPickerOpen(true)}
+          >
+            Add cover
+          </button>
+        )}
         <button
           className={`favorite-button ${isFavorite ? "is-favorite" : ""}`}
           title={isFavorite ? "Remove from Favorites" : "Add to Favorites"}
@@ -597,6 +682,17 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
         <NewPageModal
           onSubmit={createSubPage}
           onClose={() => setSubPagePromptOpen(false)}
+        />
+      )}
+      {coverPickerOpen && (
+        <CoverPicker
+          hasCover={!!note.cover}
+          onClose={() => setCoverPickerOpen(false)}
+          onPick={setPageCover}
+          onUpload={uploadPageCover}
+          onRemove={() =>
+            setPageCover({ kind: "", value: "", position: 50 })
+          }
         />
       )}
       {conflict && (

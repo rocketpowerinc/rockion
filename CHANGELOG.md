@@ -6,6 +6,14 @@ All notable changes to Rockion are documented here. This project adheres to
 ## [Unreleased]
 
 ### Added
+- Expand the page icon gallery to more than 100 categorized emoji choices and
+  add keyword search with aliases such as house, home, code, work, and money.
+- Show each target page's live icon beside internal dashboard links, including
+  managed links with Rockion query metadata, and add an icon-aware breadcrumb
+  history above the page for navigating back through recently opened pages.
+- Add Notion-style page covers with a built-in solid-color and gradient
+  gallery, validated local image uploads, hover controls to change or remove a
+  cover, and vault-portable metadata that follows page and folder renames.
 - Give project sub-pages stable UUIDs in Markdown frontmatter and manage their
   dashboard links so automatic labels and targets follow page title or filename
   changes while custom link aliases remain intact.
@@ -14,6 +22,12 @@ All notable changes to Rockion are documented here. This project adheres to
   orphaned dashboard state.
 
 ### Fixed
+- Raise the cover action controls above the overlapping page header so both
+  Change cover and Remove remain clickable.
+- Remove the corner arrow badge from authoritative managed dashboard entries
+  while retaining it on ordinary embedded page links created with Link to page.
+- Keep cover change/remove controls softly visible and enlarge their hover
+  target so they no longer disappear while the pointer moves toward them.
 - Repair duplicate managed-page IDs automatically when a page file is copied,
   ensuring both pages keep independent dashboard entries.
 

@@ -29,10 +29,20 @@ export interface Note {
   title: string;
   pageId?: string;
   icon?: string;
+  cover?: PageCover;
   markdown: string;
   frontmatter?: Record<string, unknown>;
   modifiedAt: number;
   version: string;
+}
+
+export interface PageCover {
+  kind: string;
+  value: string;
+  position: number;
+  attributionName?: string;
+  attributionUrl?: string;
+  sourceUrl?: string;
 }
 
 export interface SearchHit {
@@ -84,6 +94,9 @@ export const api = {
   backlinks: (path: string): Promise<SearchHit[]> => App.Backlinks(path),
   // SaveImage takes a Go []byte; Wails marshals a number[] / base64. We pass an array.
   saveImage: (name: string, data: number[]): Promise<string> => App.SaveImage(name, data),
+  setNoteCover: (path: string, cover: PageCover): Promise<Note> =>
+    App.SetNoteCover(path, cover),
+  coverImageDataURL: (path: string): Promise<string> => App.CoverImageDataURL(path),
   // SaveFile opens a native save dialog and writes content; returns chosen path ("" if cancelled).
   saveFile: (name: string, content: string): Promise<string> => App.SaveFile(name, content),
   exportVault: (password: string): Promise<string> => App.ExportVault(password),

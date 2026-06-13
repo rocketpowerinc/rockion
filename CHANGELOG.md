@@ -5,6 +5,8 @@ All notable changes to Rockion are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-06-12
+
 ## [0.1.5] - 2026-06-12
 
 ### Added
@@ -13,6 +15,8 @@ All notable changes to Rockion are documented here. This project adheres to
 
 ### Fixed
 - Replace raw Linux archives with self-contained x86_64 and ARM64 AppImages tested across Ubuntu, Debian, and Fedora.
+- Install host EGL/OpenGL interfaces during AppImage smoke tests and execute container test scripts interactively.
+- Make Windows release remote-tag checks resilient to missing tags and transient GitHub connection failures.
 
 ## [0.1.4] - 2026-06-12
 
@@ -78,3 +82,4 @@ First release. A working local-first markdown editor: Notion-style UI over plain
 [0.1.3]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.3
 [0.1.4]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.4
 [0.1.5]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.5
+[0.1.6]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.6

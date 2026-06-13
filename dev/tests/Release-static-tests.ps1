@@ -114,6 +114,9 @@ foreach ($requiredText in @(
     'Test Linux package',
     'linux-distro-compatibility',
     'APPIMAGE_EXTRACT_AND_RUN=1',
+    'docker run --rm --interactive',
+    'libegl1 libgl1',
+    'libglvnd-egl libglvnd-glx',
     'xvfb-run',
     'linux-compatibility',
     'choco install nsis',
@@ -171,6 +174,20 @@ if (-not (Test-Path -LiteralPath (Join-Path $RepoRoot 'frontend\dist\.gitkeep'))
 }
 if (-not (Test-Path -LiteralPath (Join-Path $RepoRoot 'frontend\public\.gitkeep'))) {
     Add-Failure 'frontend/public/.gitkeep is required so Vite restores the embed placeholder after builds.'
+}
+
+$releaseCoordinator = Get-Content -Raw -LiteralPath (Join-Path $RepoRoot 'dev\windows-create-release.ps1')
+foreach ($requiredText in @(
+    'git ls-remote --refs --tags origin',
+    '$attempt -le 3',
+    'Git reported:'
+)) {
+    if (-not $releaseCoordinator.Contains($requiredText)) {
+        Add-Failure "Release coordinator is missing resilient remote-tag handling: $requiredText"
+    }
+}
+if ($releaseCoordinator.Contains('git ls-remote --exit-code')) {
+    Add-Failure 'Release coordinator must not depend on the special git ls-remote --exit-code status for missing tags.'
 }
 
 Write-Host '[CHECK] Changelog structure' -ForegroundColor Gray

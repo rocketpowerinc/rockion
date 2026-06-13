@@ -130,11 +130,28 @@ $Tag = "v$CleanVersion"
 if ($LASTEXITCODE -eq 0) {
     Stop-Release "Local tag $Tag already exists."
 }
-& git ls-remote --exit-code --tags origin "refs/tags/$Tag" *> $null
-if ($LASTEXITCODE -eq 0) {
+$RemoteTagResult = @()
+$RemoteTagExitCode = -1
+for ($attempt = 1; $attempt -le 3; $attempt++) {
+    $RemoteTagResult = @(& git ls-remote --refs --tags origin "refs/tags/$Tag" 2>&1)
+    $RemoteTagExitCode = $LASTEXITCODE
+    if ($RemoteTagExitCode -eq 0) {
+        break
+    }
+    if ($attempt -lt 3) {
+        Write-Host "[WARN] Remote tag check failed (attempt $attempt of 3); retrying..." -ForegroundColor Yellow
+        Start-Sleep -Seconds 2
+    }
+}
+if ($RemoteTagExitCode -ne 0) {
+    $RemoteTagError = ($RemoteTagResult | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine
+    if ([string]::IsNullOrWhiteSpace($RemoteTagError)) {
+        $RemoteTagError = "git ls-remote exited with code $RemoteTagExitCode."
+    }
+    Stop-Release "Could not verify whether remote tag $Tag exists. Git reported: $RemoteTagError"
+}
+if ($RemoteTagResult.Count -gt 0) {
     Stop-Release "Remote tag $Tag already exists."
-} elseif ($LASTEXITCODE -ne 2) {
-    Stop-Release "Could not verify whether remote tag $Tag exists."
 }
 
 Write-Host

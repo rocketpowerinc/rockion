@@ -46,3 +46,31 @@ type SearchHit struct {
 	Title   string `json:"title"`
 	Snippet string `json:"snippet,omitempty"`
 }
+
+// PageCard is a dashboard "gallery card" view of a managed page. It is derived
+// entirely from the page file + sidecar metadata, so nothing card-specific is
+// stored in the dashboard markdown.
+type PageCard struct {
+	PageID     string            `json:"pageId"`
+	Path       string            `json:"path"`
+	Title      string            `json:"title"`
+	Icon       string            `json:"icon,omitempty"`
+	Cover      *PageCover        `json:"cover,omitempty"`
+	Excerpt    string            `json:"excerpt,omitempty"`
+	ModifiedAt int64             `json:"modifiedAt"`
+	Properties map[string]string `json:"properties,omitempty"`
+	TodoDone   int               `json:"todoDone"`
+	TodoTotal  int               `json:"todoTotal"`
+}
+
+// DashboardView is the persisted view configuration for a dashboard. It lives in
+// the dashboard's own YAML frontmatter so the layout choice travels with the
+// file and never pollutes the body markdown.
+type DashboardView struct {
+	View        string `json:"view"`                  // gallery | list | table | board
+	GroupBy     string `json:"groupBy,omitempty"`     // property key for board grouping
+	SortBy      string `json:"sortBy,omitempty"`      // title | modified | <property>
+	SortDir     string `json:"sortDir,omitempty"`     // asc | desc
+	FilterKey   string `json:"filterKey,omitempty"`   // property key to filter on
+	FilterValue string `json:"filterValue,omitempty"` // required value ("" = no filter)
+}

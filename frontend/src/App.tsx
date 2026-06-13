@@ -4,6 +4,7 @@ import Editor, { type EditorHandle } from "./components/Editor";
 import Backlinks from "./components/Backlinks";
 import QuickSwitcher from "./components/QuickSwitcher";
 import NewPageModal from "./components/NewPageModal";
+import Dashboard from "./components/Dashboard";
 import VaultTransferModal from "./components/VaultTransferModal";
 import Breadcrumbs, {
   type BreadcrumbItem,
@@ -31,6 +32,7 @@ export default function App() {
   const [note, setNote] = useState<Note | null>(null);
   const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [dashboardAsMarkdown, setDashboardAsMarkdown] = useState(false);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [vaultTransfer, setVaultTransfer] = useState<
     { mode: "export" } | { mode: "import"; archivePath: string } | null
@@ -75,6 +77,11 @@ export default function App() {
     () => setTheme((current) => (current === "dark" ? "light" : "dark")),
     []
   );
+
+  // Always reopen a dashboard in its card view, not the raw-markdown editor.
+  useEffect(() => {
+    setDashboardAsMarkdown(false);
+  }, [note?.path]);
 
   const flushEditor = useCallback(async () => {
     return (await editorRef.current?.flushSave()) ?? true;
@@ -380,30 +387,50 @@ export default function App() {
           items={breadcrumbs}
           onOpen={(index, path) => void openNote(path, index)}
         />
-        <Editor
-          ref={editorRef}
-          note={note}
-          writingLanguage={writingLanguage}
-          pages={pageRefs}
-          isFavorite={favorites.some((favorite) => favorite.path === note?.path)}
-          onPageCreated={refreshTree}
-          onOpenLink={openNote}
-          onSetIcon={setIcon}
-          onToggleFavorite={toggleFavorite}
-          onNoteUpdated={(updated) =>
-            setNote((current) => (current?.path === updated.path ? updated : current))
-          }
-          onNoteRenamed={(renamed) => {
-            const previousPath = note?.path;
-            setNote(renamed);
-            if (previousPath && previousPath !== renamed.path) {
-              setNavigationHistory((current) =>
-                current.map((path) => (path === previousPath ? renamed.path : path))
-              );
+        {note && /(^|\/)dashboard\.md$/i.test(note.path) && !dashboardAsMarkdown ? (
+          <Dashboard
+            note={note}
+            onOpenPage={openNote}
+            onError={setError}
+            onRefreshTree={() => void refreshTree()}
+            onOpenMarkdown={() => setDashboardAsMarkdown(true)}
+          />
+        ) : (
+          <>
+            {note && /(^|\/)dashboard\.md$/i.test(note.path) && dashboardAsMarkdown && (
+              <button
+                className="db-back-to-cards"
+                onClick={() => setDashboardAsMarkdown(false)}
+              >
+                ← Back to cards
+              </button>
+            )}
+          <Editor
+            ref={editorRef}
+            note={note}
+            writingLanguage={writingLanguage}
+            pages={pageRefs}
+            isFavorite={favorites.some((favorite) => favorite.path === note?.path)}
+            onPageCreated={refreshTree}
+            onOpenLink={openNote}
+            onSetIcon={setIcon}
+            onToggleFavorite={toggleFavorite}
+            onNoteUpdated={(updated) =>
+              setNote((current) => (current?.path === updated.path ? updated : current))
             }
-            void refreshTree();
-          }}
-        />
+            onNoteRenamed={(renamed) => {
+              const previousPath = note?.path;
+              setNote(renamed);
+              if (previousPath && previousPath !== renamed.path) {
+                setNavigationHistory((current) =>
+                  current.map((path) => (path === previousPath ? renamed.path : path))
+                );
+              }
+              void refreshTree();
+            }}
+          />
+          </>
+        )}
         <Backlinks path={note?.path ?? null} onOpen={openNote} />
       </main>
       <QuickSwitcher

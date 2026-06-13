@@ -1505,6 +1505,400 @@ mark {
   color: inherit;
 }
 
+/* ---- Dashboard (database views) ---- */
+.dashboard {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 36px 80px;
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+}
+.db-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.db-title h1 {
+  font-size: 30px;
+  margin: 0;
+}
+.db-title-icon {
+  font-size: 28px;
+}
+.db-title-icon-img {
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
+  object-fit: cover;
+}
+.db-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0 18px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+}
+.db-tabs {
+  display: flex;
+  gap: 2px;
+}
+.db-tab {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.db-tab:hover {
+  background: var(--hover);
+}
+.db-tab.is-active {
+  color: var(--text);
+  background: var(--hover);
+  font-weight: 500;
+}
+.db-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.db-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.db-control select,
+.db-filter {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+.db-filter {
+  width: 110px;
+}
+.db-dir {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  width: 26px;
+  height: 26px;
+  cursor: pointer;
+}
+.db-new {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+/* Gallery */
+.db-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+}
+.db-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg);
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  transition: box-shadow 0.12s, border-color 0.12s;
+}
+.db-card:hover {
+  border-color: var(--text-muted);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+.db-card-cover {
+  height: 72px;
+  background-size: cover;
+  background-position: center;
+}
+.db-card-body {
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.db-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.db-card-icon {
+  font-size: 16px;
+}
+.db-card-icon-img {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+.db-card-title {
+  font-weight: 500;
+  color: var(--text);
+  font-size: 14px;
+}
+.db-card-excerpt {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.db-card-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.db-card-new {
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  border-style: dashed;
+  min-height: 120px;
+  font-size: 13px;
+}
+
+/* Chips */
+.db-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.db-chip {
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: var(--hover);
+  color: var(--text);
+  white-space: nowrap;
+}
+.db-chip-status {
+  background: rgba(35, 131, 226, 0.18);
+}
+.db-chip-priority {
+  background: rgba(226, 113, 81, 0.2);
+}
+.db-chip-date {
+  background: rgba(42, 157, 143, 0.18);
+}
+
+/* Progress */
+.db-progress {
+  position: relative;
+  height: 6px;
+  background: var(--hover);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.db-progress-bar {
+  height: 100%;
+  background: var(--accent);
+}
+.db-progress-label {
+  position: absolute;
+  right: 0;
+  top: -16px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* List */
+.db-list {
+  display: flex;
+  flex-direction: column;
+}
+.db-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+.db-row:hover {
+  background: var(--hover);
+}
+.db-row-title {
+  font-size: 14px;
+  color: var(--text);
+  flex: 0 0 auto;
+}
+.db-row-meta {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Table */
+.db-table-wrap {
+  overflow-x: auto;
+}
+.db-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.db-table th,
+.db-table td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.db-table th {
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 12px;
+}
+.db-table tbody tr {
+  cursor: pointer;
+}
+.db-table tbody tr:hover {
+  background: var(--hover);
+}
+
+/* Board */
+.db-board {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  align-items: flex-start;
+  padding-bottom: 8px;
+}
+.db-column {
+  flex: 0 0 240px;
+  background: var(--hover);
+  border-radius: 10px;
+  padding: 8px;
+  min-height: 80px;
+}
+.db-column-head {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  padding: 4px 6px 8px;
+}
+.db-column-count {
+  color: var(--text-muted);
+}
+.db-board-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.db-board-card:hover {
+  border-color: var(--text-muted);
+}
+
+/* Empty / loading */
+.db-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  color: var(--text-muted);
+  padding: 60px 0;
+}
+.db-rollup {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--hover);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+.db-markdown-toggle {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.db-markdown-toggle:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.db-back-to-cards {
+  align-self: flex-start;
+  margin: 4px 0 8px;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.db-back-to-cards:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.db-card:focus-visible,
+.db-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* ---- Editable property bar (page) ---- */
+.prop-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  max-width: 740px;
+  margin: 0 auto 6px;
+  /* Reserve the top-right band where the favorite star / cover controls sit so
+     the Tags field can't overlap them. */
+  padding: 6px 100px 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.prop {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.prop-key {
+  min-width: 48px;
+}
+.prop select,
+.prop input {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 6px;
+  font-size: 12px;
+}
+.prop-tags input {
+  width: 160px;
+}
+
 /* ---- New page modal ---- */
 .new-page-actions {
   display: flex;

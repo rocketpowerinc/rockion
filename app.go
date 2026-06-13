@@ -193,6 +193,80 @@ func (a *App) ListPages() ([]model.TreeNode, error) {
 	return a.vault.Pages()
 }
 
+// ListDashboardCards returns the managed pages of a dashboard as gallery cards.
+// Uses the write lock because resolving cards can assign missing page IDs.
+func (a *App) ListDashboardCards(dashboardPath string) ([]model.PageCard, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if err := a.requireVault(); err != nil {
+		return nil, err
+	}
+	return a.vault.DashboardCards(dashboardPath)
+}
+
+// GetDashboardView reads a dashboard's persisted layout config.
+func (a *App) GetDashboardView(dashboardPath string) (model.DashboardView, error) {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	if err := a.requireVault(); err != nil {
+		return model.DashboardView{}, err
+	}
+	return a.vault.DashboardView(dashboardPath)
+}
+
+// SetDashboardView persists a dashboard's layout config to its frontmatter.
+func (a *App) SetDashboardView(dashboardPath string, view model.DashboardView) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if err := a.requireVault(); err != nil {
+		return err
+	}
+	if err := a.vault.SetDashboardView(dashboardPath, view); err != nil {
+		return err
+	}
+	if err := a.indexer.IndexFile(dashboardPath); err != nil {
+		runtime.LogErrorf(a.ctx, "index dashboard view failed: %v", err)
+	}
+	return nil
+}
+
+// SetPageProperty sets or clears a recognized frontmatter property and returns
+// the updated note.
+func (a *App) SetPageProperty(path, key, value string) (model.Note, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if err := a.requireVault(); err != nil {
+		return model.Note{}, err
+	}
+	if err := a.vault.SetPageProperty(path, key, value); err != nil {
+		return model.Note{}, err
+	}
+	if err := a.indexer.IndexFile(path); err != nil {
+		runtime.LogErrorf(a.ctx, "index page property failed: %v", err)
+	}
+	note, err := a.vault.Read(path)
+	if err != nil {
+		return model.Note{}, err
+	}
+	return a.withCover(note), nil
+}
+
+// ReorderManagedPages rewrites the order of a dashboard's managed links.
+func (a *App) ReorderManagedPages(dashboardPath string, pageIDs []string) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if err := a.requireVault(); err != nil {
+		return err
+	}
+	if err := a.vault.ReorderManagedPages(dashboardPath, pageIDs); err != nil {
+		return err
+	}
+	if err := a.indexer.IndexFile(dashboardPath); err != nil {
+		runtime.LogErrorf(a.ctx, "index reordered dashboard failed: %v", err)
+	}
+	return nil
+}
+
 func (a *App) ListFavorites() ([]model.TreeNode, error) {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
@@ -265,6 +339,23 @@ func (a *App) CreateSubPage(dashboardPath, title string) (model.Note, error) {
 		return model.Note{}, err
 	}
 	note, err := a.vault.CreateManagedPage(dashboardPath, title)
+	if err != nil {
+		return model.Note{}, err
+	}
+	if err := a.indexer.IndexFile(note.Path); err != nil {
+		runtime.LogErrorf(a.ctx, "index created note failed: %v", err)
+	}
+	return note, nil
+}
+
+// CreateSubPageFromTemplate creates a managed page seeded from a built-in template.
+func (a *App) CreateSubPageFromTemplate(dashboardPath, title, template string) (model.Note, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if err := a.requireVault(); err != nil {
+		return model.Note{}, err
+	}
+	note, err := a.vault.CreateManagedPageFromTemplate(dashboardPath, title, template)
 	if err != nil {
 		return model.Note{}, err
 	}

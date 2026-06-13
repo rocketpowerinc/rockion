@@ -45,6 +45,28 @@ export interface PageCover {
   sourceUrl?: string;
 }
 
+export interface PageCard {
+  pageId: string;
+  path: string;
+  title: string;
+  icon?: string;
+  cover?: PageCover;
+  excerpt?: string;
+  modifiedAt: number;
+  properties?: Record<string, string>;
+  todoDone: number;
+  todoTotal: number;
+}
+
+export interface DashboardView {
+  view: string; // gallery | list | table | board
+  groupBy?: string;
+  sortBy?: string;
+  sortDir?: string;
+  filterKey?: string;
+  filterValue?: string;
+}
+
 export interface SearchHit {
   path: string;
   title: string;
@@ -80,11 +102,27 @@ export const api = {
     App.WriteNote(path, markdown, expectedVersion),
   createSubPage: (dashboardPath: string, title: string): Promise<Note> =>
     App.CreateSubPage(dashboardPath, title),
+  createSubPageFromTemplate: (
+    dashboardPath: string,
+    title: string,
+    template: string
+  ): Promise<Note> => App.CreateSubPageFromTemplate(dashboardPath, title, template),
   createProject: (title: string): Promise<Note> => App.CreateProject(title),
   renamePath: (oldPath: string, newPath: string): Promise<void> => App.RenamePath(oldPath, newPath),
   // Rename a note so its filename matches its title (first H1); returns the moved note.
   renameToTitle: (path: string, title: string): Promise<Note> => App.RenameToTitle(path, title),
   deletePath: (path: string): Promise<void> => App.DeletePath(path),
+  // Dashboard "database" views.
+  listDashboardCards: (dashboardPath: string): Promise<PageCard[]> =>
+    App.ListDashboardCards(dashboardPath),
+  getDashboardView: (dashboardPath: string): Promise<DashboardView> =>
+    App.GetDashboardView(dashboardPath),
+  setDashboardView: (dashboardPath: string, view: DashboardView): Promise<void> =>
+    App.SetDashboardView(dashboardPath, view),
+  setPageProperty: (path: string, key: string, value: string): Promise<Note> =>
+    App.SetPageProperty(path, key, value),
+  reorderManagedPages: (dashboardPath: string, pageIds: string[]): Promise<void> =>
+    App.ReorderManagedPages(dashboardPath, pageIds),
   deleteManagedPage: (
     dashboardPath: string,
     href: string,

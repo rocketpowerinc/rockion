@@ -6,6 +6,20 @@ All notable changes to Rockion are documented here. This project adheres to
 ## [Unreleased]
 
 ### Added
+- Turn project dashboards into a Notion-style database. A `dashboard.md` now opens as
+  Gallery / List / Table / Board views over its managed pages, with covers, icons, an
+  excerpt, a checklist-progress rollup, and last-modified date on each card. The chosen
+  view, sort, filter, and board grouping persist in the dashboard's own frontmatter, and
+  the markdown stays a plain link list (still readable in Obsidian).
+- Surface lightweight page properties (`status`, `priority`, `date`, `tags`) from YAML
+  frontmatter as chips on cards; the Board view groups by a property and dragging a card
+  between columns rewrites that page's frontmatter. Gallery/List/Table support drag-reorder
+  (rewrites the dashboard link order) and a one-click "+ New page".
+- Add an editable property bar (status/priority/date/tags) at the top of each page that
+  writes straight to frontmatter, page templates (Blank / Task / Meeting note) when creating
+  a sub-page, a project-wide checklist rollup on the dashboard header, an "Open as markdown"
+  toggle to edit a dashboard's raw body, and arrow-key navigation across cards.
+
 - Expand the page icon gallery to more than 100 categorized emoji choices and
   add keyword search with aliases such as house, home, code, work, and money.
 - Show each target page's live icon beside internal dashboard links, including

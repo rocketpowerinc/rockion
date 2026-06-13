@@ -60,6 +60,13 @@ func (v *Vault) NormalizeManagedDashboard(path string) (bool, error) {
 
 // CreateManagedPage creates a stable-ID page beside a project dashboard.
 func (v *Vault) CreateManagedPage(dashboardRel, title string) (model.Note, error) {
+	return v.CreateManagedPageFromTemplate(dashboardRel, title, "")
+}
+
+// CreateManagedPageFromTemplate creates a stable-ID page seeded from a built-in
+// template (status defaults, a meeting layout, etc.). An empty template id makes
+// a blank page.
+func (v *Vault) CreateManagedPageFromTemplate(dashboardRel, title, template string) (model.Note, error) {
 	dashboardRel = filepath.ToSlash(filepath.Clean(dashboardRel))
 	if !IsDashboardPath(dashboardRel) || filepath.Dir(filepath.FromSlash(dashboardRel)) == "." {
 		return model.Note{}, errors.New("new sub-pages must be created from a project dashboard")
@@ -84,7 +91,17 @@ func (v *Vault) CreateManagedPage(dashboardRel, title string) (model.Note, error
 	if err != nil {
 		return model.Note{}, err
 	}
-	content := []byte(fmt.Sprintf("---\nrockion_id: %s\n---\n# %s\n\n", id, title))
+	props, body := managedTemplate(template, title)
+	front := "rockion_id: " + id + "\n"
+	keys := make([]string, 0, len(props))
+	for k := range props {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		front += k + ": " + props[k] + "\n"
+	}
+	content := []byte("---\n" + front + "---\n" + body)
 	if err := createFileExclusive(full, content, 0o644); err != nil {
 		if errors.Is(err, os.ErrExist) {
 			return model.Note{}, fmt.Errorf("note already exists: %s", rel)
@@ -92,6 +109,22 @@ func (v *Vault) CreateManagedPage(dashboardRel, title string) (model.Note, error
 		return model.Note{}, err
 	}
 	return v.Read(rel)
+}
+
+// managedTemplate returns seed frontmatter properties + body for a template id.
+func managedTemplate(template, title string) (map[string]string, string) {
+	switch template {
+	case "meeting":
+		return nil, fmt.Sprintf(
+			"# %s\n\n**Date:** \n**Attendees:** \n\n## Agenda\n\n- \n\n## Notes\n\n\n## Action items\n\n- [ ] \n",
+			title,
+		)
+	case "task":
+		return map[string]string{"status": "To do", "priority": "Medium"},
+			fmt.Sprintf("# %s\n\n## Subtasks\n\n- [ ] \n", title)
+	default:
+		return nil, fmt.Sprintf("# %s\n\n", title)
+	}
 }
 
 // NormalizeDashboardForPage updates a page's managed dashboard link after a

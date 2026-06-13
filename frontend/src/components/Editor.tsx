@@ -15,6 +15,7 @@ import EmojiPicker from "./EmojiPicker";
 import type { WritingLanguage } from "../writingLanguage";
 import { refreshSpellcheck } from "../editor/Spellcheck";
 import NewPageModal from "./NewPageModal";
+import PropertyBar from "./PropertyBar";
 import {
   managedPageHref,
   relativePageHref,
@@ -235,6 +236,28 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
 
   saveNowRef.current = saveNow;
   useImperativeHandle(ref, () => ({ flushSave: saveNow }), [saveNow]);
+
+  // Write a frontmatter property. Flushes the body first so the property write
+  // (which rewrites the file's frontmatter) keeps the latest text, then adopts
+  // the new file version so the next autosave doesn't conflict.
+  const setProperty = useCallback(
+    async (key: string, value: string) => {
+      const path = currentPath.current;
+      if (!path) return;
+      if (!(await saveNowRef.current())) return;
+      if (currentPath.current !== path) return;
+      try {
+        const updated = await api.setPageProperty(path, key, value);
+        if (currentPath.current === path) {
+          version.current = updated.version;
+        }
+        onNoteUpdated?.(updated);
+      } catch (error) {
+        setSaveError(`Couldn't update ${key}: ${String(error)}`);
+      }
+    },
+    [onNoteUpdated]
+  );
 
   // Rename the file on disk so it matches the title (first H1). Saves first so
   // the move never loses pending text, then moves only when the title changed.
@@ -668,6 +691,7 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
           />
         )}
       </div>
+      <PropertyBar note={note} onSet={setProperty} />
       {saveError && <div className="save-error">{saveError}</div>}
       <div className="editor-wrap" onClick={handleWrapClick}>
         <EditorContent editor={editor} />

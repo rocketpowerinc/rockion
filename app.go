@@ -230,27 +230,6 @@ func (a *App) SetDashboardView(dashboardPath string, view model.DashboardView) e
 	return nil
 }
 
-// SetPageProperty sets or clears a recognized frontmatter property and returns
-// the updated note.
-func (a *App) SetPageProperty(path, key, value string) (model.Note, error) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if err := a.requireVault(); err != nil {
-		return model.Note{}, err
-	}
-	if err := a.vault.SetPageProperty(path, key, value); err != nil {
-		return model.Note{}, err
-	}
-	if err := a.indexer.IndexFile(path); err != nil {
-		runtime.LogErrorf(a.ctx, "index page property failed: %v", err)
-	}
-	note, err := a.vault.Read(path)
-	if err != nil {
-		return model.Note{}, err
-	}
-	return a.withCover(note), nil
-}
-
 // ReorderManagedPages rewrites the order of a dashboard's managed links.
 func (a *App) ReorderManagedPages(dashboardPath string, pageIDs []string) error {
 	a.mu.Lock()

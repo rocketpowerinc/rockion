@@ -1,0 +1,211 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { Editor } from "@tiptap/react";
+import { TEXT_COLORS, BG_COLORS } from "./colorMarks";
+
+interface Props {
+  editor: Editor | null;
+}
+
+type Sub = null | "turn" | "color";
+
+interface MenuState {
+  x: number;
+  y: number;
+  from: number; // start pos of the target top-level block
+}
+
+const TURN_INTO: { label: string; run: (c: ReturnType<Editor["chain"]>) => ReturnType<Editor["chain"]> }[] = [
+  { label: "Text", run: (c) => c.setParagraph() },
+  { label: "Heading 1", run: (c) => c.setHeading({ level: 1 as 1 }) },
+  { label: "Heading 2", run: (c) => c.setHeading({ level: 2 as 2 }) },
+  { label: "Heading 3", run: (c) => c.setHeading({ level: 3 as 3 }) },
+  { label: "Bulleted list", run: (c) => c.toggleBulletList() },
+  { label: "Numbered list", run: (c) => c.toggleOrderedList() },
+  { label: "To-do list", run: (c) => c.toggleTaskList() },
+  { label: "Quote", run: (c) => c.toggleBlockquote() },
+  { label: "Code", run: (c) => c.toggleCodeBlock() },
+  { label: "Callout", run: (c) => c.toggleCallout() },
+];
+
+// Notion-style block menu. Opens when the drag grip (".drag-handle") is clicked
+// and acts on that block: turn into, color, duplicate, delete.
+export default function BlockMenu({ editor }: Props) {
+  const [menu, setMenu] = useState<MenuState | null>(null);
+  const [sub, setSub] = useState<Sub>(null);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const close = useCallback(() => {
+    setMenu(null);
+    setSub(null);
+  }, []);
+
+  // Open the menu when the drag grip is clicked.
+  useEffect(() => {
+    if (!editor) return;
+    const onClick = (event: MouseEvent) => {
+      const handle = (event.target as HTMLElement)?.closest?.(".drag-handle");
+      if (!handle) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const view = editor.view;
+      const handleRect = (handle as HTMLElement).getBoundingClientRect();
+      const contentRect = view.dom.getBoundingClientRect();
+      const found = view.posAtCoords({
+        left: contentRect.left + 24,
+        top: handleRect.top + handleRect.height / 2,
+      });
+      if (!found) return;
+      const $pos = view.state.doc.resolve(found.pos);
+      if ($pos.depth < 1) return;
+      const from = $pos.before(1);
+      // The page title is the first block (an H1) — it's not editable via this
+      // menu, so don't open at all for it.
+      const block = view.state.doc.nodeAt(from);
+      if (from === 0 && block?.type.name === "heading") return;
+      setMenu({ x: handleRect.right + 6, y: handleRect.top, from });
+      setSub(null);
+    };
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+  }, [editor]);
+
+  // Close on outside click / Escape.
+  useEffect(() => {
+    if (!menu) return;
+    const onDown = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) close();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    document.addEventListener("mousedown", onDown, true);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown, true);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menu, close]);
+
+  if (!editor || !menu) return null;
+
+  const node = editor.state.doc.nodeAt(menu.from);
+  if (!node) return null;
+  const to = menu.from + node.nodeSize;
+
+  const turnInto = (run: (typeof TURN_INTO)[number]["run"]) => {
+    run(editor.chain().focus().setTextSelection(menu.from + 1)).run();
+    close();
+  };
+
+  const applyColor = (markName: "textColor" | "bgColor", attrs: Record<string, string>) => {
+    editor
+      .chain()
+      .focus()
+      .setTextSelection({ from: menu.from + 1, to: to - 1 })
+      .setMark(markName, attrs)
+      .run();
+    close();
+  };
+
+  const clearColor = () => {
+    editor
+      .chain()
+      .focus()
+      .setTextSelection({ from: menu.from + 1, to: to - 1 })
+      .unsetMark("textColor")
+      .unsetMark("bgColor")
+      .run();
+    close();
+  };
+
+  const duplicate = () => {
+    editor.chain().focus().insertContentAt(to, node.toJSON()).run();
+    close();
+  };
+
+  const remove = () => {
+    editor.chain().focus().deleteRange({ from: menu.from, to }).run();
+    close();
+  };
+
+  return (
+    <div
+      ref={ref}
+      className="block-menu"
+      style={{ left: menu.x, top: menu.y }}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <button
+        className="block-menu-item has-sub"
+        onMouseEnter={() => setSub("turn")}
+        onClick={() => setSub(sub === "turn" ? null : "turn")}
+      >
+        <span>Turn into</span>
+        <span className="block-menu-caret">›</span>
+      </button>
+      <button
+        className="block-menu-item has-sub"
+        onMouseEnter={() => setSub("color")}
+        onClick={() => setSub(sub === "color" ? null : "color")}
+      >
+        <span>Color</span>
+        <span className="block-menu-caret">›</span>
+      </button>
+      <div className="block-menu-sep" />
+      <button className="block-menu-item" onMouseEnter={() => setSub(null)} onClick={duplicate}>
+        Duplicate
+      </button>
+      <button
+        className="block-menu-item is-danger"
+        onMouseEnter={() => setSub(null)}
+        onClick={remove}
+      >
+        Delete
+      </button>
+
+      {sub === "turn" && (
+        <div className="block-submenu">
+          {TURN_INTO.map((item) => (
+            <button key={item.label} className="block-menu-item" onClick={() => turnInto(item.run)}>
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {sub === "color" && (
+        <div className="block-submenu block-color-menu">
+          <div className="block-color-label">Text</div>
+          <div className="block-swatches">
+            {TEXT_COLORS.map((c) => (
+              <button
+                key={c.value}
+                className="block-swatch"
+                title={c.name}
+                style={{ color: c.value }}
+                onClick={() => applyColor("textColor", { color: c.value })}
+              >
+                A
+              </button>
+            ))}
+          </div>
+          <div className="block-color-label">Background</div>
+          <div className="block-swatches">
+            {BG_COLORS.map((c) => (
+              <button
+                key={c.value}
+                className="block-swatch block-swatch-bg"
+                title={c.name}
+                style={{ background: c.value }}
+                onClick={() => applyColor("bgColor", { background: c.value })}
+              />
+            ))}
+          </div>
+          <button className="block-menu-item" onClick={clearColor}>
+            Default
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}

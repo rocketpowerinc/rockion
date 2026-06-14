@@ -36,6 +36,7 @@ type Note struct {
 	Cover       *PageCover     `json:"cover,omitempty"`
 	Markdown    string         `json:"markdown"`
 	Frontmatter map[string]any `json:"frontmatter,omitempty"`
+	CreatedAt   int64          `json:"createdAt"`
 	ModifiedAt  int64          `json:"modifiedAt"`
 	Version     string         `json:"version"`
 }
@@ -54,23 +55,17 @@ type PageCard struct {
 	PageID     string            `json:"pageId"`
 	Path       string            `json:"path"`
 	Title      string            `json:"title"`
-	Icon       string            `json:"icon,omitempty"`
-	Cover      *PageCover        `json:"cover,omitempty"`
-	Excerpt    string            `json:"excerpt,omitempty"`
-	ModifiedAt int64             `json:"modifiedAt"`
-	Properties map[string]string `json:"properties,omitempty"`
-	TodoDone   int               `json:"todoDone"`
-	TodoTotal  int               `json:"todoTotal"`
+	Icon       string     `json:"icon,omitempty"`
+	Cover      *PageCover `json:"cover,omitempty"`
+	CreatedAt  int64      `json:"createdAt"`
+	ModifiedAt int64      `json:"modifiedAt"`
 }
 
 // DashboardView is the persisted view configuration for a dashboard. It lives in
 // the dashboard's own YAML frontmatter so the layout choice travels with the
 // file and never pollutes the body markdown.
 type DashboardView struct {
-	View        string `json:"view"`                  // gallery | list | table | board
-	GroupBy     string `json:"groupBy,omitempty"`     // property key for board grouping
-	SortBy      string `json:"sortBy,omitempty"`      // title | modified | <property>
-	SortDir     string `json:"sortDir,omitempty"`     // asc | desc
-	FilterKey   string `json:"filterKey,omitempty"`   // property key to filter on
-	FilterValue string `json:"filterValue,omitempty"` // required value ("" = no filter)
+	View    string `json:"view"`              // gallery | list
+	SortBy  string `json:"sortBy,omitempty"`  // title | created | modified
+	SortDir string `json:"sortDir,omitempty"` // asc | desc
 }

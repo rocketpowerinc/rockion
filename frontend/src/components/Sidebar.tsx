@@ -4,6 +4,7 @@ import {
   writingLanguageLabel,
   type WritingLanguage,
 } from "../writingLanguage";
+import EmojiPicker from "./EmojiPicker";
 
 interface Props {
   vaultName: string;
@@ -14,6 +15,7 @@ interface Props {
   writingLanguage: WritingLanguage;
   activePath: string | null;
   onOpen: (path: string) => void;
+  onSetIcon: (path: string, icon: string) => void;
   onNewProject: () => void;
   onOpenVault: () => void;
   onToggleTheme: () => void;
@@ -33,6 +35,7 @@ export default function Sidebar({
   writingLanguage,
   activePath,
   onOpen,
+  onSetIcon,
   onNewProject,
   onOpenVault,
   onToggleTheme,
@@ -49,6 +52,7 @@ export default function Sidebar({
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [unsortedOpen, setUnsortedOpen] = useState(true);
   const [draggedFavorite, setDraggedFavorite] = useState<string | null>(null);
+  const [iconPickerFor, setIconPickerFor] = useState<string | null>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -126,16 +130,39 @@ export default function Sidebar({
             <div className="sidebar-section-empty">Create a folder in the vault to add it here.</div>
           )}
           {folders.map((node) => (
-            <button
+            <div
               key={node.path}
-              className={`tree-row folder sidebar-row-button ${
+              className={`tree-row folder ${
                 activePath === node.entryPath ? "is-active" : ""
               }`}
-              onClick={() => onOpen(node.entryPath || `${node.path}/dashboard.md`)}
             >
-              <span className="tree-icon">📁</span>
-              <span className="tree-row-label">{node.name}</span>
-            </button>
+              <button
+                className="tree-icon-btn"
+                title="Change project icon"
+                onClick={() => setIconPickerFor(node.path)}
+              >
+                {node.icon && node.icon.startsWith("data:") ? (
+                  <img className="tree-icon-img" src={node.icon} alt="" />
+                ) : (
+                  <span className="tree-icon">{node.icon || "📁"}</span>
+                )}
+              </button>
+              <button
+                className="folder-open-btn"
+                onClick={() => onOpen(node.entryPath || `${node.path}/dashboard.md`)}
+              >
+                {node.name}
+              </button>
+              {iconPickerFor === node.path && (
+                <EmojiPicker
+                  onClose={() => setIconPickerFor(null)}
+                  onPick={(icon) => {
+                    setIconPickerFor(null);
+                    onSetIcon(node.entryPath || `${node.path}/dashboard.md`, icon);
+                  }}
+                />
+              )}
+            </div>
           ))}
         </SidebarSection>
         {rootNotes.length > 0 && (

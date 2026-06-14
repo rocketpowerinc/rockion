@@ -6,19 +6,27 @@ All notable changes to Rockion are documented here. This project adheres to
 ## [Unreleased]
 
 ### Added
-- Turn project dashboards into a Notion-style database. A `dashboard.md` now opens as
-  Gallery / List / Table / Board views over its managed pages, with covers, icons, an
-  excerpt, a checklist-progress rollup, and last-modified date on each card. The chosen
-  view, sort, filter, and board grouping persist in the dashboard's own frontmatter, and
-  the markdown stays a plain link list (still readable in Obsidian).
-- Surface lightweight page properties (`status`, `priority`, `date`, `tags`) from YAML
-  frontmatter as chips on cards; the Board view groups by a property and dragging a card
-  between columns rewrites that page's frontmatter. Gallery/List/Table support drag-reorder
-  (rewrites the dashboard link order) and a one-click "+ New page".
-- Add an editable property bar (status/priority/date/tags) at the top of each page that
-  writes straight to frontmatter, page templates (Blank / Task / Meeting note) when creating
-  a sub-page, a project-wide checklist rollup on the dashboard header, an "Open as markdown"
-  toggle to edit a dashboard's raw body, and arrow-key navigation across cards.
+- Add a Notion-style block menu, opened by clicking the drag grip (⋮⋮) beside a block:
+  Turn into (paragraph, headings, bulleted/numbered/to-do lists, quote, code, callout),
+  Color (cyberpunk text and background palette), Duplicate, and Delete. Colored runs are
+  stored as portable inline `<span style>` markup, so HTML round-tripping is now enabled in
+  the Markdown serializer. (Copy-link-to-block and Move-to are coming in a follow-up.)
+
+- Project dashboards (`dashboard.md`) open as Gallery and List views over their managed
+  pages. Each card shows the page icon, title, cover, and the created/last-modified dates;
+  drag to reorder, sort by title/created/modified, pick a template (Blank / Task / Meeting
+  note) for new pages, and use arrow keys to move between cards. The dashboard markdown
+  stays a plain link list (still readable in Obsidian).
+- Project dashboards support full covers directly in the card view (full-bleed banner with
+  change/remove controls).
+- Projects can now have an emoji or uploaded image icon — it's the dashboard page's icon,
+  changeable by clicking the icon on the dashboard landing page or the folder icon in the
+  sidebar, and the two stay in sync.
+- Breadcrumbs reset when you move into a different project, so the current project's
+  dashboard is always the root of the trail.
+
+### Removed
+- Drop the page "Date" property — it had no behavior and went unused.
 
 - Expand the page icon gallery to more than 100 categorized emoji choices and
   add keyword search with aliases such as house, home, code, work, and money.

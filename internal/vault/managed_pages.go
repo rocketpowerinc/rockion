@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"rockion/internal/model"
 )
@@ -93,6 +94,7 @@ func (v *Vault) CreateManagedPageFromTemplate(dashboardRel, title, template stri
 	}
 	props, body := managedTemplate(template, title)
 	front := "rockion_id: " + id + "\n"
+	front += "rockion_created: " + time.Now().UTC().Format(time.RFC3339) + "\n"
 	keys := make([]string, 0, len(props))
 	for k := range props {
 		keys = append(keys, k)
@@ -324,13 +326,25 @@ func (v *Vault) ensurePageID(rel string) (model.Note, error) {
 	if err != nil {
 		return model.Note{}, err
 	}
-	if note.PageID != "" {
+	_, hasCreated := note.Frontmatter["rockion_created"]
+	if note.PageID != "" && hasCreated {
 		return note, nil
 	}
-	id, err := newPageID()
-	if err != nil {
-		return model.Note{}, err
+
+	// Build the frontmatter lines that are missing.
+	inject := ""
+	if note.PageID == "" {
+		id, err := newPageID()
+		if err != nil {
+			return model.Note{}, err
+		}
+		inject += "rockion_id: " + id + "\n"
 	}
+	if !hasCreated {
+		// Freeze the best-available creation estimate so it stops tracking saves.
+		inject += "rockion_created: " + time.UnixMilli(note.CreatedAt).UTC().Format(time.RFC3339) + "\n"
+	}
+
 	full, err := v.resolve(rel, false)
 	if err != nil {
 		return model.Note{}, err
@@ -342,7 +356,7 @@ func (v *Vault) ensurePageID(rel string) (model.Note, error) {
 	_, header, body := splitFrontmatter(string(raw))
 	var updated string
 	if header == "" {
-		updated = fmt.Sprintf("---\nrockion_id: %s\n---\n%s", id, body)
+		updated = "---\n" + inject + "---\n" + body
 	} else {
 		closeAt := strings.LastIndex(header, "---")
 		if closeAt < 0 {
@@ -351,7 +365,7 @@ func (v *Vault) ensurePageID(rel string) (model.Note, error) {
 		if closeAt < 0 {
 			return model.Note{}, errors.New("could not update page frontmatter")
 		}
-		updated = header[:closeAt] + "rockion_id: " + id + "\n" + header[closeAt:] + body
+		updated = header[:closeAt] + inject + header[closeAt:] + body
 	}
 	if err := atomicWriteFileChecked(full, []byte(updated), 0o644, note.Version); err != nil {
 		return model.Note{}, err

@@ -32,6 +32,7 @@ export interface Note {
   cover?: PageCover;
   markdown: string;
   frontmatter?: Record<string, unknown>;
+  createdAt: number;
   modifiedAt: number;
   version: string;
 }
@@ -51,20 +52,14 @@ export interface PageCard {
   title: string;
   icon?: string;
   cover?: PageCover;
-  excerpt?: string;
+  createdAt: number;
   modifiedAt: number;
-  properties?: Record<string, string>;
-  todoDone: number;
-  todoTotal: number;
 }
 
 export interface DashboardView {
-  view: string; // gallery | list | table | board
-  groupBy?: string;
+  view: string; // gallery | list
   sortBy?: string;
   sortDir?: string;
-  filterKey?: string;
-  filterValue?: string;
 }
 
 export interface SearchHit {
@@ -119,8 +114,6 @@ export const api = {
     App.GetDashboardView(dashboardPath),
   setDashboardView: (dashboardPath: string, view: DashboardView): Promise<void> =>
     App.SetDashboardView(dashboardPath, view),
-  setPageProperty: (path: string, key: string, value: string): Promise<Note> =>
-    App.SetPageProperty(path, key, value),
   reorderManagedPages: (dashboardPath: string, pageIds: string[]): Promise<void> =>
     App.ReorderManagedPages(dashboardPath, pageIds),
   deleteManagedPage: (

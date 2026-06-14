@@ -7,16 +7,19 @@ import {
   type DragEvent,
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
-import { api, type DashboardView, type Note, type PageCard } from "../api";
+import { api, type DashboardView, type Note, type PageCard, type PageCover } from "../api";
 import { coverBackground } from "../editor/coverStyles.mjs";
 import NewPageModal from "./NewPageModal";
+import CoverPicker from "./CoverPicker";
+import EmojiPicker from "./EmojiPicker";
 
 interface Props {
   note: Note;
   onOpenPage: (path: string) => void;
   onError: (message: string | null) => void;
   onRefreshTree: () => void;
-  onOpenMarkdown: () => void;
+  onNoteUpdated: (note: Note) => void;
+  onSetIcon: (path: string, icon: string) => void;
 }
 
 const TEMPLATES: { id: string; label: string }[] = [
@@ -25,64 +28,26 @@ const TEMPLATES: { id: string; label: string }[] = [
   { id: "meeting", label: "Meeting note" },
 ];
 
-type ViewKind = "gallery" | "list" | "board" | "table";
+type ViewKind = "gallery" | "list";
 
 const VIEWS: { id: ViewKind; label: string }[] = [
   { id: "gallery", label: "Gallery" },
   { id: "list", label: "List" },
-  { id: "board", label: "Board" },
-  { id: "table", label: "Table" },
 ];
-
-const STATUS_DEFAULTS = ["To do", "In progress", "Done"];
-const NO_VALUE = "—"; // em dash, label for the "no value" board column
 
 function formatDate(ms: number): string {
   if (!ms) return "";
   try {
-    return new Date(ms).toLocaleDateString(undefined, {
+    return new Date(ms).toLocaleString(undefined, {
       month: "short",
       day: "numeric",
       year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
     });
   } catch {
     return "";
   }
-}
-
-function Chip({ kind, value }: { kind: string; value: string }) {
-  if (!value) return null;
-  return <span className={`db-chip db-chip-${kind}`}>{value}</span>;
-}
-
-function CardChips({ card }: { card: PageCard }) {
-  const props = card.properties || {};
-  return (
-    <div className="db-chips">
-      {props.status && <Chip kind="status" value={props.status} />}
-      {props.priority && <Chip kind="priority" value={props.priority} />}
-      {props.date && <Chip kind="date" value={props.date} />}
-      {props.tags &&
-        props.tags
-          .split(",")
-          .map((t) => t.trim())
-          .filter(Boolean)
-          .map((t) => <Chip key={t} kind="tag" value={t} />)}
-    </div>
-  );
-}
-
-function Progress({ card }: { card: PageCard }) {
-  if (!card.todoTotal) return null;
-  const pct = Math.round((card.todoDone / card.todoTotal) * 100);
-  return (
-    <div className="db-progress" title={`${card.todoDone}/${card.todoTotal} done`}>
-      <div className="db-progress-bar" style={{ width: `${pct}%` }} />
-      <span className="db-progress-label">
-        {card.todoDone}/{card.todoTotal}
-      </span>
-    </div>
-  );
 }
 
 function CardIcon({ card }: { card: PageCard }) {
@@ -93,32 +58,81 @@ function CardIcon({ card }: { card: PageCard }) {
   return <span className="db-card-icon">{icon || "📄"}</span>;
 }
 
+function CardDates({ card }: { card: PageCard }) {
+  return (
+    <div className="db-card-meta">
+      <span>Created {formatDate(card.createdAt)}</span>
+      <span>Edited {formatDate(card.modifiedAt)}</span>
+    </div>
+  );
+}
+
 export default function Dashboard({
   note,
   onOpenPage,
   onError,
   onRefreshTree,
-  onOpenMarkdown,
+  onNoteUpdated,
+  onSetIcon,
 }: Props) {
   const dashboardPath = note.path;
   const [cards, setCards] = useState<PageCard[]>([]);
+  const [iconPickerOpen, setIconPickerOpen] = useState(false);
   const [view, setView] = useState<DashboardView>({ view: "gallery" });
   const [loading, setLoading] = useState(true);
   const [newOpen, setNewOpen] = useState(false);
   const [template, setTemplate] = useState("");
   const [coverImages, setCoverImages] = useState<Record<string, string>>({});
+  const [coverPickerOpen, setCoverPickerOpen] = useState(false);
+  const [dashCoverURL, setDashCoverURL] = useState("");
   const dragId = useRef<string | null>(null);
 
-  // Project-wide checklist rollup across all cards.
-  const rollup = useMemo(() => {
-    let done = 0;
-    let total = 0;
-    for (const c of cards) {
-      done += c.todoDone;
-      total += c.todoTotal;
+  // Resolve the dashboard page's own cover (color/gradient need no fetch).
+  useEffect(() => {
+    let cancelled = false;
+    if (note.cover && note.cover.kind === "image") {
+      void api
+        .coverImageDataURL(note.path)
+        .then((url) => {
+          if (!cancelled) setDashCoverURL(url);
+        })
+        .catch(() => {
+          if (!cancelled) setDashCoverURL("");
+        });
+    } else {
+      setDashCoverURL("");
     }
-    return { done, total };
-  }, [cards]);
+    return () => {
+      cancelled = true;
+    };
+  }, [note.path, note.cover]);
+
+  const setCover = useCallback(
+    async (cover: PageCover) => {
+      try {
+        const updated = await api.setNoteCover(note.path, cover);
+        onNoteUpdated(updated);
+      } catch (reason) {
+        onError(`Couldn't update cover: ${String(reason)}`);
+      }
+    },
+    [note.path, onNoteUpdated, onError]
+  );
+
+  const uploadCover = useCallback(
+    async (file: File) => {
+      if (file.size > 10 * 1024 * 1024) throw new Error("Cover images must be 10 MB or smaller.");
+      const data = new Uint8Array(await file.arrayBuffer());
+      const asset = await api.saveImage(file.name, Array.from(data));
+      await setCover({ kind: "image", value: asset, position: 50 });
+    },
+    [setCover]
+  );
+
+  const removeCover = useCallback(
+    () => setCover({ kind: "", value: "", position: 50 }),
+    [setCover]
+  );
 
   // Move focus between cards with arrow keys.
   const onGridKeyDown = (ev: ReactKeyboardEvent) => {
@@ -168,7 +182,7 @@ export default function Dashboard({
     void reload();
   }, [reload, note.version]);
 
-  // Resolve data URLs for local-image covers (color/gradient need no fetch).
+  // Resolve data URLs for local-image card covers.
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -203,12 +217,7 @@ export default function Dashboard({
   );
 
   const visibleCards = useMemo(() => {
-    let list = cards.slice();
-    if (view.filterKey && view.filterValue) {
-      const key = view.filterKey;
-      const needle = view.filterValue.toLowerCase();
-      list = list.filter((c) => (c.properties?.[key] || "").toLowerCase().includes(needle));
-    }
+    const list = cards.slice();
     const sortBy = view.sortBy;
     if (sortBy) {
       list.sort((a, b) => {
@@ -217,12 +226,12 @@ export default function Dashboard({
         if (sortBy === "modified") {
           av = a.modifiedAt;
           bv = b.modifiedAt;
-        } else if (sortBy === "title") {
+        } else if (sortBy === "created") {
+          av = a.createdAt;
+          bv = b.createdAt;
+        } else {
           av = a.title.toLowerCase();
           bv = b.title.toLowerCase();
-        } else {
-          av = (a.properties?.[sortBy] || "").toLowerCase();
-          bv = (b.properties?.[sortBy] || "").toLowerCase();
         }
         if (av < bv) return view.sortDir === "desc" ? 1 : -1;
         if (av > bv) return view.sortDir === "desc" ? -1 : 1;
@@ -268,51 +277,12 @@ export default function Dashboard({
     [cards, dashboardPath, onError, reload]
   );
 
-  const setProperty = useCallback(
-    async (path: string, key: string, value: string) => {
-      setCards((cs) =>
-        cs.map((c) => {
-          if (c.path !== path) return c;
-          const props = { ...(c.properties || {}) };
-          if (value) props[key] = value;
-          else delete props[key];
-          return { ...c, properties: props };
-        })
-      );
-      try {
-        await api.setPageProperty(path, key, value);
-      } catch (reason) {
-        onError(`Couldn't update ${key}: ${String(reason)}`);
-        await reload();
-      }
-    },
-    [onError, reload]
-  );
-
   const kind = (view.view as ViewKind) || "gallery";
-  const groupKey = view.groupBy || "status";
-
-  const boardColumns = useMemo(() => {
-    const values: string[] = [];
-    if (groupKey === "status") values.push(...STATUS_DEFAULTS);
-    for (const c of visibleCards) {
-      const v = c.properties?.[groupKey];
-      if (v && !values.includes(v)) values.push(v);
-    }
-    values.push(NO_VALUE);
-    return values.map((value) => ({
-      value,
-      cards: visibleCards.filter((c) => {
-        const v = c.properties?.[groupKey] || "";
-        return value === NO_VALUE ? !v : v === value;
-      }),
-    }));
-  }, [visibleCards, groupKey]);
 
   const cardBackground = (card: PageCard): string =>
     coverBackground(card.cover, coverImages[card.pageId] || "");
 
-  // --- drag handlers ---
+  // --- drag handlers (reorder only) ---
   const handleDragStart = (id: string) => (e: DragEvent) => {
     dragId.current = id;
     e.dataTransfer.effectAllowed = "move";
@@ -323,262 +293,191 @@ export default function Dashboard({
     dragId.current = null;
     if (from) void reorder(from, id);
   };
-  const handleDropOnColumn = (value: string) => (e: DragEvent) => {
-    e.preventDefault();
-    const from = dragId.current;
-    dragId.current = null;
-    if (!from) return;
-    const card = cards.find((c) => c.pageId === from);
-    if (card) void setProperty(card.path, groupKey, value === NO_VALUE ? "" : value);
-  };
   const allowDrop = (e: DragEvent) => e.preventDefault();
+
+  const dashCoverBackground = coverBackground(note.cover, dashCoverURL);
 
   return (
     <div className="dashboard">
-      <div className="db-header">
-        <div className="db-title">
-          {note.icon && note.icon.startsWith("data:") ? (
-            <img className="db-title-icon-img" src={note.icon} alt="" />
-          ) : (
-            <span className="db-title-icon">{note.icon || "📁"}</span>
-          )}
-          <h1>{note.title}</h1>
-          {rollup.total > 0 && (
-            <span className="db-rollup" title="Checklist items across all pages">
-              {rollup.done}/{rollup.total} done
-            </span>
-          )}
-          <button
-            className="db-markdown-toggle"
-            title="Edit this dashboard as markdown"
-            onClick={onOpenMarkdown}
-          >
-            Open as markdown
-          </button>
-        </div>
-
-        <div className="db-toolbar">
-          <div className="db-tabs">
-            {VIEWS.map((v) => (
-              <button
-                key={v.id}
-                className={`db-tab ${kind === v.id ? "is-active" : ""}`}
-                onClick={() => void updateView({ view: v.id })}
-              >
-                {v.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="db-controls">
-            {kind === "board" && (
-              <label className="db-control">
-                Group
-                <select
-                  value={groupKey}
-                  onChange={(e) => void updateView({ groupBy: e.target.value })}
-                >
-                  <option value="status">Status</option>
-                  <option value="priority">Priority</option>
-                </select>
-              </label>
-            )}
-            <label className="db-control">
-              Sort
-              <select
-                value={view.sortBy || ""}
-                onChange={(e) => void updateView({ sortBy: e.target.value })}
-              >
-                <option value="">Manual</option>
-                <option value="title">Title</option>
-                <option value="modified">Modified</option>
-                <option value="status">Status</option>
-                <option value="priority">Priority</option>
-                <option value="date">Date</option>
-              </select>
-            </label>
-            {view.sortBy && (
-              <button
-                className="db-dir"
-                title="Toggle sort direction"
-                onClick={() =>
-                  void updateView({ sortDir: view.sortDir === "desc" ? "asc" : "desc" })
-                }
-              >
-                {view.sortDir === "desc" ? "↓" : "↑"}
-              </button>
-            )}
-            <label className="db-control">
-              Filter
-              <input
-                className="db-filter"
-                placeholder="status…"
-                value={view.filterValue || ""}
-                onChange={(e) =>
-                  void updateView({
-                    filterKey: view.filterKey || "status",
-                    filterValue: e.target.value,
-                  })
-                }
-              />
-            </label>
-            <label className="db-control">
-              Template
-              <select value={template} onChange={(e) => setTemplate(e.target.value)}>
-                {TEMPLATES.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button className="primary db-new" onClick={() => setNewOpen(true)}>
-              + New page
+      {note.cover && dashCoverBackground && (
+        <div
+          className="page-cover db-cover"
+          style={{
+            background: dashCoverBackground,
+            backgroundPosition: `center ${note.cover.position ?? 50}%`,
+          }}
+        >
+          <div className="page-cover-actions">
+            <button type="button" onClick={() => setCoverPickerOpen(true)}>
+              Change cover
+            </button>
+            <button type="button" onClick={() => void removeCover()}>
+              Remove
             </button>
           </div>
         </div>
-      </div>
-
-      {loading ? (
-        <div className="db-empty">Loading…</div>
-      ) : cards.length === 0 ? (
-        <div className="db-empty">
-          <p>No pages yet.</p>
-          <button className="primary" onClick={() => setNewOpen(true)}>
-            Create your first page
-          </button>
-        </div>
-      ) : kind === "gallery" ? (
-        <div className="db-gallery" onKeyDown={onGridKeyDown}>
-          {visibleCards.map((card) => (
-            <div
-              key={card.pageId}
-              className="db-card"
-              data-card
-              tabIndex={0}
-              draggable
-              onDragStart={handleDragStart(card.pageId)}
-              onDragOver={allowDrop}
-              onDrop={handleDropOnCard(card.pageId)}
-              onClick={() => onOpenPage(card.path)}
-              onKeyDown={openOnEnter(card.path)}
+      )}
+      <div className="db-content">
+        <div className="db-header">
+          <div className="db-title">
+            <button
+              className="db-title-icon-btn"
+              title="Change project icon"
+              onClick={() => setIconPickerOpen((open) => !open)}
             >
-              <div
-                className="db-card-cover"
-                style={{ background: cardBackground(card) || "var(--hover)" }}
+              {note.icon && note.icon.startsWith("data:") ? (
+                <img className="db-title-icon-img" src={note.icon} alt="" />
+              ) : (
+                <span className="db-title-icon">{note.icon || "📁"}</span>
+              )}
+            </button>
+            {iconPickerOpen && (
+              <EmojiPicker
+                onClose={() => setIconPickerOpen(false)}
+                onPick={(icon) => {
+                  setIconPickerOpen(false);
+                  onSetIcon(note.path, icon);
+                }}
               />
-              <div className="db-card-body">
-                <div className="db-card-head">
-                  <CardIcon card={card} />
-                  <span className="db-card-title">{card.title}</span>
-                </div>
-                {card.excerpt && <p className="db-card-excerpt">{card.excerpt}</p>}
-                <CardChips card={card} />
-                <Progress card={card} />
-                <div className="db-card-meta">{formatDate(card.modifiedAt)}</div>
-              </div>
-            </div>
-          ))}
-          <button className="db-card db-card-new" onClick={() => setNewOpen(true)}>
-            <span>+ New page</span>
-          </button>
-        </div>
-      ) : kind === "list" ? (
-        <div className="db-list" onKeyDown={onGridKeyDown}>
-          {visibleCards.map((card) => (
-            <div
-              key={card.pageId}
-              className="db-row"
-              data-card
-              tabIndex={0}
-              draggable
-              onDragStart={handleDragStart(card.pageId)}
-              onDragOver={allowDrop}
-              onDrop={handleDropOnCard(card.pageId)}
-              onClick={() => onOpenPage(card.path)}
-              onKeyDown={openOnEnter(card.path)}
-            >
-              <CardIcon card={card} />
-              <span className="db-row-title">{card.title}</span>
-              <CardChips card={card} />
-              <span className="db-row-meta">{formatDate(card.modifiedAt)}</span>
-            </div>
-          ))}
-        </div>
-      ) : kind === "table" ? (
-        <div className="db-table-wrap">
-          <table className="db-table">
-            <thead>
-              <tr>
-                <th>Title</th>
-                <th>Status</th>
-                <th>Priority</th>
-                <th>Date</th>
-                <th>Tags</th>
-                <th>Modified</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibleCards.map((card) => (
-                <tr
-                  key={card.pageId}
-                  draggable
-                  onDragStart={handleDragStart(card.pageId)}
-                  onDragOver={allowDrop}
-                  onDrop={handleDropOnCard(card.pageId)}
-                  onClick={() => onOpenPage(card.path)}
+            )}
+            <h1>{note.title}</h1>
+            {!note.cover && (
+              <button className="db-add-cover" onClick={() => setCoverPickerOpen(true)}>
+                Add cover
+              </button>
+            )}
+          </div>
+
+          <div className="db-toolbar">
+            <div className="db-tabs">
+              {VIEWS.map((v) => (
+                <button
+                  key={v.id}
+                  className={`db-tab ${kind === v.id ? "is-active" : ""}`}
+                  onClick={() => void updateView({ view: v.id })}
                 >
-                  <td>
-                    <CardIcon card={card} /> {card.title}
-                  </td>
-                  <td>{card.properties?.status || ""}</td>
-                  <td>{card.properties?.priority || ""}</td>
-                  <td>{card.properties?.date || ""}</td>
-                  <td>{card.properties?.tags || ""}</td>
-                  <td>{formatDate(card.modifiedAt)}</td>
-                </tr>
+                  {v.label}
+                </button>
               ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="db-board">
-          {boardColumns.map((column) => (
-            <div
-              key={column.value}
-              className="db-column"
-              onDragOver={allowDrop}
-              onDrop={handleDropOnColumn(column.value)}
-            >
-              <div className="db-column-head">
-                {column.value} <span className="db-column-count">{column.cards.length}</span>
-              </div>
-              {column.cards.map((card) => (
-                <div
-                  key={card.pageId}
-                  className="db-board-card"
-                  draggable
-                  onDragStart={handleDragStart(card.pageId)}
-                  onClick={() => onOpenPage(card.path)}
+            </div>
+
+            <div className="db-controls">
+              <label className="db-control">
+                Sort
+                <select
+                  value={view.sortBy || ""}
+                  onChange={(e) => void updateView({ sortBy: e.target.value })}
                 >
+                  <option value="">Manual</option>
+                  <option value="title">Title</option>
+                  <option value="created">Created</option>
+                  <option value="modified">Modified</option>
+                </select>
+              </label>
+              {view.sortBy && (
+                <button
+                  className="db-dir"
+                  title="Toggle sort direction"
+                  onClick={() =>
+                    void updateView({ sortDir: view.sortDir === "desc" ? "asc" : "desc" })
+                  }
+                >
+                  {view.sortDir === "desc" ? "↓" : "↑"}
+                </button>
+              )}
+              <label className="db-control">
+                Template
+                <select value={template} onChange={(e) => setTemplate(e.target.value)}>
+                  {TEMPLATES.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button className="primary db-new" onClick={() => setNewOpen(true)}>
+                + New page
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="db-empty">Loading…</div>
+        ) : cards.length === 0 ? (
+          <div className="db-empty">
+            <p>No pages yet.</p>
+            <button className="primary" onClick={() => setNewOpen(true)}>
+              Create your first page
+            </button>
+          </div>
+        ) : kind === "list" ? (
+          <div className="db-list" onKeyDown={onGridKeyDown}>
+            {visibleCards.map((card) => (
+              <div
+                key={card.pageId}
+                className="db-row"
+                data-card
+                tabIndex={0}
+                draggable
+                onDragStart={handleDragStart(card.pageId)}
+                onDragOver={allowDrop}
+                onDrop={handleDropOnCard(card.pageId)}
+                onClick={() => onOpenPage(card.path)}
+                onKeyDown={openOnEnter(card.path)}
+              >
+                <CardIcon card={card} />
+                <span className="db-row-title">{card.title}</span>
+                <span className="db-row-meta">Created {formatDate(card.createdAt)}</span>
+                <span className="db-row-meta">Edited {formatDate(card.modifiedAt)}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="db-gallery" onKeyDown={onGridKeyDown}>
+            {visibleCards.map((card) => (
+              <div
+                key={card.pageId}
+                className="db-card"
+                data-card
+                tabIndex={0}
+                draggable
+                onDragStart={handleDragStart(card.pageId)}
+                onDragOver={allowDrop}
+                onDrop={handleDropOnCard(card.pageId)}
+                onClick={() => onOpenPage(card.path)}
+                onKeyDown={openOnEnter(card.path)}
+              >
+                <div
+                  className="db-card-cover"
+                  style={{ background: cardBackground(card) || "var(--hover)" }}
+                />
+                <div className="db-card-body">
                   <div className="db-card-head">
                     <CardIcon card={card} />
                     <span className="db-card-title">{card.title}</span>
                   </div>
-                  <CardChips card={card} />
-                  <Progress card={card} />
+                  <CardDates card={card} />
                 </div>
-              ))}
-            </div>
-          ))}
-        </div>
-      )}
+              </div>
+            ))}
+            <button className="db-card db-card-new" onClick={() => setNewOpen(true)}>
+              <span>+ New page</span>
+            </button>
+          </div>
+        )}
+      </div>
 
       {newOpen && (
-        <NewPageModal
-          itemName="page"
-          onSubmit={createPage}
-          onClose={() => setNewOpen(false)}
+        <NewPageModal itemName="page" onSubmit={createPage} onClose={() => setNewOpen(false)} />
+      )}
+      {coverPickerOpen && (
+        <CoverPicker
+          hasCover={!!note.cover}
+          onClose={() => setCoverPickerOpen(false)}
+          onPick={setCover}
+          onUpload={uploadCover}
+          onRemove={removeCover}
         />
       )}
     </div>

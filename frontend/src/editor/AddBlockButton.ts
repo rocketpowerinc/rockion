@@ -2,7 +2,6 @@ import { Extension } from "@tiptap/core";
 import { Plugin, PluginKey, TextSelection } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
 
-const BUTTON_HEIGHT = 24;
 const BUTTON_WIDTH = 22;
 const GRIP_GAP = 6; // constant horizontal gap between "+" and the drag grip // keep in sync with .add-block-button height in CSS
 
@@ -61,52 +60,41 @@ class AddBlockView {
     this.blockPos = null;
   };
 
-  private handleMove = (event: MouseEvent) => {
+  private handleMove = () => {
     const view = this.view;
     if (this.dragging) return;
     if (!view.dom.isConnected) return this.hide();
 
-    const r = view.dom.getBoundingClientRect();
-    // "Hot zone" = the content column plus the left gutter where the button sits.
-    const inZone =
-      event.clientX >= r.left - 64 &&
-      event.clientX <= r.right &&
-      event.clientY >= r.top - 4 &&
-      event.clientY <= r.bottom + 4;
-    if (!inZone) return this.hide();
-
-    // Sample inside the content column at the pointer's Y to find the block.
-    const found = view.posAtCoords({ left: r.left + 24, top: event.clientY });
-    if (!found) return; // stay put while inside the zone
-
-    const $pos = view.state.doc.resolve(found.pos);
-    if ($pos.depth < 1) return;
-
-    const blockPos = $pos.before(1);
-    const dom = view.nodeDOM(blockPos);
-    if (!(dom instanceof HTMLElement)) return;
-
-    // Vertically center the button on the block's first text line.
-    const b = dom.getBoundingClientRect();
-    const style = getComputedStyle(dom);
-    let lineHeight = parseFloat(style.lineHeight);
-    if (Number.isNaN(lineHeight)) lineHeight = parseFloat(style.fontSize) * 1.4;
-    const padTop = parseFloat(style.paddingTop) || 0;
-    const top = b.top + padTop + (lineHeight - BUTTON_HEIGHT) / 2;
-
-    // Anchor horizontally to the drag grip so the gap between "+" and grip is
-    // identical for every block type (lists, callouts, headings shift the grip).
-    let left = b.left - 52;
+    // Mirror the drag grip: the "+" only appears when the library shows the grip
+    // (i.e. while hovering a block), sits directly left of it, and shares its top
+    // edge so the two buttons are always at the same height.
     const grip = document.querySelector(".drag-handle") as HTMLElement | null;
-    if (grip && !grip.classList.contains("hide")) {
-      const gr = grip.getBoundingClientRect();
-      if (gr.width > 0) left = gr.left - GRIP_GAP - BUTTON_WIDTH;
+    if (!grip || grip.classList.contains("hide")) return this.hide();
+    const gr = grip.getBoundingClientRect();
+    if (gr.width === 0 || gr.height === 0) return this.hide();
+
+    // Resolve the hovered block from the grip's vertical center for the click action.
+    const r = view.dom.getBoundingClientRect();
+    const found = view.posAtCoords({ left: r.left + 24, top: gr.top + gr.height / 2 });
+    if (!found) return this.hide();
+    const $pos = view.state.doc.resolve(found.pos);
+    if ($pos.depth < 1) return this.hide();
+    const blockPos = $pos.before(1);
+
+    // The page title is the first block (an H1) — show no "+" or grip beside it.
+    // visibility (not display) keeps the grip measurable so it restores cleanly
+    // once the pointer moves to another block.
+    const node = view.state.doc.nodeAt(blockPos);
+    if (blockPos === 0 && node?.type.name === "heading") {
+      grip.style.visibility = "hidden";
+      return this.hide();
     }
+    grip.style.visibility = "";
 
     this.blockPos = blockPos;
     this.button.style.display = "flex";
-    this.button.style.left = `${left}px`;
-    this.button.style.top = `${top}px`;
+    this.button.style.left = `${gr.left - GRIP_GAP - BUTTON_WIDTH}px`;
+    this.button.style.top = `${gr.top}px`;
   };
 
   private handleClick = (event: MouseEvent) => {

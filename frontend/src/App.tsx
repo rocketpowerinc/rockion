@@ -32,7 +32,6 @@ export default function App() {
   const [note, setNote] = useState<Note | null>(null);
   const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
   const [switcherOpen, setSwitcherOpen] = useState(false);
-  const [dashboardAsMarkdown, setDashboardAsMarkdown] = useState(false);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [vaultTransfer, setVaultTransfer] = useState<
     { mode: "export" } | { mode: "import"; archivePath: string } | null
@@ -77,11 +76,6 @@ export default function App() {
     () => setTheme((current) => (current === "dark" ? "light" : "dark")),
     []
   );
-
-  // Always reopen a dashboard in its card view, not the raw-markdown editor.
-  useEffect(() => {
-    setDashboardAsMarkdown(false);
-  }, [note?.path]);
 
   const flushEditor = useCallback(async () => {
     return (await editorRef.current?.flushSave()) ?? true;
@@ -273,7 +267,24 @@ export default function App() {
         if (typeof historyIndex === "number") {
           return current.slice(0, historyIndex + 1);
         }
-        if (current[current.length - 1] === opened.path) return current;
+        // The breadcrumb trail is always rooted at the current project's
+        // dashboard. Entering a different project resets the trail to that
+        // project's root.
+        const projectOf = (p: string) => {
+          const slash = p.indexOf("/");
+          return slash > 0 ? p.slice(0, slash) : "";
+        };
+        const project = projectOf(opened.path);
+        const currentProject = current.length ? projectOf(current[0]) : null;
+        if (current.length === 0 || project !== currentProject) {
+          const dashboard = project ? `${project}/dashboard.md` : "";
+          if (dashboard && dashboard !== opened.path) return [dashboard, opened.path];
+          return [opened.path];
+        }
+        // Same project: revisiting a page already in the trail truncates back to
+        // it (like a browser) instead of appending a duplicate.
+        const existing = current.indexOf(opened.path);
+        if (existing >= 0) return current.slice(0, existing + 1);
         return [...current, opened.path];
       });
       setError(null);
@@ -371,6 +382,7 @@ export default function App() {
         writingLanguage={writingLanguage}
         activePath={note?.path ?? null}
         onOpen={openNote}
+        onSetIcon={setIcon}
         onNewProject={newProject}
         onOpenVault={openVault}
         onToggleTheme={toggleTheme}
@@ -387,24 +399,18 @@ export default function App() {
           items={breadcrumbs}
           onOpen={(index, path) => void openNote(path, index)}
         />
-        {note && /(^|\/)dashboard\.md$/i.test(note.path) && !dashboardAsMarkdown ? (
+        {note && /(^|\/)dashboard\.md$/i.test(note.path) ? (
           <Dashboard
             note={note}
             onOpenPage={openNote}
             onError={setError}
             onRefreshTree={() => void refreshTree()}
-            onOpenMarkdown={() => setDashboardAsMarkdown(true)}
+            onNoteUpdated={(updated) =>
+              setNote((current) => (current?.path === updated.path ? updated : current))
+            }
+            onSetIcon={setIcon}
           />
         ) : (
-          <>
-            {note && /(^|\/)dashboard\.md$/i.test(note.path) && dashboardAsMarkdown && (
-              <button
-                className="db-back-to-cards"
-                onClick={() => setDashboardAsMarkdown(false)}
-              >
-                ← Back to cards
-              </button>
-            )}
           <Editor
             ref={editorRef}
             note={note}
@@ -429,7 +435,6 @@ export default function App() {
               void refreshTree();
             }}
           />
-          </>
         )}
         <Backlinks path={note?.path ?? null} onOpen={openNote} />
       </main>

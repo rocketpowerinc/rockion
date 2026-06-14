@@ -19,6 +19,7 @@ import { Spellcheck } from "./Spellcheck";
 import { AutoLink } from "./AutoLink";
 import { LinkContextMenu } from "./LinkContextMenu";
 import { MarkdownLinkCleanup } from "./MarkdownLinkCleanup";
+import { TextColor, BgColor } from "./colorMarks";
 
 // The full set of TipTap extensions that make up the Rockion editor.
 export const editorExtensions = [
@@ -40,9 +41,12 @@ export const editorExtensions = [
   SafeImage,
   AutoLink,
   MarkdownLinkCleanup,
+  TextColor,
+  BgColor,
   // Round-trips the document to/from GitHub-Flavored Markdown on disk.
+  // html is enabled so colored runs persist as portable <span style> markup.
   Markdown.configure({
-    html: false,
+    html: true,
     tightLists: true,
     bulletListMarker: "-",
     linkify: false,

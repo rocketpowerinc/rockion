@@ -51,9 +51,16 @@ func (v *Vault) readIcons() map[string]string {
 	return m
 }
 
-// SetIcon sets (or clears, if icon == "") the icon for a note path.
+// SetIcon sets (or clears, if icon == "") the icon for a note or folder path.
 func (v *Vault) SetIcon(rel, icon string) error {
-	if _, err := v.Read(rel); err != nil {
+	if err := requireUserPath(rel); err != nil {
+		return err
+	}
+	full, err := v.resolve(rel, false)
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stat(full); err != nil {
 		return err
 	}
 	if err := validateIcon(icon); err != nil {

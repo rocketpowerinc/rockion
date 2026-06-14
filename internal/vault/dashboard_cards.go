@@ -12,17 +12,10 @@ import (
 	"rockion/internal/model"
 )
 
-// cardPropertyKeys are the lightweight frontmatter fields surfaced as editable
-// chips on pages and cards. Everything else in frontmatter is left untouched.
-var cardPropertyKeys = []string{"status", "priority", "date", "tags"}
-
 const (
-	viewKey        = "rockion_view"
-	groupKey       = "rockion_group"
-	sortKey        = "rockion_sort"
-	sortDirKey     = "rockion_sort_dir"
-	filterKeyKey   = "rockion_filter_key"
-	filterValueKey = "rockion_filter_value"
+	viewKey    = "rockion_view"
+	sortKey    = "rockion_sort"
+	sortDirKey = "rockion_sort_dir"
 )
 
 // DashboardCards returns the managed pages of a dashboard as gallery cards, in
@@ -51,18 +44,14 @@ func (v *Vault) DashboardCards(dashboardRel string) ([]model.PageCard, error) {
 			return
 		}
 		seen[note.PageID] = true
-		done, total := todoCounts(note.Markdown)
 		cards = append(cards, model.PageCard{
 			PageID:     note.PageID,
 			Path:       note.Path,
 			Title:      managedTitle(note),
 			Icon:       icons[note.Path],
 			Cover:      v.Cover(note.Path),
-			Excerpt:    pageExcerpt(note.Markdown),
+			CreatedAt:  note.CreatedAt,
 			ModifiedAt: note.ModifiedAt,
-			Properties: cardProperties(note.Frontmatter),
-			TodoDone:   done,
-			TodoTotal:  total,
 		})
 	}
 
@@ -102,12 +91,9 @@ func (v *Vault) DashboardView(dashboardRel string) (model.DashboardView, error) 
 		return model.DashboardView{}, err
 	}
 	view := model.DashboardView{
-		View:        frontmatterString(note.Frontmatter[viewKey]),
-		GroupBy:     frontmatterString(note.Frontmatter[groupKey]),
-		SortBy:      frontmatterString(note.Frontmatter[sortKey]),
-		SortDir:     frontmatterString(note.Frontmatter[sortDirKey]),
-		FilterKey:   frontmatterString(note.Frontmatter[filterKeyKey]),
-		FilterValue: frontmatterString(note.Frontmatter[filterValueKey]),
+		View:    frontmatterString(note.Frontmatter[viewKey]),
+		SortBy:  frontmatterString(note.Frontmatter[sortKey]),
+		SortDir: frontmatterString(note.Frontmatter[sortDirKey]),
 	}
 	if view.View == "" {
 		view.View = "gallery"
@@ -123,37 +109,8 @@ func (v *Vault) SetDashboardView(dashboardRel string, view model.DashboardView) 
 	}
 	return v.mutateFrontmatter(dashboardRel, note.Version, func(fm map[string]any) {
 		setOrDelete(fm, viewKey, view.View)
-		setOrDelete(fm, groupKey, view.GroupBy)
 		setOrDelete(fm, sortKey, view.SortBy)
 		setOrDelete(fm, sortDirKey, view.SortDir)
-		setOrDelete(fm, filterKeyKey, view.FilterKey)
-		setOrDelete(fm, filterValueKey, view.FilterValue)
-	})
-}
-
-// SetPageProperty sets (or clears, when value is empty) a recognized frontmatter
-// property on a page. "tags" is stored as a YAML list; the rest as scalars.
-func (v *Vault) SetPageProperty(pageRel, key, value string) error {
-	key = strings.ToLower(strings.TrimSpace(key))
-	if !isCardPropertyKey(key) {
-		return fmt.Errorf("unsupported property: %s", key)
-	}
-	note, err := v.Read(pageRel)
-	if err != nil {
-		return err
-	}
-	value = strings.TrimSpace(value)
-	return v.mutateFrontmatter(pageRel, note.Version, func(fm map[string]any) {
-		if key == "tags" {
-			tags := splitTags(value)
-			if len(tags) == 0 {
-				delete(fm, "tags")
-			} else {
-				fm["tags"] = tags
-			}
-			return
-		}
-		setOrDelete(fm, key, value)
 	})
 }
 
@@ -243,93 +200,12 @@ func managedLineID(line string) string {
 	return managedIDFromDestination(match[3])
 }
 
-func cardProperties(fm map[string]any) map[string]string {
-	if fm == nil {
-		return nil
-	}
-	props := map[string]string{}
-	for _, key := range []string{"status", "priority", "date"} {
-		if s := frontmatterString(fm[key]); s != "" {
-			props[key] = s
-		}
-	}
-	if tags := frontmatterTags(fm["tags"]); tags != "" {
-		props["tags"] = tags
-	}
-	if len(props) == 0 {
-		return nil
-	}
-	return props
-}
-
-func pageExcerpt(body string) string {
-	for _, raw := range strings.Split(body, "\n") {
-		line := strings.TrimSpace(raw)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		// Strip a leading list/quote/todo marker.
-		line = strings.TrimLeft(line, ">*+-0123456789. ")
-		line = strings.TrimPrefix(line, "[ ] ")
-		line = strings.TrimPrefix(line, "[x] ")
-		line = strings.TrimPrefix(line, "[X] ")
-		// Turn [label](url) into label and drop basic emphasis characters.
-		line = managedMarkdownLinkPattern.ReplaceAllString(line, "$2")
-		line = strings.NewReplacer("**", "", "__", "", "`", "").Replace(line)
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		runes := []rune(line)
-		if len(runes) > 160 {
-			return strings.TrimSpace(string(runes[:160])) + "…"
-		}
-		return line
-	}
-	return ""
-}
-
-func todoCounts(body string) (done, total int) {
-	for _, raw := range strings.Split(body, "\n") {
-		line := strings.TrimSpace(raw)
-		line = strings.TrimLeft(line, "*+- ")
-		switch {
-		case strings.HasPrefix(line, "[ ]"):
-			total++
-		case strings.HasPrefix(line, "[x]"), strings.HasPrefix(line, "[X]"):
-			total++
-			done++
-		}
-	}
-	return done, total
-}
-
-func isCardPropertyKey(key string) bool {
-	for _, k := range cardPropertyKeys {
-		if k == key {
-			return true
-		}
-	}
-	return false
-}
-
 func setOrDelete(fm map[string]any, key, value string) {
 	if strings.TrimSpace(value) == "" {
 		delete(fm, key)
 		return
 	}
 	fm[key] = value
-}
-
-func splitTags(value string) []string {
-	parts := strings.Split(value, ",")
-	out := make([]string, 0, len(parts))
-	for _, p := range parts {
-		if t := strings.TrimSpace(p); t != "" {
-			out = append(out, t)
-		}
-	}
-	return out
 }
 
 func frontmatterString(value any) string {
@@ -344,26 +220,5 @@ func frontmatterString(value any) string {
 		return strings.TrimSpace(fmt.Sprintf("%v", v))
 	default:
 		return strings.TrimSpace(fmt.Sprintf("%v", v))
-	}
-}
-
-func frontmatterTags(value any) string {
-	switch v := value.(type) {
-	case nil:
-		return ""
-	case []any:
-		parts := make([]string, 0, len(v))
-		for _, item := range v {
-			if s := frontmatterString(item); s != "" {
-				parts = append(parts, s)
-			}
-		}
-		return strings.Join(parts, ", ")
-	case []string:
-		return strings.Join(v, ", ")
-	case string:
-		return strings.TrimSpace(v)
-	default:
-		return frontmatterString(value)
 	}
 }

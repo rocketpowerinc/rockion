@@ -152,6 +152,9 @@ func (v *Vault) SidebarTree() ([]model.TreeNode, error) {
 				Path:      filepath.ToSlash(entry.Name()),
 				EntryPath: dashboard,
 				IsDir:     true,
+				// The project icon is the dashboard page's icon, so it stays in
+				// sync between the sidebar and the dashboard landing page.
+				Icon: icons[filepath.ToSlash(dashboard)],
 			})
 			continue
 		}
@@ -336,6 +339,13 @@ func (v *Vault) read(rel string, icons map[string]string) (model.Note, error) {
 	fm, _, body := splitFrontmatter(string(raw))
 	relSlash := filepath.ToSlash(rel)
 	pageID, _ := fm["rockion_id"].(string)
+	// Created time is taken from the frozen "rockion_created" frontmatter stamp
+	// when present; the filesystem birth time is only a fallback because atomic
+	// saves (write-temp + rename) reset it to the last save on every edit.
+	created := fileCreatedAt(info)
+	if c, ok := frontmatterTimeMillis(fm["rockion_created"]); ok {
+		created = c
+	}
 	return model.Note{
 		Path:        relSlash,
 		Title:       titleFor(rel, fm, body),
@@ -343,9 +353,38 @@ func (v *Vault) read(rel string, icons map[string]string) (model.Note, error) {
 		Icon:        icons[relSlash],
 		Markdown:    body,
 		Frontmatter: fm,
+		CreatedAt:   created,
 		ModifiedAt:  info.ModTime().UnixMilli(),
 		Version:     contentVersion(raw),
 	}, nil
+}
+
+// frontmatterTimeMillis parses a frontmatter timestamp (YAML may decode it to a
+// time.Time, or it may be a string/number) into unix milliseconds.
+func frontmatterTimeMillis(v any) (int64, bool) {
+	switch t := v.(type) {
+	case time.Time:
+		return t.UnixMilli(), true
+	case string:
+		s := strings.TrimSpace(t)
+		if s == "" {
+			return 0, false
+		}
+		for _, layout := range []string{time.RFC3339Nano, time.RFC3339, "2006-01-02T15:04:05", "2006-01-02"} {
+			if tm, err := time.Parse(layout, s); err == nil {
+				return tm.UnixMilli(), true
+			}
+		}
+		return 0, false
+	case int:
+		return int64(t), true
+	case int64:
+		return t, true
+	case float64:
+		return int64(t), true
+	default:
+		return 0, false
+	}
 }
 
 // Write saves markdown to a note while preserving its existing YAML

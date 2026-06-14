@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Editor } from "@tiptap/react";
 import { TEXT_COLORS, BG_COLORS } from "./colorMarks";
+import { transformBlockJSON } from "./blockTransforms.mjs";
 
 interface Props {
   editor: Editor | null;
@@ -14,17 +15,17 @@ interface MenuState {
   from: number; // start pos of the target top-level block
 }
 
-const TURN_INTO: { label: string; run: (c: ReturnType<Editor["chain"]>) => ReturnType<Editor["chain"]> }[] = [
-  { label: "Text", run: (c) => c.setParagraph() },
-  { label: "Heading 1", run: (c) => c.setHeading({ level: 1 as 1 }) },
-  { label: "Heading 2", run: (c) => c.setHeading({ level: 2 as 2 }) },
-  { label: "Heading 3", run: (c) => c.setHeading({ level: 3 as 3 }) },
-  { label: "Bulleted list", run: (c) => c.toggleBulletList() },
-  { label: "Numbered list", run: (c) => c.toggleOrderedList() },
-  { label: "To-do list", run: (c) => c.toggleTaskList() },
-  { label: "Quote", run: (c) => c.toggleBlockquote() },
-  { label: "Code", run: (c) => c.toggleCodeBlock() },
-  { label: "Callout", run: (c) => c.toggleCallout() },
+const TURN_INTO = [
+  { label: "Text", target: "text" },
+  { label: "Heading 1", target: "heading1" },
+  { label: "Heading 2", target: "heading2" },
+  { label: "Heading 3", target: "heading3" },
+  { label: "Bulleted list", target: "bullet" },
+  { label: "Numbered list", target: "ordered" },
+  { label: "To-do list", target: "task" },
+  { label: "Quote", target: "quote" },
+  { label: "Code", target: "code" },
+  { label: "Callout", target: "callout" },
 ];
 
 // Notion-style block menu. Opens when the drag grip (".drag-handle") is clicked
@@ -92,8 +93,17 @@ export default function BlockMenu({ editor }: Props) {
   if (!node) return null;
   const to = menu.from + node.nodeSize;
 
-  const turnInto = (run: (typeof TURN_INTO)[number]["run"]) => {
-    run(editor.chain().focus().setTextSelection(menu.from + 1)).run();
+  const turnInto = (target: string) => {
+    const content = transformBlockJSON(node.toJSON(), target);
+    editor
+      .chain()
+      .focus()
+      .insertContentAt(
+        { from: menu.from, to },
+        content,
+        { updateSelection: true, errorOnInvalidContent: true }
+      )
+      .run();
     close();
   };
 
@@ -166,7 +176,11 @@ export default function BlockMenu({ editor }: Props) {
       {sub === "turn" && (
         <div className="block-submenu">
           {TURN_INTO.map((item) => (
-            <button key={item.label} className="block-menu-item" onClick={() => turnInto(item.run)}>
+            <button
+              key={item.label}
+              className="block-menu-item"
+              onClick={() => turnInto(item.target)}
+            >
               {item.label}
             </button>
           ))}

@@ -53,6 +53,9 @@ All notable changes to Rockion are documented here. This project adheres to
 - Drop the page "Date" property — it had no behavior and went unused.
 
 ### Fixed
+- Make every Block menu “Turn into” conversion structural and reliable,
+  including bullet/numbered lists to to-do lists, lists to headings, and task
+  lists back to ordinary text or list blocks without losing item content.
 - Allow the Vite page at `localhost:5173` to render as an explicit browser
   preview without a Wails bridge; native vault actions stay disabled until the
   frontend runs inside the desktop window.

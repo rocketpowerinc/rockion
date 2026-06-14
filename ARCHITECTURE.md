@@ -60,6 +60,7 @@ without lag.
 | `vault` media | Validates decoded image bytes, caps size/dimensions, and writes into `assets/`. |
 | `vault` covers | Stores page cover metadata in `.rockion/covers.json`; validates generated styles and local uploaded assets. |
 | `vault` dashboard views | Stores layout and sort preferences in `.rockion/dashboard-views.json` without rewriting Markdown frontmatter. |
+| `vault` templates | Seeds and securely renders vault-local `.rockion/templates/*.md` files for managed pages. |
 
 ### Why these choices
 
@@ -153,6 +154,20 @@ in `.rockion/dashboard-views.json`; legacy frontmatter settings are read for
 compatibility but are never rewritten. Manual card order remains the order of
 managed links in `dashboard.md`, while title/date sorting is derived in the UI
 and disables drag reordering.
+
+Page templates live in `.rockion/templates/` and are listed from disk whenever
+the New Page dialog opens. The initial directory is seeded from the embedded
+Markdown files in `internal/vault/default_templates/`; once created, it is never
+re-seeded, so user additions and removals remain authoritative. Template reads
+reject traversal, symlinks, oversized files, and reserved managed-page metadata.
+Created pages store the selected filename stem in the managed
+`rockion_template_tag` frontmatter field. Dashboard cards derive a constrained
+color token from that value: Other is gray, Bootstrap variants are neon green,
+Cheatsheet variants are neon pink, and custom template names map deterministically
+across the remaining neon palette. New managed pages are stored in a tag folder
+under their project (`Other/`, `Bootstraps/`, `Cheatsheets/`, or the custom tag
+name). Managed-page discovery is recursive so the root `dashboard.md` remains
+the authoritative entry point for all category folders.
 
 Page covers do not modify Markdown. Their metadata is stored in the exported
 vault under `.rockion/covers.json`, while uploaded cover images live in

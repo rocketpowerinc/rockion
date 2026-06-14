@@ -7,6 +7,7 @@ import {
 } from "react";
 import { api, type PageCard } from "../api";
 import { coverBackground } from "../editor/coverStyles.mjs";
+import PageTag from "./PageTag";
 
 type ViewKind = "gallery" | "list";
 
@@ -194,6 +195,14 @@ export default function DashboardCards({
   if (kind === "list") {
     return (
       <div className="db-list" onKeyDown={onGridKeyDown}>
+        <div className="db-list-header" aria-hidden="true">
+          <span />
+          <span>Page</span>
+          <span>Tag</span>
+          <span>Created</span>
+          <span>Edited</span>
+          <span />
+        </div>
         {cards.map((card) => (
           <div
             key={card.pageId}
@@ -209,8 +218,9 @@ export default function DashboardCards({
           >
             <CardIcon card={card} />
             <span className="db-row-title">{card.title}</span>
-            <span className="db-row-meta">Created {formatDate(card.createdAt)}</span>
-            <span className="db-row-meta">Edited {formatDate(card.modifiedAt)}</span>
+            <PageTag tag={card.tag} color={card.tagColor} />
+            <span className="db-row-meta">{formatDate(card.createdAt)}</span>
+            <span className="db-row-meta">{formatDate(card.modifiedAt)}</span>
             {deleteButton(card, true)}
           </div>
         ))}
@@ -240,6 +250,7 @@ export default function DashboardCards({
               <CardIcon card={card} />
               <span className="db-card-title">{card.title}</span>
             </div>
+            <PageTag tag={card.tag} color={card.tagColor} />
             <CardDates card={card} />
           </div>
         </div>

@@ -1,16 +1,24 @@
 import { useEffect, useRef, useState } from "react";
+import type { PageTemplate } from "../api";
 
 interface Props {
-  onSubmit: (title: string) => Promise<void>;
+  onSubmit: (title: string, template: string) => Promise<void>;
   onClose: () => void;
   itemName?: "page" | "project";
+  templates?: PageTemplate[];
 }
 
 // In-app "new page" prompt. Replaces window.prompt, which returns null on macOS
 // (Wails' WKWebView does not implement a text-input panel), so the native prompt
 // silently failed to create pages there.
-export default function NewPageModal({ onSubmit, onClose, itemName = "page" }: Props) {
+export default function NewPageModal({
+  onSubmit,
+  onClose,
+  itemName = "page",
+  templates = [],
+}: Props) {
   const [title, setTitle] = useState(itemName === "project" ? "New Project" : "Untitled");
+  const [template, setTemplate] = useState(templates[0]?.id ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const submittingRef = useRef(false);
@@ -30,7 +38,7 @@ export default function NewPageModal({ onSubmit, onClose, itemName = "page" }: P
     setSubmitting(true);
     setError(null);
     try {
-      await onSubmit(title);
+      await onSubmit(title, template);
     } catch (reason) {
       setError(String(reason));
     } finally {
@@ -58,6 +66,22 @@ export default function NewPageModal({ onSubmit, onClose, itemName = "page" }: P
             }
           }}
         />
+        {templates.length > 0 && (
+          <label className="new-page-template">
+            <span>Template</span>
+            <select
+              value={template}
+              disabled={submitting}
+              onChange={(event) => setTemplate(event.target.value)}
+            >
+              {templates.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         {error && <div className="new-item-error">{error}</div>}
         <div className="new-page-actions">
           <button className="ghost" disabled={submitting} onClick={onClose}>

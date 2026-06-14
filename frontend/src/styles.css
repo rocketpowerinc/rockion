@@ -567,6 +567,12 @@ button.primary,
 .favorite-button.is-favorite {
   color: #e6a700;
 }
+.page-header-tag {
+  position: absolute;
+  top: 55px;
+  right: 98px;
+  max-width: min(220px, calc(100% - 210px));
+}
 .page-header + .editor-wrap {
   padding-top: 10px;
 }
@@ -1808,6 +1814,54 @@ mark {
   color: var(--text);
   font-size: 14px;
 }
+.page-tag {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 20px;
+  border: 1px solid color-mix(in srgb, var(--tag-color) 60%, transparent);
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: color-mix(in srgb, var(--tag-color) 15%, transparent);
+  color: var(--tag-color);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.page-tag[data-color="gray"] {
+  --tag-color: #8b949e;
+}
+.page-tag[data-color="green"] {
+  --tag-color: #39ff14;
+}
+.page-tag[data-color="pink"] {
+  --tag-color: #ff2bd6;
+}
+.page-tag[data-color="cyan"] {
+  --tag-color: #00e5ff;
+}
+.page-tag[data-color="yellow"] {
+  --tag-color: #fff01f;
+}
+.page-tag[data-color="purple"] {
+  --tag-color: #b967ff;
+}
+.page-tag[data-color="orange"] {
+  --tag-color: #ff8a00;
+}
+.page-tag[data-color="blue"] {
+  --tag-color: #3d7eff;
+}
+.page-tag[data-color="lime"] {
+  --tag-color: #b6ff00;
+}
+.page-tag[data-color="magenta"] {
+  --tag-color: #ff00a8;
+}
 .db-card-meta {
   display: flex;
   flex-direction: column;
@@ -1826,14 +1880,29 @@ mark {
 
 /* List */
 .db-list {
-  display: flex;
-  flex-direction: column;
+  overflow-x: auto;
+}
+.db-list-header,
+.db-row {
+  display: grid;
+  grid-template-columns:
+    24px minmax(170px, 1fr) minmax(100px, 0.5fr)
+    minmax(135px, 0.65fr) minmax(135px, 0.65fr) 28px;
+  align-items: center;
+  gap: 8px;
+  min-width: 720px;
+}
+.db-list-header {
+  padding: 6px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 .db-row {
   position: relative;
-  display: flex;
-  align-items: center;
-  gap: 8px;
   padding: 8px 6px;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
@@ -1854,10 +1923,12 @@ mark {
 .db-row-title {
   font-size: 14px;
   color: var(--text);
-  flex: 0 0 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .db-row-meta {
-  margin-left: auto;
   font-size: 11px;
   color: var(--text-muted);
 }
@@ -1898,6 +1969,29 @@ mark {
 }
 
 /* ---- New page modal ---- */
+.new-page-template {
+  display: grid;
+  gap: 6px;
+  padding: 12px 16px 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.new-page-template select {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 9px 10px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-weight: 400;
+}
+.new-page-template select:focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(35, 131, 226, 0.16);
+}
 .new-page-actions {
   display: flex;
   justify-content: flex-end;

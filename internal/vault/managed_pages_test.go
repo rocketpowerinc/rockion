@@ -106,25 +106,25 @@ func TestManagedDashboardLinkTracksTitleAndPreservesAliases(t *testing.T) {
 	if err := v.Write(page.Path, "# Second\n\n"); err != nil {
 		t.Fatal(err)
 	}
-	if err := v.Rename(page.Path, "Project/Second.md"); err != nil {
+	if err := v.Rename(page.Path, "Project/Other/Second.md"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := v.RewriteLinksAfterRename(
 		page.Path,
-		"Project/Second.md",
+		"Project/Other/Second.md",
 		false,
 		[]string{"Project/dashboard.md"},
 	); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := v.NormalizeDashboardForPage("Project/Second.md"); err != nil {
+	if _, _, err := v.NormalizeDashboardForPage("Project/Other/Second.md"); err != nil {
 		t.Fatal(err)
 	}
 	dashboard, err := v.Read("Project/dashboard.md")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(dashboard.Markdown, "[Second](Second.md?") {
+	if !strings.Contains(dashboard.Markdown, "[Second](Other/Second.md?") {
 		t.Fatalf("managed label did not follow title: %q", dashboard.Markdown)
 	}
 
@@ -181,7 +181,7 @@ func TestManagedDashboardRestoresRemovedLinksAndDeletesThroughLink(t *testing.T)
 	if strings.Contains(result.Dashboard.Markdown, page.PageID) {
 		t.Fatal("managed link remains after deletion")
 	}
-	if _, err := os.Stat(filepath.Join(v.Root, "Project", "Page.md")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(v.Root, filepath.FromSlash(page.Path))); !os.IsNotExist(err) {
 		t.Fatal("managed page file remains after deletion")
 	}
 }

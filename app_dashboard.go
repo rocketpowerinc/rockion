@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
@@ -17,6 +18,15 @@ func (a *App) ListDashboardCards(dashboardPath string) ([]model.PageCard, error)
 		return nil, err
 	}
 	return a.vault.DashboardCards(dashboardPath)
+}
+
+func (a *App) ListPageTemplates() ([]model.PageTemplate, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if err := a.requireVault(); err != nil {
+		return nil, err
+	}
+	return a.vault.PageTemplates()
 }
 
 func (a *App) GetDashboardView(dashboardPath string) (model.DashboardView, error) {
@@ -71,6 +81,12 @@ func (a *App) createSubPage(dashboardPath, title, template string) (model.Note, 
 	note, err := a.vault.CreateManagedPageFromTemplate(dashboardPath, title, template)
 	if err != nil {
 		return model.Note{}, err
+	}
+	if a.watcher != nil {
+		parent := filepath.Join(a.vault.Root, filepath.Dir(filepath.FromSlash(note.Path)))
+		if err := addWatchDirs(a.watcher, parent); err != nil {
+			runtime.LogErrorf(a.ctx, "watch new tag folder failed: %v", err)
+		}
 	}
 	if err := a.indexer.IndexFile(note.Path); err != nil {
 		runtime.LogErrorf(a.ctx, "index created note failed: %v", err)

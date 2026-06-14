@@ -34,11 +34,17 @@ func (v *Vault) DashboardCards(dashboardRel string) ([]model.PageCard, error) {
 		if note.PageID == "" || seen[note.PageID] {
 			return
 		}
+		tag := frontmatterString(note.Frontmatter[templateTagKey])
+		if tag == "" {
+			tag = "Other"
+		}
 		seen[note.PageID] = true
 		cards = append(cards, model.PageCard{
 			PageID:     note.PageID,
 			Path:       note.Path,
 			Title:      managedTitle(note),
+			Tag:        tag,
+			TagColor:   templateTagColor(tag),
 			Icon:       icons[note.Path],
 			Cover:      v.Cover(note.Path),
 			CreatedAt:  note.CreatedAt,

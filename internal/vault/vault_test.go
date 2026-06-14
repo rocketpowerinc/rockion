@@ -320,7 +320,7 @@ func TestCreateIsExclusive(t *testing.T) {
 	if successes != 1 {
 		t.Fatalf("exclusive create succeeded %d times, want 1", successes)
 	}
-	note, err := v.Read("Project/Only Once.md")
+	note, err := v.Read("Project/Other/Only Once.md")
 	if err != nil {
 		t.Fatal(err)
 	}

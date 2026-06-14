@@ -24,6 +24,7 @@ import {
 import { setCurrentPagePath } from "../editor/pageIcons";
 import CoverPicker from "./CoverPicker";
 import { coverBackground } from "../editor/coverStyles.mjs";
+import PageTag from "./PageTag";
 
 interface Props {
   note: Note | null;
@@ -628,6 +629,13 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
           >
             Add cover
           </button>
+        )}
+        {note.pageId && (
+          <PageTag
+            tag={note.tag}
+            color={note.tagColor}
+            className="page-header-tag"
+          />
         )}
         <button
           className={`favorite-button ${isFavorite ? "is-favorite" : ""}`}

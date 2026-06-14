@@ -186,7 +186,7 @@ during native builds.
 
 The SQLite index at `.rockion/index.db` is disposable and rebuilds on the next
 open. Back up the rest of `.rockion/`: it contains user settings and metadata
-such as icons, covers, Favorites, and dashboard views.
+such as icons, covers, Favorites, dashboard views, and page templates.
 
 ## How it works under the hood
 
@@ -233,6 +233,15 @@ markdown.
 - **Dashboard views** are stored in `<vault>/.rockion/dashboard-views.json`, so changing layout or
   sort order does not rewrite user frontmatter. Card content and manual order remain portable
   Markdown links in `dashboard.md`.
+- **Page templates** are ordinary `.md` files in `<vault>/.rockion/templates/`. Their filenames
+  populate the New Page template list each time it opens, so files can be added or removed while
+  Rockion is running. Use `{{title}}` (or `{{ title }}`) where the new page title should appear;
+  template frontmatter and body content are copied into the new managed page. Rockion records the
+  selected template as `rockion_template_tag`, displays it as a colored dashboard tag, and supports
+  sorting Gallery or List views by tag. The tag also appears beside the favorite star when a page
+  is open. New pages are grouped under their project dashboard in a tag folder: Blank pages go to
+  `Other/`, Bootstrap pages to `Bootstraps/`, Cheatsheet pages to `Cheatsheets/`, and custom
+  templates to a folder matching their tag. Blank and legacy pages use the gray `Other` tag.
 - **Dashboard covers** load bounded thumbnails on demand; the full validated image is only loaded
   for the active page cover.
 - **Page links** are plain markdown links. The icon + ↗ badge are added by a ProseMirror
@@ -246,7 +255,7 @@ markdown.
 
 The rebuildable index and user metadata both live under `<vault>/.rockion/`.
 Only `index.db` is disposable. Vault export includes the metadata sidecars so
-icons, covers, Favorites, and dashboard settings survive backup and restore.
+icons, covers, Favorites, dashboard settings, and templates survive backup and restore.
 
 ## Project layout
 

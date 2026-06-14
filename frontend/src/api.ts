@@ -29,6 +29,8 @@ export interface Note {
   path: string;
   title: string;
   pageId?: string;
+  tag?: string;
+  tagColor?: string;
   icon?: string;
   cover?: PageCover;
   markdown: string;
@@ -48,6 +50,8 @@ export interface PageCard {
   pageId: string;
   path: string;
   title: string;
+  tag: string;
+  tagColor: string;
   icon?: string;
   cover?: PageCover;
   createdAt: number;
@@ -58,6 +62,11 @@ export interface DashboardView {
   view: string; // gallery | list
   sortBy?: string;
   sortDir?: string;
+}
+
+export interface PageTemplate {
+  id: string;
+  label: string;
 }
 
 export interface SearchHit {
@@ -109,6 +118,7 @@ export const api = {
   // Dashboard "database" views.
   listDashboardCards: (dashboardPath: string): Promise<PageCard[]> =>
     App.ListDashboardCards(dashboardPath),
+  listPageTemplates: (): Promise<PageTemplate[]> => App.ListPageTemplates(),
   getDashboardView: (dashboardPath: string): Promise<DashboardView> =>
     App.GetDashboardView(dashboardPath),
   setDashboardView: (dashboardPath: string, view: DashboardView): Promise<void> =>

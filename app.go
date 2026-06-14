@@ -120,6 +120,9 @@ func (a *App) OpenVault(path string) (model.VaultInfo, error) {
 	if err := v.EnsureRootDashboards(); err != nil {
 		return model.VaultInfo{}, fmt.Errorf("create folder dashboards: %w", err)
 	}
+	if err := v.EnsurePageTemplates(); err != nil {
+		return model.VaultInfo{}, fmt.Errorf("prepare page templates: %w", err)
+	}
 	if err := v.EnsureManagedDashboards(); err != nil {
 		return model.VaultInfo{}, fmt.Errorf("prepare managed project pages: %w", err)
 	}

@@ -20,6 +20,8 @@ const managedPageQuery = "rockion-page"
 
 var managedMarkdownLinkPattern = regexp.MustCompile(`(!?)\[([^\]]*)\]\(([^)]+)\)`)
 var pageIDFrontmatterPattern = regexp.MustCompile(`(?m)^rockion_id[ \t]*:[^\r\n]*(\r?)$`)
+var templatePageTitlePattern = regexp.MustCompile(`(?m)^#[ \t]+[^\r\n]*`)
+var templateTitleFrontmatterPattern = regexp.MustCompile(`(?m)^title[ \t]*:[^\r\n]*`)
 
 type ManagedDeleteResult struct {
 	Dashboard   model.Note
@@ -64,9 +66,8 @@ func (v *Vault) CreateManagedPage(dashboardRel, title string) (model.Note, error
 	return v.CreateManagedPageFromTemplate(dashboardRel, title, "")
 }
 
-// CreateManagedPageFromTemplate creates a stable-ID page seeded from a built-in
-// template (status defaults, a meeting layout, etc.). An empty template id makes
-// a blank page.
+// CreateManagedPageFromTemplate creates a stable-ID page from a vault-local
+// Markdown template. An empty template filename creates a blank page.
 func (v *Vault) CreateManagedPageFromTemplate(dashboardRel, title, template string) (model.Note, error) {
 	dashboardRel = filepath.ToSlash(filepath.Clean(dashboardRel))
 	if !IsDashboardPath(dashboardRel) || filepath.Dir(filepath.FromSlash(dashboardRel)) == "." {
@@ -79,8 +80,17 @@ func (v *Vault) CreateManagedPageFromTemplate(dashboardRel, title, template stri
 	if title == "" {
 		return model.Note{}, errors.New("page title is required")
 	}
+	tag := templateTag(template)
+	folder, err := templateTagFolder(tag)
+	if err != nil {
+		return model.Note{}, err
+	}
 	name := sanitize(title) + ".md"
-	rel := filepath.ToSlash(filepath.Join(filepath.Dir(filepath.FromSlash(dashboardRel)), name))
+	rel := filepath.ToSlash(filepath.Join(
+		filepath.Dir(filepath.FromSlash(dashboardRel)),
+		folder,
+		name,
+	))
 	if err := requireUserPath(rel); err != nil {
 		return model.Note{}, err
 	}
@@ -92,18 +102,15 @@ func (v *Vault) CreateManagedPageFromTemplate(dashboardRel, title, template stri
 	if err != nil {
 		return model.Note{}, err
 	}
-	props, body := managedTemplate(template, title)
-	front := "rockion_id: " + id + "\n"
-	front += "rockion_created: " + time.Now().UTC().Format(time.RFC3339) + "\n"
-	keys := make([]string, 0, len(props))
-	for k := range props {
-		keys = append(keys, k)
+	content, err := v.renderPageTemplate(
+		template,
+		title,
+		id,
+		time.Now().UTC().Format(time.RFC3339),
+	)
+	if err != nil {
+		return model.Note{}, err
 	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		front += k + ": " + props[k] + "\n"
-	}
-	content := []byte("---\n" + front + "---\n" + body)
 	if err := createFileExclusive(full, content, 0o644); err != nil {
 		if errors.Is(err, os.ErrExist) {
 			return model.Note{}, fmt.Errorf("note already exists: %s", rel)
@@ -113,31 +120,14 @@ func (v *Vault) CreateManagedPageFromTemplate(dashboardRel, title, template stri
 	return v.Read(rel)
 }
 
-// managedTemplate returns seed frontmatter properties + body for a template id.
-func managedTemplate(template, title string) (map[string]string, string) {
-	switch template {
-	case "meeting":
-		return nil, fmt.Sprintf(
-			"# %s\n\n**Date:** \n**Attendees:** \n\n## Agenda\n\n- \n\n## Notes\n\n\n## Action items\n\n- [ ] \n",
-			title,
-		)
-	case "task":
-		return map[string]string{"status": "To do", "priority": "Medium"},
-			fmt.Sprintf("# %s\n\n## Subtasks\n\n- [ ] \n", title)
-	default:
-		return nil, fmt.Sprintf("# %s\n\n", title)
-	}
-}
-
 // NormalizeDashboardForPage updates a page's managed dashboard link after a
 // title or filename change.
 func (v *Vault) NormalizeDashboardForPage(pageRel string) (string, bool, error) {
 	pageRel = filepath.ToSlash(filepath.Clean(pageRel))
-	dir := filepath.ToSlash(filepath.Dir(filepath.FromSlash(pageRel)))
-	if dir == "." || IsDashboardPath(pageRel) {
+	if filepath.Dir(filepath.FromSlash(pageRel)) == "." || IsDashboardPath(pageRel) {
 		return "", false, nil
 	}
-	dashboard, err := v.dashboardPath(dir)
+	dashboard, err := v.projectDashboardForPage(pageRel)
 	if errors.Is(err, os.ErrNotExist) {
 		return "", false, nil
 	}
@@ -295,30 +285,60 @@ func (v *Vault) managedPages(dir string) (map[string]model.Note, error) {
 	if err != nil {
 		return nil, err
 	}
-	entries, err := os.ReadDir(full)
-	if err != nil {
-		return nil, err
-	}
 	pages := map[string]model.Note{}
-	for _, entry := range entries {
-		if entry.IsDir() || entry.Type()&os.ModeSymlink != 0 ||
-			!IsMarkdownPath(entry.Name()) || strings.EqualFold(entry.Name(), "dashboard.md") {
-			continue
+	err = filepath.WalkDir(full, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
 		}
-		rel := filepath.ToSlash(filepath.Join(dir, entry.Name()))
+		if path == full {
+			return nil
+		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			if entry.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if entry.IsDir() {
+			if hidden(entry.Name()) || strings.EqualFold(entry.Name(), "assets") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !IsMarkdownPath(entry.Name()) || strings.EqualFold(entry.Name(), "dashboard.md") {
+			return nil
+		}
+		relative, err := filepath.Rel(v.Root, path)
+		if err != nil {
+			return err
+		}
+		rel := filepath.ToSlash(relative)
 		note, err := v.ensurePageID(rel)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if _, duplicate := pages[note.PageID]; duplicate {
 			note, err = v.replacePageID(rel, note)
 			if err != nil {
-				return nil, err
+				return err
 			}
 		}
 		pages[note.PageID] = note
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	return pages, nil
+}
+
+func (v *Vault) projectDashboardForPage(pageRel string) (string, error) {
+	clean := filepath.ToSlash(filepath.Clean(filepath.FromSlash(pageRel)))
+	parts := strings.Split(clean, "/")
+	if len(parts) < 2 || parts[0] == "" {
+		return "", os.ErrNotExist
+	}
+	return v.dashboardPath(parts[0])
 }
 
 func (v *Vault) ensurePageID(rel string) (model.Note, error) {

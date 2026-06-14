@@ -195,7 +195,7 @@ func validateDashboardView(view model.DashboardView) (model.DashboardView, error
 		return model.DashboardView{}, errors.New("dashboard view must be gallery or list")
 	}
 	switch view.SortBy {
-	case "", "title", "created", "modified":
+	case "", "title", "tag", "created", "modified":
 	default:
 		return model.DashboardView{}, errors.New("unknown dashboard sort field")
 	}

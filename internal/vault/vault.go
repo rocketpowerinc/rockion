@@ -334,6 +334,10 @@ func (v *Vault) read(rel string, icons map[string]string) (model.Note, error) {
 	fm, _, body := splitFrontmatter(string(raw))
 	relSlash := filepath.ToSlash(rel)
 	pageID, _ := fm["rockion_id"].(string)
+	tag := frontmatterString(fm[templateTagKey])
+	if pageID != "" && tag == "" {
+		tag = "Other"
+	}
 	// Created time is taken from the frozen "rockion_created" frontmatter stamp
 	// when present; the filesystem birth time is only a fallback because atomic
 	// saves (write-temp + rename) reset it to the last save on every edit.
@@ -345,6 +349,8 @@ func (v *Vault) read(rel string, icons map[string]string) (model.Note, error) {
 		Path:        relSlash,
 		Title:       titleFor(rel, fm, body),
 		PageID:      pageID,
+		Tag:         tag,
+		TagColor:    templateTagColor(tag),
 		Icon:        icons[relSlash],
 		Markdown:    body,
 		Frontmatter: fm,

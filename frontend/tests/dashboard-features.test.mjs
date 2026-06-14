@@ -12,9 +12,9 @@ import {
 } from "../src/editor/colorMarkup.mjs";
 
 const cards = [
-  { pageId: "b", title: "Beta", createdAt: 20, modifiedAt: 10 },
-  { pageId: "a", title: "Alpha", createdAt: 10, modifiedAt: 30 },
-  { pageId: "c", title: "Charlie", createdAt: 30, modifiedAt: 20 },
+  { pageId: "b", title: "Beta", tag: "Other", createdAt: 20, modifiedAt: 10 },
+  { pageId: "a", title: "Alpha", tag: "CheatSheets", createdAt: 10, modifiedAt: 30 },
+  { pageId: "c", title: "Charlie", tag: "Bootstraps", createdAt: 30, modifiedAt: 20 },
 ];
 
 test("dashboard sorting is derived without mutating manual order", () => {
@@ -29,6 +29,12 @@ test("dashboard sorting is derived without mutating manual order", () => {
       (card) => card.pageId
     ),
     ["a", "c", "b"]
+  );
+  assert.deepEqual(
+    sortDashboardCards(cards, { sortBy: "tag", sortDir: "asc" }).map(
+      (card) => card.pageId
+    ),
+    ["c", "a", "b"]
   );
   assert.deepEqual(cards.map((card) => card.pageId), ["b", "a", "c"]);
 });
@@ -47,6 +53,24 @@ test("dashboard cards expose deletion, lazy thumbnails, and manual-only dragging
   assert.match(source, /IntersectionObserver/);
   assert.match(source, /draggable=\{manualOrder\}/);
   assert.match(source, /onDelete\(card\)/);
+  assert.match(source, /<PageTag tag=\{card\.tag\} color=\{card\.tagColor\}/);
+  assert.match(source, /className="db-list-header"/);
+  assert.match(source, />Tag<\/span>/);
+});
+
+test("opened managed pages show their template tag beside the favorite star", () => {
+  const editor = fs.readFileSync(
+    new URL("../src/components/Editor.tsx", import.meta.url),
+    "utf8"
+  );
+  const styles = fs.readFileSync(
+    new URL("../src/styles.css", import.meta.url),
+    "utf8"
+  );
+  assert.match(editor, /className="page-header-tag"/);
+  assert.match(editor, /tag=\{note\.tag\}/);
+  assert.ok(editor.indexOf('className="page-header-tag"') < editor.indexOf("favorite-button"));
+  assert.match(styles, /\.page-header-tag\s*\{[\s\S]*right:\s*98px/);
 });
 
 test("external vault revisions reload an open dashboard", () => {
@@ -58,6 +82,24 @@ test("external vault revisions reload an open dashboard", () => {
   assert.match(app, /setVaultRevision\(\(revision\) => revision \+ 1\)/);
   assert.match(app, /refreshVersion=\{vaultRevision\}/);
   assert.match(dashboard, /\[reload, note\.version, refreshVersion\]/);
+});
+
+test("dashboard templates are loaded from the vault into the new-page modal", () => {
+  const dashboard = fs.readFileSync(
+    new URL("../src/components/Dashboard.tsx", import.meta.url),
+    "utf8"
+  );
+  const modal = fs.readFileSync(
+    new URL("../src/components/NewPageModal.tsx", import.meta.url),
+    "utf8"
+  );
+  assert.match(dashboard, /api\.listPageTemplates\(\)/);
+  assert.match(dashboard, /templates=\{templates\}/);
+  assert.doesNotMatch(dashboard, /const TEMPLATES/);
+  assert.doesNotMatch(dashboard, /Meeting note/);
+  assert.doesNotMatch(dashboard, />\s*Template\s*<select/);
+  assert.match(modal, /className="new-page-template"/);
+  assert.match(modal, /await onSubmit\(title, template\)/);
 });
 
 test("color span markup survives the configured Markdown HTML round trip", () => {

@@ -29,6 +29,8 @@ type Note struct {
 	Path        string         `json:"path"`
 	Title       string         `json:"title"`
 	PageID      string         `json:"pageId,omitempty"`
+	Tag         string         `json:"tag,omitempty"`
+	TagColor    string         `json:"tagColor,omitempty"`
 	Icon        string         `json:"icon,omitempty"`
 	Cover       *PageCover     `json:"cover,omitempty"`
 	Markdown    string         `json:"markdown"`
@@ -52,6 +54,8 @@ type PageCard struct {
 	PageID     string     `json:"pageId"`
 	Path       string     `json:"path"`
 	Title      string     `json:"title"`
+	Tag        string     `json:"tag"`
+	TagColor   string     `json:"tagColor"`
 	Icon       string     `json:"icon,omitempty"`
 	Cover      *PageCover `json:"cover,omitempty"`
 	CreatedAt  int64      `json:"createdAt"`
@@ -62,6 +66,13 @@ type PageCard struct {
 // in Rockion's dashboard-view sidecar so user frontmatter is not rewritten.
 type DashboardView struct {
 	View    string `json:"view"`              // gallery | list
-	SortBy  string `json:"sortBy,omitempty"`  // title | created | modified
+	SortBy  string `json:"sortBy,omitempty"`  // title | tag | created | modified
 	SortDir string `json:"sortDir,omitempty"` // asc | desc
+}
+
+// PageTemplate is a vault-local Markdown template available when creating a
+// managed project page. ID is the exact filename inside .rockion/templates.
+type PageTemplate struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
 }

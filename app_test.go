@@ -76,7 +76,7 @@ func TestRenameToTitleUpdatesManagedLinkWithoutFilenameChange(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(dashboard.Markdown, "[Question?](Question.md?") {
+	if !strings.Contains(dashboard.Markdown, "[Question?](Other/Question.md?") {
 		t.Fatalf("managed dashboard label was not updated: %q", dashboard.Markdown)
 	}
 }

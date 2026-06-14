@@ -6,6 +6,16 @@ All notable changes to Rockion are documented here. This project adheres to
 ## [Unreleased]
 
 ### Added
+- Add vault-local page templates in `.rockion/templates/`. Template filenames
+  populate the New Page menu dynamically, custom YAML/body content is copied
+  into new pages, and `{{title}}` placeholders receive the entered page title.
+- Tag newly created pages with their source template, show color-coded tags on
+  Gallery cards and in a List-view column, and allow dashboards to sort by tag.
+  Blank and legacy pages use a gray Other tag; Bootstrap and Cheatsheet variants
+  use neon green and neon pink, with stable neon colors for custom templates.
+- Show the active page's template tag immediately left of the favorite star and
+  store newly created pages in project-local tag folders: `Other`, `Bootstraps`,
+  `Cheatsheets`, or a folder matching a custom template tag.
 - Add a Notion-style block menu, opened by clicking the drag grip (⋮⋮) beside a block:
   Turn into (paragraph, headings, bulleted/numbered/to-do lists, quote, code, callout),
   Color (cyberpunk text and background palette), Duplicate, and Delete. Colored runs are
@@ -42,6 +52,10 @@ All notable changes to Rockion are documented here. This project adheres to
   orphaned dashboard state.
 
 ### Changed
+- Move dashboard page-template selection into the New page dialog, directly
+  below the page-title field, for both New page entry points.
+- Replace hard-coded Blank, Task, and Meeting Note template logic with seeded
+  Markdown files that users can add or remove without restarting Rockion.
 - Split the main Wails, vault filesystem/media, and dashboard UI modules into
   focused files before further dashboard expansion.
 - Store dashboard layout and sorting preferences in

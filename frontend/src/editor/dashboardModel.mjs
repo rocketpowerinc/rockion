@@ -11,13 +11,16 @@ export function sortDashboardCards(cards, view) {
     } else if (sortBy === "created") {
       left = a.createdAt;
       right = b.createdAt;
+    } else if (sortBy === "tag") {
+      left = String(a.tag || "Other").toLowerCase();
+      right = String(b.tag || "Other").toLowerCase();
     } else {
       left = String(a.title).toLowerCase();
       right = String(b.title).toLowerCase();
     }
     if (left < right) return view.sortDir === "desc" ? 1 : -1;
     if (left > right) return view.sortDir === "desc" ? -1 : 1;
-    return 0;
+    return String(a.title).localeCompare(String(b.title));
   });
   return list;
 }

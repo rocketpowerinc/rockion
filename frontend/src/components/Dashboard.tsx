@@ -4,7 +4,14 @@ import {
   useMemo,
   useState,
 } from "react";
-import { api, type DashboardView, type Note, type PageCard, type PageCover } from "../api";
+import {
+  api,
+  type DashboardView,
+  type Note,
+  type PageCard,
+  type PageCover,
+  type PageTemplate,
+} from "../api";
 import { coverBackground } from "../editor/coverStyles.mjs";
 import {
   reorderedDashboardIDs,
@@ -24,12 +31,6 @@ interface Props {
   onSetIcon: (path: string, icon: string) => void;
   refreshVersion: number;
 }
-
-const TEMPLATES: { id: string; label: string }[] = [
-  { id: "", label: "Blank" },
-  { id: "task", label: "Task" },
-  { id: "meeting", label: "Meeting note" },
-];
 
 type ViewKind = "gallery" | "list";
 
@@ -53,7 +54,7 @@ export default function Dashboard({
   const [view, setView] = useState<DashboardView>({ view: "gallery" });
   const [loading, setLoading] = useState(true);
   const [newOpen, setNewOpen] = useState(false);
-  const [template, setTemplate] = useState("");
+  const [templates, setTemplates] = useState<PageTemplate[]>([]);
   const [coverPickerOpen, setCoverPickerOpen] = useState(false);
   const [dashCoverURL, setDashCoverURL] = useState("");
 
@@ -145,9 +146,11 @@ export default function Dashboard({
   }, [cards, view]);
 
   const createPage = useCallback(
-    async (title: string) => {
+    async (title: string, template: string) => {
       try {
-        const created = await api.createSubPageFromTemplate(dashboardPath, title, template);
+        const created = template
+          ? await api.createSubPageFromTemplate(dashboardPath, title, template)
+          : await api.createSubPage(dashboardPath, title);
         setNewOpen(false);
         onRefreshTree();
         await reload();
@@ -157,8 +160,19 @@ export default function Dashboard({
         throw reason;
       }
     },
-    [dashboardPath, template, onOpenPage, onError, onRefreshTree, reload]
+    [dashboardPath, onOpenPage, onError, onRefreshTree, reload]
   );
+
+  const openNewPage = useCallback(async () => {
+    try {
+      const available = await api.listPageTemplates();
+      setTemplates(Array.isArray(available) ? available : []);
+      setNewOpen(true);
+      onError(null);
+    } catch (reason) {
+      onError(`Couldn't load page templates: ${String(reason)}`);
+    }
+  }, [onError]);
 
   const reorder = useCallback(
     async (fromId: string, toId: string) => {
@@ -276,6 +290,7 @@ export default function Dashboard({
                 >
                   <option value="">Manual</option>
                   <option value="title">Title</option>
+                  <option value="tag">Tag</option>
                   <option value="created">Created</option>
                   <option value="modified">Modified</option>
                 </select>
@@ -291,17 +306,7 @@ export default function Dashboard({
                   {view.sortDir === "desc" ? "↓" : "↑"}
                 </button>
               )}
-              <label className="db-control">
-                Template
-                <select value={template} onChange={(e) => setTemplate(e.target.value)}>
-                  {TEMPLATES.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button className="primary db-new" onClick={() => setNewOpen(true)}>
+              <button className="primary db-new" onClick={() => void openNewPage()}>
                 + New page
               </button>
             </div>
@@ -313,7 +318,7 @@ export default function Dashboard({
         ) : cards.length === 0 ? (
           <div className="db-empty">
             <p>No pages yet.</p>
-            <button className="primary" onClick={() => setNewOpen(true)}>
+            <button className="primary" onClick={() => void openNewPage()}>
               Create your first page
             </button>
           </div>
@@ -325,13 +330,18 @@ export default function Dashboard({
             onOpen={onOpenPage}
             onDelete={(card) => void deletePage(card)}
             onReorder={(fromID, toID) => void reorder(fromID, toID)}
-            onNew={() => setNewOpen(true)}
+            onNew={() => void openNewPage()}
           />
         )}
       </div>
 
       {newOpen && (
-        <NewPageModal itemName="page" onSubmit={createPage} onClose={() => setNewOpen(false)} />
+        <NewPageModal
+          itemName="page"
+          templates={templates}
+          onSubmit={createPage}
+          onClose={() => setNewOpen(false)}
+        />
       )}
       {coverPickerOpen && (
         <CoverPicker

@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
 } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { editorExtensions } from "../editor/extensions";
@@ -23,7 +24,9 @@ import {
 } from "../editor/pagePaths.mjs";
 import { setCurrentPagePath } from "../editor/pageIcons";
 import CoverPicker from "./CoverPicker";
+import CoverRepositionControls from "./CoverRepositionControls";
 import { coverBackground } from "../editor/coverStyles.mjs";
+import { coverPositionFromDrag } from "../editor/coverPosition.mjs";
 import PageTag from "./PageTag";
 
 interface Props {
@@ -103,6 +106,15 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
   const [subPagePromptOpen, setSubPagePromptOpen] = useState(false);
   const [coverPickerOpen, setCoverPickerOpen] = useState(false);
   const [coverImageDataURL, setCoverImageDataURL] = useState("");
+  const [coverRepositioning, setCoverRepositioning] = useState(false);
+  const [coverDraftPosition, setCoverDraftPosition] = useState(50);
+  const [coverPositionSaving, setCoverPositionSaving] = useState(false);
+  const coverDrag = useRef({
+    pointerId: -1,
+    startY: 0,
+    startPosition: 50,
+    height: 1,
+  });
 
   const clearSaveTimer = useCallback(() => {
     if (saveTimer.current !== null) {
@@ -155,6 +167,7 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
   useEffect(() => {
     let cancelled = false;
     setCoverImageDataURL("");
+    setCoverRepositioning(false);
     if (!note || note.cover?.kind !== "image") return () => {};
     void api
       .coverImageDataURL(note.path)
@@ -305,6 +318,65 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
       value: asset,
       position: 50,
     });
+  }
+
+  function startCoverReposition() {
+    setCoverDraftPosition(note?.cover?.position ?? 50);
+    setCoverRepositioning(true);
+  }
+
+  function cancelCoverReposition() {
+    setCoverRepositioning(false);
+    setCoverDraftPosition(note?.cover?.position ?? 50);
+  }
+
+  async function saveCoverPosition() {
+    if (!note?.cover || note.cover.kind !== "image") return;
+    setCoverPositionSaving(true);
+    try {
+      await setPageCover({ ...note.cover, position: coverDraftPosition });
+      setCoverRepositioning(false);
+    } catch (reason) {
+      setSaveError(`Couldn't reposition the page cover: ${String(reason)}`);
+    } finally {
+      setCoverPositionSaving(false);
+    }
+  }
+
+  function beginCoverDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    if (
+      !coverRepositioning ||
+      (event.target as HTMLElement).closest(".cover-reposition-ui")
+    ) {
+      return;
+    }
+    event.preventDefault();
+    coverDrag.current = {
+      pointerId: event.pointerId,
+      startY: event.clientY,
+      startPosition: coverDraftPosition,
+      height: event.currentTarget.getBoundingClientRect().height,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function moveCoverDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!coverRepositioning || coverDrag.current.pointerId !== event.pointerId) return;
+    setCoverDraftPosition(
+      coverPositionFromDrag(
+        coverDrag.current.startPosition,
+        event.clientY - coverDrag.current.startY,
+        coverDrag.current.height
+      )
+    );
+  }
+
+  function endCoverDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    if (coverDrag.current.pointerId !== event.pointerId) return;
+    coverDrag.current.pointerId = -1;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
   }
 
   function handleImagePaste(event: ClipboardEvent): boolean {
@@ -600,25 +672,44 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
     <>
       {note.cover && pageCoverBackground && (
         <div
-          className="page-cover"
+          className={`page-cover ${coverRepositioning ? "is-repositioning" : ""}`}
           style={{
             background: pageCoverBackground,
-            backgroundPosition: `center ${note.cover.position ?? 50}%`,
+            backgroundPosition: `center ${
+              coverRepositioning ? coverDraftPosition : note.cover.position ?? 50
+            }%`,
           }}
+          onPointerDown={beginCoverDrag}
+          onPointerMove={moveCoverDrag}
+          onPointerUp={endCoverDrag}
+          onPointerCancel={endCoverDrag}
         >
-          <div className="page-cover-actions">
-            <button type="button" onClick={() => setCoverPickerOpen(true)}>
-              Change cover
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                void setPageCover({ kind: "", value: "", position: 50 })
-              }
-            >
-              Remove
-            </button>
-          </div>
+          {coverRepositioning ? (
+            <CoverRepositionControls
+              saving={coverPositionSaving}
+              onSave={() => void saveCoverPosition()}
+              onCancel={cancelCoverReposition}
+            />
+          ) : (
+            <div className="page-cover-actions">
+              <button type="button" onClick={() => setCoverPickerOpen(true)}>
+                Change cover
+              </button>
+              {note.cover.kind === "image" && (
+                <button type="button" onClick={startCoverReposition}>
+                  Reposition
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() =>
+                  void setPageCover({ kind: "", value: "", position: 50 })
+                }
+              >
+                Remove
+              </button>
+            </div>
+          )}
         </div>
       )}
       <div className={`page-header ${note.cover ? "has-cover" : ""}`}>

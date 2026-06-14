@@ -1,8 +1,10 @@
 import type { Editor, Range } from "@tiptap/core";
+import { matchesSlashSearch } from "./slashSearch.mjs";
 
 export interface SlashItem {
   title: string;
   hint: string;
+  aliases?: string[];
   command: (props: { editor: Editor; range: Range }) => void;
 }
 
@@ -40,6 +42,7 @@ export const slashItems: SlashItem[] = [
   {
     title: "To-do",
     hint: "Checklist item",
+    aliases: ["todo", "to do", "task", "checkbox", "checklist"],
     command: ({ editor, range }) =>
       editor.chain().focus().deleteRange(range).toggleTaskList().run(),
   },
@@ -98,6 +101,5 @@ export const slashItems: SlashItem[] = [
 ];
 
 export function filterSlashItems(query: string): SlashItem[] {
-  const q = query.toLowerCase();
-  return slashItems.filter((i) => i.title.toLowerCase().includes(q)).slice(0, 10);
+  return slashItems.filter((item) => matchesSlashSearch(item, query)).slice(0, 10);
 }

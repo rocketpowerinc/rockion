@@ -10,6 +10,10 @@ import {
   backgroundColorStyle,
   textColorStyle,
 } from "../src/editor/colorMarkup.mjs";
+import {
+  clampCoverPosition,
+  coverPositionFromDrag,
+} from "../src/editor/coverPosition.mjs";
 
 const cards = [
   { pageId: "b", title: "Beta", tag: "Other", createdAt: 20, modifiedAt: 10 },
@@ -56,6 +60,34 @@ test("dashboard cards expose deletion, lazy thumbnails, and manual-only dragging
   assert.match(source, /<PageTag tag=\{card\.tag\} color=\{card\.tagColor\}/);
   assert.match(source, /className="db-list-header"/);
   assert.match(source, />Tag<\/span>/);
+  assert.match(source, /objectPosition:\s*`center \$\{card\.cover\?\.position \?\? 50\}%`/);
+  assert.match(source, /<img[\s\S]*src=\{thumbnail\}/);
+});
+
+test("cover repositioning converts vertical drag into a bounded saved position", () => {
+  assert.equal(coverPositionFromDrag(50, -50, 200), 75);
+  assert.equal(coverPositionFromDrag(50, 50, 200), 25);
+  assert.equal(clampCoverPosition(49.130434782608695), 49);
+  assert.equal(clampCoverPosition(-10), 0);
+  assert.equal(clampCoverPosition(140), 100);
+
+  const editor = fs.readFileSync(
+    new URL("../src/components/Editor.tsx", import.meta.url),
+    "utf8"
+  );
+  const dashboard = fs.readFileSync(
+    new URL("../src/components/Dashboard.tsx", import.meta.url),
+    "utf8"
+  );
+  const controls = fs.readFileSync(
+    new URL("../src/components/CoverRepositionControls.tsx", import.meta.url),
+    "utf8"
+  );
+  assert.match(editor, /Reposition/);
+  assert.match(controls, /Save position/);
+  assert.match(controls, /Drag image to reposition/);
+  assert.match(dashboard, /Reposition/);
+  assert.match(dashboard, /coverPositionFromDrag/);
 });
 
 test("opened managed pages show their template tag beside the favorite star", () => {

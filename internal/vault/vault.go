@@ -48,6 +48,33 @@ func Open(root string) (*Vault, error) {
 	return &Vault{Root: filepath.Clean(absolute)}, nil
 }
 
+// Create makes a new vault directory under an existing parent folder.
+func Create(parent, title string) (*Vault, error) {
+	name, err := projectName(strings.TrimSpace(title))
+	if err != nil {
+		return nil, errors.New(
+			strings.NewReplacer("project", "vault", "Project", "Vault").Replace(err.Error()),
+		)
+	}
+	parentVault, err := Open(parent)
+	if err != nil {
+		return nil, fmt.Errorf("invalid vault location: %w", err)
+	}
+	root := filepath.Join(parentVault.Root, name)
+	if err := os.Mkdir(root, 0o755); err != nil {
+		if errors.Is(err, os.ErrExist) {
+			return nil, fmt.Errorf("vault already exists: %s", name)
+		}
+		return nil, err
+	}
+	created, err := Open(root)
+	if err != nil {
+		_ = os.Remove(root)
+		return nil, err
+	}
+	return created, nil
+}
+
 func (v *Vault) Info() model.VaultInfo {
 	return model.VaultInfo{Path: v.Root, Name: filepath.Base(v.Root)}
 }

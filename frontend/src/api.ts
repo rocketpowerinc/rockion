@@ -93,6 +93,8 @@ export interface UpdateInfo {
 export const api = {
   isNativeRuntime: (): boolean => hasWailsRuntime(),
   pickVault: (): Promise<VaultInfo> => App.PickVault(),
+  createVault: (name: string): Promise<VaultInfo> => App.CreateVault(name),
+  closeVault: (): Promise<void> => App.CloseVault(),
   openVault: (path: string): Promise<VaultInfo> => App.OpenVault(path),
   listTree: (): Promise<TreeNode[]> => App.ListTree(),
   listPages: (): Promise<TreeNode[]> => App.ListPages(),

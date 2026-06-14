@@ -2,7 +2,9 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
+  type PointerEvent as ReactPointerEvent,
 } from "react";
 import {
   api,
@@ -13,12 +15,14 @@ import {
   type PageTemplate,
 } from "../api";
 import { coverBackground } from "../editor/coverStyles.mjs";
+import { coverPositionFromDrag } from "../editor/coverPosition.mjs";
 import {
   reorderedDashboardIDs,
   sortDashboardCards,
 } from "../editor/dashboardModel.mjs";
 import NewPageModal from "./NewPageModal";
 import CoverPicker from "./CoverPicker";
+import CoverRepositionControls from "./CoverRepositionControls";
 import DashboardCards from "./DashboardCards";
 import EmojiPicker from "./EmojiPicker";
 
@@ -57,10 +61,20 @@ export default function Dashboard({
   const [templates, setTemplates] = useState<PageTemplate[]>([]);
   const [coverPickerOpen, setCoverPickerOpen] = useState(false);
   const [dashCoverURL, setDashCoverURL] = useState("");
+  const [coverRepositioning, setCoverRepositioning] = useState(false);
+  const [coverDraftPosition, setCoverDraftPosition] = useState(50);
+  const [coverPositionSaving, setCoverPositionSaving] = useState(false);
+  const coverDrag = useRef({
+    pointerId: -1,
+    startY: 0,
+    startPosition: 50,
+    height: 1,
+  });
 
   // Resolve the dashboard page's own cover (color/gradient need no fetch).
   useEffect(() => {
     let cancelled = false;
+    setCoverRepositioning(false);
     if (note.cover && note.cover.kind === "image") {
       void api
         .coverImageDataURL(note.path)
@@ -104,6 +118,63 @@ export default function Dashboard({
     () => setCover({ kind: "", value: "", position: 50 }),
     [setCover]
   );
+
+  const startCoverReposition = useCallback(() => {
+    setCoverDraftPosition(note.cover?.position ?? 50);
+    setCoverRepositioning(true);
+  }, [note.cover?.position]);
+
+  const cancelCoverReposition = useCallback(() => {
+    setCoverRepositioning(false);
+    setCoverDraftPosition(note.cover?.position ?? 50);
+  }, [note.cover?.position]);
+
+  const saveCoverPosition = useCallback(async () => {
+    if (!note.cover || note.cover.kind !== "image") return;
+    setCoverPositionSaving(true);
+    try {
+      await setCover({ ...note.cover, position: coverDraftPosition });
+      setCoverRepositioning(false);
+    } finally {
+      setCoverPositionSaving(false);
+    }
+  }, [coverDraftPosition, note.cover, setCover]);
+
+  function beginCoverDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    if (
+      !coverRepositioning ||
+      (event.target as HTMLElement).closest(".cover-reposition-ui")
+    ) {
+      return;
+    }
+    event.preventDefault();
+    coverDrag.current = {
+      pointerId: event.pointerId,
+      startY: event.clientY,
+      startPosition: coverDraftPosition,
+      height: event.currentTarget.getBoundingClientRect().height,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function moveCoverDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!coverRepositioning || coverDrag.current.pointerId !== event.pointerId) return;
+    setCoverDraftPosition(
+      coverPositionFromDrag(
+        coverDrag.current.startPosition,
+        event.clientY - coverDrag.current.startY,
+        coverDrag.current.height
+      )
+    );
+  }
+
+  function endCoverDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    if (coverDrag.current.pointerId !== event.pointerId) return;
+    coverDrag.current.pointerId = -1;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }
 
   const reload = useCallback(async () => {
     try {
@@ -221,20 +292,41 @@ export default function Dashboard({
     <div className="dashboard">
       {note.cover && dashCoverBackground && (
         <div
-          className="page-cover db-cover"
+          className={`page-cover db-cover ${
+            coverRepositioning ? "is-repositioning" : ""
+          }`}
           style={{
             background: dashCoverBackground,
-            backgroundPosition: `center ${note.cover.position ?? 50}%`,
+            backgroundPosition: `center ${
+              coverRepositioning ? coverDraftPosition : note.cover.position ?? 50
+            }%`,
           }}
+          onPointerDown={beginCoverDrag}
+          onPointerMove={moveCoverDrag}
+          onPointerUp={endCoverDrag}
+          onPointerCancel={endCoverDrag}
         >
-          <div className="page-cover-actions">
-            <button type="button" onClick={() => setCoverPickerOpen(true)}>
-              Change cover
-            </button>
-            <button type="button" onClick={() => void removeCover()}>
-              Remove
-            </button>
-          </div>
+          {coverRepositioning ? (
+            <CoverRepositionControls
+              saving={coverPositionSaving}
+              onSave={() => void saveCoverPosition()}
+              onCancel={cancelCoverReposition}
+            />
+          ) : (
+            <div className="page-cover-actions">
+              <button type="button" onClick={() => setCoverPickerOpen(true)}>
+                Change cover
+              </button>
+              {note.cover.kind === "image" && (
+                <button type="button" onClick={startCoverReposition}>
+                  Reposition
+                </button>
+              )}
+              <button type="button" onClick={() => void removeCover()}>
+                Remove
+              </button>
+            </div>
+          )}
         </div>
       )}
       <div className="db-content">

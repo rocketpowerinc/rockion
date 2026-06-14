@@ -106,6 +106,31 @@ func (a *App) PickVault() (model.VaultInfo, error) {
 	return a.OpenVault(dir)
 }
 
+// CreateVault asks for a parent folder, creates a named vault there, and opens it.
+func (a *App) CreateVault(name string) (model.VaultInfo, error) {
+	parent, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "Choose where to create the vault",
+	})
+	if err != nil {
+		return model.VaultInfo{}, err
+	}
+	if parent == "" {
+		return model.VaultInfo{}, errors.New("no vault location selected")
+	}
+	created, err := vault.Create(parent, name)
+	if err != nil {
+		return model.VaultInfo{}, err
+	}
+	return a.OpenVault(created.Root)
+}
+
+// CloseVault releases the active vault and its background resources.
+func (a *App) CloseVault() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.closeVault()
+}
+
 // OpenVault opens a vault at the given path, builds the index, and starts watching.
 func (a *App) OpenVault(path string) (model.VaultInfo, error) {
 	a.mu.Lock()

@@ -27,6 +27,46 @@ func openTestVault(t *testing.T) *Vault {
 	return v
 }
 
+func TestCreateVaultCreatesSafeNamedDirectory(t *testing.T) {
+	parent, err := os.MkdirTemp(".", ".vault-parent-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(parent) })
+
+	created, err := Create(parent, "My Vault")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if created.Info().Name != "My Vault" {
+		t.Fatalf("unexpected vault name: %q", created.Info().Name)
+	}
+	info, err := os.Stat(created.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !info.IsDir() {
+		t.Fatalf("created vault is not a directory: %s", created.Root)
+	}
+	if _, err := Create(parent, "My Vault"); err == nil {
+		t.Fatal("duplicate vault creation unexpectedly succeeded")
+	}
+}
+
+func TestCreateVaultRejectsUnsafeNames(t *testing.T) {
+	parent, err := os.MkdirTemp(".", ".vault-parent-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(parent) })
+
+	for _, name := range []string{"", ".", "..", "CON"} {
+		if _, err := Create(parent, name); err == nil {
+			t.Fatalf("Create(%q) unexpectedly succeeded", name)
+		}
+	}
+}
+
 func TestWritePreservesFrontmatter(t *testing.T) {
 	v := openTestVault(t)
 	path := filepath.Join(v.Root, "note.md")

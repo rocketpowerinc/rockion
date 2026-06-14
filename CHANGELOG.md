@@ -6,6 +6,22 @@ All notable changes to Rockion are documented here. This project adheres to
 ## [Unreleased]
 
 ### Added
+- Add image-cover repositioning to pages and project dashboards. Users can drag
+  the cover vertically, save or cancel the framing, and see the saved position
+  reflected in dashboard gallery thumbnails.
+- Add a sidebar home button that saves pending edits, closes the active vault
+  and its background resources, and returns to the vault landing dashboard.
+- Replace the minimal vault picker with a responsive welcome dashboard showing
+  recently opened and pinned vaults, safe named vault creation, a quick-start
+  guide, encrypted backup import, and locally cached vault statistics.
+- Compact the welcome dashboard so Vault Safety and Local Overview sit side by
+  side with the Pinned Vaults and Quick-start cards on wider windows.
+- Add a GitHub repository link to the welcome dashboard header.
+- Arrange Local Overview statistics in a compact two-by-two grid so values and
+  labels remain readable inside the smaller welcome card.
+- Increase the default desktop window to 1320 by 900 pixels and tighten welcome
+  page spacing so the complete dashboard is visible without initial scrolling.
+- Add theme-aware scrollbars with dark gray tracks and thumbs in dark mode.
 - Add vault-local page templates in `.rockion/templates/`. Template filenames
   populate the New Page menu dynamically, custom YAML/body content is copied
   into new pages, and `{{title}}` placeholders receive the entered page title.
@@ -76,6 +92,12 @@ All notable changes to Rockion are documented here. This project adheres to
 - Drop the page "Date" property — it had no behavior and went unused.
 
 ### Fixed
+- Render gallery image covers with `object-position` using the page's saved
+  vertical framing, so cards match the repositioned cover shown on the page.
+- Round dragged cover positions to whole percentages before sending them through
+  Wails, preventing fractional values from failing Go integer decoding.
+- Make slash-command search punctuation-insensitive and add common To-do
+  aliases, so `todo`, `to do`, `task`, `checkbox`, and `checklist` find To-do.
 - Align to-do checkboxes with their first text line and strike through only the
   checked item’s own content, leaving nested child tasks independently styled.
 - Make every Block menu “Turn into” conversion structural and reliable,

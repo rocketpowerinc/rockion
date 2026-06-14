@@ -6,6 +6,7 @@ import QuickSwitcher from "./components/QuickSwitcher";
 import NewPageModal from "./components/NewPageModal";
 import Dashboard from "./components/Dashboard";
 import VaultTransferModal from "./components/VaultTransferModal";
+import WelcomeDashboard from "./components/WelcomeDashboard";
 import Breadcrumbs, {
   type BreadcrumbItem,
 } from "./components/Breadcrumbs";
@@ -23,6 +24,14 @@ import {
   normalizeWritingLanguage,
   type WritingLanguage,
 } from "./writingLanguage";
+import {
+  loadVaultHistory,
+  rememberVault,
+  saveVaultHistory,
+  toggleVaultPinned,
+  updateVaultStats,
+  type SavedVault,
+} from "./vaultHistory.mjs";
 
 export default function App() {
   const nativeRuntime = api.isNativeRuntime();
@@ -35,11 +44,16 @@ export default function App() {
   const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [newVaultOpen, setNewVaultOpen] = useState(false);
+  const [savedVaults, setSavedVaults] = useState<SavedVault[]>(() =>
+    loadVaultHistory()
+  );
   const [vaultTransfer, setVaultTransfer] = useState<
     { mode: "export" } | { mode: "import"; archivePath: string } | null
   >(null);
   const [error, setError] = useState<string | null>(null);
   const editorRef = useRef<EditorHandle>(null);
+  const vaultRef = useRef<VaultInfo | null>(null);
   const closing = useRef(false);
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     const saved =
@@ -83,6 +97,29 @@ export default function App() {
     return (await editorRef.current?.flushSave()) ?? true;
   }, []);
 
+  const changeSavedVaults = useCallback(
+    (change: (current: SavedVault[]) => SavedVault[]) => {
+      setSavedVaults((current) => {
+        const next = change(current);
+        saveVaultHistory(next);
+        return next;
+      });
+    },
+    []
+  );
+
+  const activateVault = useCallback(
+    (info: VaultInfo) => {
+      vaultRef.current = info;
+      setVault(info);
+      changeSavedVaults((current) => rememberVault(current, info));
+      setNote(null);
+      setNavigationHistory([]);
+      setError(null);
+    },
+    [changeSavedVaults]
+  );
+
   const pageRefs = useMemo(
     () =>
       pages.map((page) => ({
@@ -124,6 +161,20 @@ export default function App() {
       setTree(Array.isArray(t) ? t : []);
       setPages(Array.isArray(allPages) ? allPages : []);
       setFavorites(Array.isArray(savedFavorites) ? savedFavorites : []);
+      const activeVault = vaultRef.current;
+      if (activeVault) {
+        changeSavedVaults((current) =>
+          updateVaultStats(current, activeVault.path, {
+            pageCount: Array.isArray(allPages) ? allPages.length : 0,
+            projectCount: Array.isArray(t)
+              ? t.filter((item) => item.isDir).length
+              : 0,
+            favoriteCount: Array.isArray(savedFavorites)
+              ? savedFavorites.length
+              : 0,
+          })
+        );
+      }
       setError(null);
     } catch (e) {
       console.error("listTree failed:", e);
@@ -132,7 +183,7 @@ export default function App() {
       setPages([]);
       setFavorites([]);
     }
-  }, []);
+  }, [changeSavedVaults]);
 
   const toggleFavorite = useCallback(
     async (path: string) => {
@@ -176,15 +227,68 @@ export default function App() {
     if (!(await flushEditor())) return;
     try {
       const info = await api.pickVault();
-      setVault(info);
-      setNote(null);
-      setNavigationHistory([]);
+      activateVault(info);
       await refreshTree();
     } catch (e) {
       console.error("openVault failed:", e);
       setError(`Couldn't open vault: ${String(e)}`);
     }
-  }, [flushEditor, nativeRuntime, refreshTree]);
+  }, [activateVault, flushEditor, nativeRuntime, refreshTree]);
+
+  const openRecentVault = useCallback(
+    async (path: string) => {
+      if (!nativeRuntime || !(await flushEditor())) return;
+      try {
+        const info = await api.openVault(path);
+        activateVault(info);
+        await refreshTree();
+      } catch (reason) {
+        setError(`Couldn't open saved vault: ${String(reason)}`);
+      }
+    },
+    [activateVault, flushEditor, nativeRuntime, refreshTree]
+  );
+
+  const createVault = useCallback(
+    async (name: string) => {
+      if (!nativeRuntime || !(await flushEditor())) return;
+      try {
+        const info = await api.createVault(name.trim());
+        setNewVaultOpen(false);
+        activateVault(info);
+        await refreshTree();
+      } catch (reason) {
+        setError(`Couldn't create vault: ${String(reason)}`);
+        throw reason;
+      }
+    },
+    [activateVault, flushEditor, nativeRuntime, refreshTree]
+  );
+
+  const togglePinnedVault = useCallback(
+    (path: string) => {
+      changeSavedVaults((current) => toggleVaultPinned(current, path));
+    },
+    [changeSavedVaults]
+  );
+
+  const goToVaultHome = useCallback(async () => {
+    if (!(await flushEditor())) return;
+    try {
+      await api.closeVault();
+      vaultRef.current = null;
+      setVault(null);
+      setTree([]);
+      setPages([]);
+      setFavorites([]);
+      setNote(null);
+      setNavigationHistory([]);
+      setVaultRevision(0);
+      setError(null);
+    } catch (reason) {
+      setError(`Couldn't return to vault home: ${String(reason)}`);
+    }
+  }, [flushEditor]);
 
   const checkForUpdate = useCallback(async () => {
     try {
@@ -250,14 +354,11 @@ export default function App() {
         return;
       }
       const info = await api.importVault(vaultTransfer.archivePath, password);
-      setVault(info);
-      setNote(null);
-      setNavigationHistory([]);
+      activateVault(info);
       setVaultTransfer(null);
-      setError(null);
       await refreshTree();
     },
-    [refreshTree, vaultTransfer]
+    [activateVault, refreshTree, vaultTransfer]
   );
 
   const openNote = useCallback(async (path: string, historyIndex?: number) => {
@@ -329,12 +430,16 @@ export default function App() {
         setSwitcherOpen(true);
       } else if (mod && (e.key === "n" || e.key === "N")) {
         e.preventDefault();
-        void newProject();
+        if (vaultRef.current) {
+          void newProject();
+        } else if (nativeRuntime) {
+          setNewVaultOpen(true);
+        }
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [newProject]);
+  }, [nativeRuntime, newProject]);
 
   // React to external vault changes and index readiness.
   useEffect(() => {
@@ -369,20 +474,35 @@ export default function App() {
 
   if (!vault) {
     return (
-      <div className="welcome">
-        <img className="hero-img" src="/Rockion-Hero.png" alt="Rockion" />
-        <h1>Rockion</h1>
-        <p>A local-first markdown workspace.</p>
-        {!nativeRuntime && (
-          <p className="browser-preview-note">
-            Browser preview mode. Vault access and native file dialogs are available
-            in the Rockion desktop window started by <code>wails dev</code>.
-          </p>
+      <>
+        <WelcomeDashboard
+          nativeRuntime={nativeRuntime}
+          vaults={savedVaults}
+          error={error}
+          onOpenVault={() => void openVault()}
+          onCreateVault={() => setNewVaultOpen(true)}
+          onOpenRecent={(path) => void openRecentVault(path)}
+          onTogglePinned={togglePinnedVault}
+          onImportVault={() => void beginVaultImport()}
+          onOpenRepository={() =>
+            api.openExternal("https://github.com/rocketpowerinc/rockion")
+          }
+        />
+        {newVaultOpen && (
+          <NewPageModal
+            itemName="vault"
+            onSubmit={createVault}
+            onClose={() => setNewVaultOpen(false)}
+          />
         )}
-        <button className="primary" onClick={openVault} disabled={!nativeRuntime}>
-          {nativeRuntime ? "Open a vault folder" : "Desktop runtime required"}
-        </button>
-      </div>
+        {vaultTransfer && (
+          <VaultTransferModal
+            mode={vaultTransfer.mode}
+            onSubmit={submitVaultTransfer}
+            onClose={() => setVaultTransfer(null)}
+          />
+        )}
+      </>
     );
   }
 
@@ -399,6 +519,7 @@ export default function App() {
         onOpen={openNote}
         onSetIcon={setIcon}
         onNewProject={newProject}
+        onGoHome={() => void goToVaultHome()}
         onOpenVault={openVault}
         onToggleTheme={toggleTheme}
         onToggleWritingLanguage={() =>

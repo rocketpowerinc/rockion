@@ -4,7 +4,7 @@ import type { PageTemplate } from "../api";
 interface Props {
   onSubmit: (title: string, template: string) => Promise<void>;
   onClose: () => void;
-  itemName?: "page" | "project";
+  itemName?: "page" | "project" | "vault";
   templates?: PageTemplate[];
 }
 
@@ -17,7 +17,9 @@ export default function NewPageModal({
   itemName = "page",
   templates = [],
 }: Props) {
-  const [title, setTitle] = useState(itemName === "project" ? "New Project" : "Untitled");
+  const defaultTitle =
+    itemName === "project" ? "New Project" : itemName === "vault" ? "My Vault" : "Untitled";
+  const [title, setTitle] = useState(defaultTitle);
   const [template, setTemplate] = useState(templates[0]?.id ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,7 +55,13 @@ export default function NewPageModal({
         <input
           ref={inputRef}
           className="switcher-input"
-          placeholder={itemName === "project" ? "Project name" : "Page title"}
+          placeholder={
+            itemName === "project"
+              ? "Project name"
+              : itemName === "vault"
+                ? "Vault name"
+                : "Page title"
+          }
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => {

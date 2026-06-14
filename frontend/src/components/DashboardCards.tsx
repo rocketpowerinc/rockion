@@ -107,15 +107,25 @@ function LazyCardCover({ card }: { card: PageCard }) {
     };
   }, [card.path, card.cover?.kind, card.cover?.value, localImage]);
 
+  const generatedBackground = localImage
+    ? "var(--hover)"
+    : coverBackground(ready ? card.cover : undefined, thumbnail) || "var(--hover)";
+
   return (
     <div
       ref={ref}
       className="db-card-cover"
-      style={{
-        background:
-          coverBackground(ready ? card.cover : undefined, thumbnail) || "var(--hover)",
-      }}
-    />
+      style={{ background: generatedBackground }}
+    >
+      {localImage && ready && thumbnail && (
+        <img
+          src={thumbnail}
+          alt=""
+          draggable={false}
+          style={{ objectPosition: `center ${card.cover?.position ?? 50}%` }}
+        />
+      )}
+    </div>
   );
 }
 

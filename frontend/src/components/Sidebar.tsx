@@ -17,6 +17,7 @@ interface Props {
   onOpen: (path: string) => void;
   onSetIcon: (path: string, icon: string) => void;
   onNewProject: () => void;
+  onGoHome: () => void;
   onOpenVault: () => void;
   onToggleTheme: () => void;
   onToggleWritingLanguage: () => void;
@@ -37,6 +38,7 @@ export default function Sidebar({
   onOpen,
   onSetIcon,
   onNewProject,
+  onGoHome,
   onOpenVault,
   onToggleTheme,
   onToggleWritingLanguage,
@@ -90,6 +92,22 @@ export default function Sidebar({
           {vaultName || "Open vault…"}
         </button>
         <div className="sidebar-head-actions">
+          <button
+            className="icon-btn"
+            title="Back to vault home"
+            aria-label="Back to vault home"
+            onClick={onGoHome}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M4 10.5 12 4l8 6.5v8a1.5 1.5 0 0 1-1.5 1.5H15v-6H9v6H5.5A1.5 1.5 0 0 1 4 18.5z"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
           <button className="icon-btn" title="New project" onClick={onNewProject}>
             +
           </button>

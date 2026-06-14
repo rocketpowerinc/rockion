@@ -4,6 +4,10 @@ import test from "node:test";
 import MarkdownIt from "markdown-it";
 import { isSafeImageSource } from "../src/editor/imageSources.mjs";
 import { shouldHandleSlashMenuKey } from "../src/editor/slashMenuKeys.mjs";
+import {
+  matchesSlashSearch,
+  normalizeSlashSearch,
+} from "../src/editor/slashSearch.mjs";
 import nspell from "nspell";
 import englishDictionary from "dictionary-en";
 import frenchDictionary from "dictionary-fr";
@@ -95,6 +99,19 @@ test("an unmatched slash command does not block Enter", () => {
   assert.equal(shouldHandleSlashMenuKey("Enter", 0), false);
   assert.equal(shouldHandleSlashMenuKey("ArrowDown", 0), false);
   assert.equal(shouldHandleSlashMenuKey("Enter", 1), true);
+});
+
+test("to-do slash commands match common spellings and aliases", () => {
+  const item = {
+    title: "To-do",
+    hint: "Checklist item",
+    aliases: ["todo", "to do", "task", "checkbox", "checklist"],
+  };
+  assert.equal(normalizeSlashSearch("To-do"), "todo");
+  for (const query of ["todo", "to do", "to-do", "task", "checkbox", "checklist"]) {
+    assert.equal(matchesSlashSearch(item, query), true, query);
+  }
+  assert.equal(matchesSlashSearch(item, "quote"), false);
 });
 
 test("the editor enables offline English and French spellcheck", () => {

@@ -372,7 +372,7 @@ export default function App() {
       <div className="welcome">
         <img className="hero-img" src="/Rockion-Hero.png" alt="Rockion" />
         <h1>Rockion</h1>
-        <p>A local-first markdown workspace. Your notes stay plain files on disk.</p>
+        <p>A local-first markdown workspace.</p>
         {!nativeRuntime && (
           <p className="browser-preview-note">
             Browser preview mode. Vault access and native file dialogs are available

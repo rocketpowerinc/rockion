@@ -1853,6 +1853,9 @@ mark {
 .page-tag[data-color="orange"] {
   --tag-color: #ff8a00;
 }
+.page-tag[data-color="red"] {
+  --tag-color: #ff3131;
+}
 .page-tag[data-color="blue"] {
   --tag-color: #3d7eff;
 }

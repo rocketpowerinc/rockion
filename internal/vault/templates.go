@@ -2,6 +2,7 @@ package vault
 
 import (
 	"embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"hash/fnv"
@@ -15,17 +16,23 @@ import (
 )
 
 const (
-	pageTemplatesRel     = ".rockion/templates"
-	maxPageTemplateBytes = 1 << 20
-	templateTagKey       = "rockion_template_tag"
+	pageTemplatesRel         = ".rockion/templates"
+	defaultTemplatesStateRel = ".rockion/default-templates.json"
+	maxPageTemplateBytes     = 1 << 20
+	maxTemplateStateBytes    = 1 << 20
+	templateTagKey           = "rockion_template_tag"
 )
 
 //go:embed default_templates/*.md
 var defaultPageTemplates embed.FS
 
-// EnsurePageTemplates creates the vault-local template directory and seeds it
-// once. An existing directory is never re-seeded, so deleting a template keeps
-// it deleted.
+type defaultTemplatesState struct {
+	Seen []string `json:"seen"`
+}
+
+// EnsurePageTemplates creates the vault-local template directory and copies
+// each newly bundled default once. A manifest remembers defaults already seen,
+// so deleting one from the vault does not cause it to be restored later.
 func (v *Vault) EnsurePageTemplates() error {
 	dir, err := v.resolve(pageTemplatesRel, true)
 	if err != nil {
@@ -40,23 +47,34 @@ func (v *Vault) EnsurePageTemplates() error {
 		if !info.IsDir() {
 			return errors.New("page templates path is not a directory")
 		}
-		return nil
 	case !errors.Is(err, os.ErrNotExist):
 		return err
-	}
-
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return err
+	default:
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return err
+		}
 	}
 	if _, err := v.resolve(pageTemplatesRel, false); err != nil {
 		return err
+	}
+	state, err := v.readDefaultTemplatesState()
+	if err != nil {
+		return err
+	}
+	seen := make(map[string]bool, len(state.Seen))
+	for _, name := range state.Seen {
+		seen[name] = true
 	}
 	entries, err := defaultPageTemplates.ReadDir("default_templates")
 	if err != nil {
 		return err
 	}
+	changed := false
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.EqualFold(filepath.Ext(entry.Name()), ".md") {
+			continue
+		}
+		if seen[entry.Name()] {
 			continue
 		}
 		content, err := defaultPageTemplates.ReadFile("default_templates/" + entry.Name())
@@ -70,8 +88,72 @@ func (v *Vault) EnsurePageTemplates() error {
 		); err != nil && !errors.Is(err, os.ErrExist) {
 			return err
 		}
+		seen[entry.Name()] = true
+		changed = true
+	}
+	if changed || len(state.Seen) == 0 {
+		state.Seen = make([]string, 0, len(seen))
+		for name := range seen {
+			state.Seen = append(state.Seen, name)
+		}
+		sort.SliceStable(state.Seen, func(i, j int) bool {
+			return strings.ToLower(state.Seen[i]) < strings.ToLower(state.Seen[j])
+		})
+		if err := v.writeDefaultTemplatesState(state); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+func (v *Vault) readDefaultTemplatesState() (defaultTemplatesState, error) {
+	state := defaultTemplatesState{Seen: []string{}}
+	full, err := v.resolve(defaultTemplatesStateRel, true)
+	if err != nil {
+		return state, err
+	}
+	info, err := os.Lstat(full)
+	if errors.Is(err, os.ErrNotExist) {
+		return state, nil
+	}
+	if err != nil {
+		return state, err
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+		return state, errors.New("default template manifest must be a regular file")
+	}
+	if info.Size() > maxTemplateStateBytes {
+		return state, errors.New("default template manifest exceeds the 1 MB limit")
+	}
+	data, err := os.ReadFile(full)
+	if err != nil {
+		return state, err
+	}
+	if err := json.Unmarshal(data, &state); err != nil {
+		return state, fmt.Errorf("read default template manifest: %w", err)
+	}
+	if state.Seen == nil {
+		state.Seen = []string{}
+	}
+	return state, nil
+}
+
+func (v *Vault) writeDefaultTemplatesState(state defaultTemplatesState) error {
+	if err := v.ensureMetadataDir(); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(state, "", "  ")
+	if err != nil {
+		return err
+	}
+	if len(data) > maxTemplateStateBytes {
+		return errors.New("default template manifest exceeds the 1 MB limit")
+	}
+	full, err := v.resolve(defaultTemplatesStateRel, true)
+	if err != nil {
+		return err
+	}
+	return atomicWriteFile(full, data, 0o644)
 }
 
 // PageTemplates lists the current .md files from the vault template directory.
@@ -202,6 +284,20 @@ func templateTag(name string) string {
 		return "Other"
 	case "cheatsheet", "cheatsheets", "cheetsheet", "cheetsheets":
 		return "Cheatsheet"
+	case "prepper":
+		return "Prepper"
+	case "kids":
+		return "Kids"
+	case "health":
+		return "Health"
+	case "education":
+		return "Education"
+	case "gaming":
+		return "Gaming"
+	case "homelab":
+		return "Homelab"
+	case "bookmarks":
+		return "Bookmarks"
 	}
 	return label
 }
@@ -215,6 +311,20 @@ func templateTagColor(tag string) string {
 		return "green"
 	case "cheatsheet", "cheatsheets", "cheetsheet", "cheetsheets":
 		return "pink"
+	case "prepper":
+		return "orange"
+	case "kids":
+		return "yellow"
+	case "health":
+		return "purple"
+	case "education":
+		return "red"
+	case "gaming":
+		return "cyan"
+	case "homelab":
+		return "blue"
+	case "bookmarks":
+		return "lime"
 	}
 	palette := [...]string{"cyan", "yellow", "purple", "orange", "blue", "lime", "magenta"}
 	hash := fnv.New32a()
@@ -230,6 +340,20 @@ func templateTagFolder(tag string) (string, error) {
 		return "Bootstraps", nil
 	case "cheatsheet", "cheatsheets", "cheetsheet", "cheetsheets":
 		return "Cheatsheets", nil
+	case "prepper":
+		return "Prepper", nil
+	case "kids":
+		return "Kids", nil
+	case "health":
+		return "Health", nil
+	case "education":
+		return "Education", nil
+	case "gaming":
+		return "Gaming", nil
+	case "homelab":
+		return "Homelab", nil
+	case "bookmarks":
+		return "Bookmarks", nil
 	}
 	folder, err := projectName(tag)
 	if err != nil {

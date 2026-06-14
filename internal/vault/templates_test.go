@@ -73,6 +73,48 @@ func TestPageTemplatesSeedOnceAndTrackDirectoryChanges(t *testing.T) {
 	}
 }
 
+func TestPageTemplatesCatchUpExistingVaultOnce(t *testing.T) {
+	v := openTestVault(t)
+	dir := filepath.Join(v.Root, ".rockion", "templates")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(dir, "Blank.md"),
+		[]byte("# {{title}}\n"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	templates, err := v.PageTemplates()
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := map[string]bool{}
+	for _, template := range templates {
+		names[template.ID] = true
+	}
+	for _, name := range []string{"Bookmarks.md", "Homelab.md"} {
+		if !names[name] {
+			t.Fatalf("new bundled template %q was not copied into an existing vault", name)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(v.Root, defaultTemplatesStateRel)); err != nil {
+		t.Fatal("default template manifest was not created:", err)
+	}
+
+	if err := os.Remove(filepath.Join(dir, "Homelab.md")); err != nil {
+		t.Fatal(err)
+	}
+	if err := v.EnsurePageTemplates(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "Homelab.md")); !os.IsNotExist(err) {
+		t.Fatal("deleted default template was restored after being recorded")
+	}
+}
+
 func TestCreateManagedPageFromVaultTemplate(t *testing.T) {
 	v := openTestVault(t)
 	if _, err := v.CreateProject("Project"); err != nil {
@@ -136,6 +178,13 @@ func TestTemplateTagsAndColors(t *testing.T) {
 		{template: "Cheat Sheet.md", tag: "Cheatsheet", color: "pink"},
 		{template: "CheatSheets.md", tag: "Cheatsheet", color: "pink"},
 		{template: "Cheetsheet.md", tag: "Cheatsheet", color: "pink"},
+		{template: "Prepper.md", tag: "Prepper", color: "orange"},
+		{template: "Kids.md", tag: "Kids", color: "yellow"},
+		{template: "Health.md", tag: "Health", color: "purple"},
+		{template: "Education.md", tag: "Education", color: "red"},
+		{template: "Gaming.md", tag: "Gaming", color: "cyan"},
+		{template: "Homelab.md", tag: "Homelab", color: "blue"},
+		{template: "Bookmarks.md", tag: "Bookmarks", color: "lime"},
 	}
 	for _, test := range tests {
 		tag := templateTag(test.template)
@@ -165,6 +214,13 @@ func TestTemplateTagFolders(t *testing.T) {
 		{tag: "Bootstraps", want: "Bootstraps"},
 		{tag: "Cheatsheet", want: "Cheatsheets"},
 		{tag: "Cheat Sheet", want: "Cheatsheets"},
+		{tag: "Prepper", want: "Prepper"},
+		{tag: "Kids", want: "Kids"},
+		{tag: "Health", want: "Health"},
+		{tag: "Education", want: "Education"},
+		{tag: "Gaming", want: "Gaming"},
+		{tag: "Homelab", want: "Homelab"},
+		{tag: "Bookmarks", want: "Bookmarks"},
 		{tag: "Client Brief", want: "Client Brief"},
 	}
 	for _, test := range tests {
@@ -174,6 +230,41 @@ func TestTemplateTagFolders(t *testing.T) {
 		}
 		if got != test.want {
 			t.Errorf("templateTagFolder(%q) = %q, want %q", test.tag, got, test.want)
+		}
+	}
+}
+
+func TestBuiltInTemplatesCreateMatchingTagFolders(t *testing.T) {
+	v := openTestVault(t)
+	if _, err := v.CreateProject("Project"); err != nil {
+		t.Fatal(err)
+	}
+	if err := v.EnsurePageTemplates(); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{
+		"Prepper",
+		"Kids",
+		"Health",
+		"Education",
+		"Gaming",
+		"Homelab",
+		"Bookmarks",
+	} {
+		page, err := v.CreateManagedPageFromTemplate(
+			"Project/dashboard.md",
+			name+" Page",
+			name+".md",
+		)
+		if err != nil {
+			t.Fatalf("create %s page: %v", name, err)
+		}
+		wantPath := "Project/" + name + "/" + name + " Page.md"
+		if page.Path != wantPath {
+			t.Errorf("%s page path = %q, want %q", name, page.Path, wantPath)
+		}
+		if page.Tag != name {
+			t.Errorf("%s page tag = %q", name, page.Tag)
 		}
 	}
 }

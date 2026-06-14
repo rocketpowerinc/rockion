@@ -16,6 +16,15 @@ All notable changes to Rockion are documented here. This project adheres to
 - Show the active page's template tag immediately left of the favorite star and
   store newly created pages in project-local tag folders: `Other`, `Bootstraps`,
   `Cheatsheets`, or a folder matching a custom template tag.
+- Add stable Prepper, Kids, Health, and Education template tags with matching
+  project folder names and dedicated neon colors.
+- Add the Gaming template with a cyan tag and matching folder, change Prepper
+  to neon orange, and change Education to neon red.
+- Add Homelab and Bookmarks template mappings with matching folders and stable
+  neon blue and neon lime tags.
+- Sync newly bundled default templates into existing vaults once while tracking
+  seen defaults in `.rockion/default-templates.json`, so later user deletions
+  remain respected.
 - Add a Notion-style block menu, opened by clicking the drag grip (⋮⋮) beside a block:
   Turn into (paragraph, headings, bulleted/numbered/to-do lists, quote, code, callout),
   Color (cyberpunk text and background palette), Duplicate, and Delete. Colored runs are

@@ -241,7 +241,10 @@ markdown.
   sorting Gallery or List views by tag. The tag also appears beside the favorite star when a page
   is open. New pages are grouped under their project dashboard in a tag folder: Blank pages go to
   `Other/`, Bootstrap pages to `Bootstraps/`, Cheatsheet pages to `Cheatsheets/`, and custom
-  templates to a folder matching their tag. Blank and legacy pages use the gray `Other` tag.
+  templates to a folder matching their tag. The built-in Prepper, Kids, Health, Education,
+  Gaming, Homelab, and Bookmarks templates use matching tag and folder names. Blank and legacy
+  pages use the gray `Other` tag. Newly bundled defaults are copied into existing vaults once;
+  `.rockion/default-templates.json` remembers them so user-deleted defaults stay deleted.
 - **Dashboard covers** load bounded thumbnails on demand; the full validated image is only loaded
   for the active page cover.
 - **Page links** are plain markdown links. The icon + ↗ badge are added by a ProseMirror

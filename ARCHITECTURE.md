@@ -158,7 +158,9 @@ and disables drag reordering.
 Page templates live in `.rockion/templates/` and are listed from disk whenever
 the New Page dialog opens. The initial directory is seeded from the embedded
 Markdown files in `internal/vault/default_templates/`; once created, it is never
-re-seeded, so user additions and removals remain authoritative. Template reads
+blindly re-seeded. `.rockion/default-templates.json` tracks defaults already
+offered to the vault, allowing newly shipped defaults to be copied once while
+user deletions remain authoritative. Template reads
 reject traversal, symlinks, oversized files, and reserved managed-page metadata.
 Created pages store the selected filename stem in the managed
 `rockion_template_tag` frontmatter field. Dashboard cards derive a constrained

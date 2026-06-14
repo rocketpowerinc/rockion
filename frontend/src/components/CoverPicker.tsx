@@ -1,6 +1,5 @@
 import { useRef, useState } from "react";
 import type { PageCover } from "../api";
-import { api } from "../api";
 import { coverColors, coverGradients } from "../editor/coverStyles.mjs";
 
 interface Props {
@@ -18,7 +17,7 @@ export default function CoverPicker({
   onRemove,
   hasCover,
 }: Props) {
-  const [tab, setTab] = useState<"gallery" | "upload" | "unsplash">("gallery");
+  const [tab, setTab] = useState<"gallery" | "upload">("gallery");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -45,7 +44,7 @@ export default function CoverPicker({
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="cover-picker-tabs">
-          {(["gallery", "upload", "unsplash"] as const).map((name) => (
+          {(["gallery", "upload"] as const).map((name) => (
             <button
               key={name}
               className={tab === name ? "is-active" : ""}
@@ -113,25 +112,6 @@ export default function CoverPicker({
             >
               Choose an image
             </button>
-          </div>
-        )}
-
-        {tab === "unsplash" && (
-          <div className="cover-unsplash">
-            <p>
-              Integrated search requires a Rockion API proxy so Unsplash credentials
-              remain confidential and photographer attribution is recorded correctly.
-            </p>
-            <button
-              onClick={() =>
-                api.openExternal(
-                  "https://unsplash.com/?utm_source=rockion&utm_medium=referral"
-                )
-              }
-            >
-              Browse Unsplash
-            </button>
-            <span>Download a photo there, then add it through Upload.</span>
           </div>
         )}
 

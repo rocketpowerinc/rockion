@@ -1,4 +1,8 @@
 import { Mark, mergeAttributes } from "@tiptap/core";
+import {
+  backgroundColorStyle,
+  textColorStyle,
+} from "./colorMarkup.mjs";
 
 // Cyberpunk palette. Text colors are vivid neons; background colors are the same
 // hues at low alpha so they tint without hurting readability. Values are plain
@@ -32,7 +36,10 @@ export const TextColor = Mark.create({
       color: {
         default: null,
         parseHTML: (el) => (el as HTMLElement).style.color || null,
-        renderHTML: (attrs) => (attrs.color ? { style: `color: ${attrs.color}` } : {}),
+        renderHTML: (attrs) => {
+          const style = textColorStyle(attrs.color);
+          return style ? { style } : {};
+        },
       },
     };
   },
@@ -60,10 +67,10 @@ export const BgColor = Mark.create({
       background: {
         default: null,
         parseHTML: (el) => (el as HTMLElement).style.backgroundColor || null,
-        renderHTML: (attrs) =>
-          attrs.background
-            ? { style: `background-color: ${attrs.background}; border-radius: 3px; padding: 0 2px` }
-            : {},
+        renderHTML: (attrs) => {
+          const style = backgroundColorStyle(attrs.background);
+          return style ? { style } : {};
+        },
       },
     };
   },

@@ -2,20 +2,11 @@ package vault
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
-	"gopkg.in/yaml.v3"
-
 	"rockion/internal/model"
-)
-
-const (
-	viewKey    = "rockion_view"
-	sortKey    = "rockion_sort"
-	sortDirKey = "rockion_sort_dir"
 )
 
 // DashboardCards returns the managed pages of a dashboard as gallery cards, in
@@ -84,36 +75,6 @@ func (v *Vault) DashboardCards(dashboardRel string) ([]model.PageCard, error) {
 	return cards, nil
 }
 
-// DashboardView reads the persisted layout config from a dashboard's frontmatter.
-func (v *Vault) DashboardView(dashboardRel string) (model.DashboardView, error) {
-	note, err := v.Read(dashboardRel)
-	if err != nil {
-		return model.DashboardView{}, err
-	}
-	view := model.DashboardView{
-		View:    frontmatterString(note.Frontmatter[viewKey]),
-		SortBy:  frontmatterString(note.Frontmatter[sortKey]),
-		SortDir: frontmatterString(note.Frontmatter[sortDirKey]),
-	}
-	if view.View == "" {
-		view.View = "gallery"
-	}
-	return view, nil
-}
-
-// SetDashboardView persists the layout config into the dashboard's frontmatter.
-func (v *Vault) SetDashboardView(dashboardRel string, view model.DashboardView) error {
-	note, err := v.Read(dashboardRel)
-	if err != nil {
-		return err
-	}
-	return v.mutateFrontmatter(dashboardRel, note.Version, func(fm map[string]any) {
-		setOrDelete(fm, viewKey, view.View)
-		setOrDelete(fm, sortKey, view.SortBy)
-		setOrDelete(fm, sortDirKey, view.SortDir)
-	})
-}
-
 // ReorderManagedPages rewrites the order of managed links in the dashboard body
 // to match ids, leaving non-managed lines in place.
 func (v *Vault) ReorderManagedPages(dashboardRel string, ids []string) error {
@@ -165,60 +126,10 @@ func (v *Vault) ReorderManagedPages(dashboardRel string, ids []string) error {
 	return v.WriteExpected(dashboardRel, updated, dashboard.Version)
 }
 
-// --- helpers ---
-
-func (v *Vault) mutateFrontmatter(rel, expectedVersion string, mutate func(map[string]any)) error {
-	full, err := v.resolve(rel, false)
-	if err != nil {
-		return err
-	}
-	raw, err := os.ReadFile(full)
-	if err != nil {
-		return err
-	}
-	fm, _, body := splitFrontmatter(string(raw))
-	if fm == nil {
-		fm = map[string]any{}
-	}
-	mutate(fm)
-	header := ""
-	if len(fm) > 0 {
-		out, err := yaml.Marshal(fm)
-		if err != nil {
-			return err
-		}
-		header = "---\n" + string(out) + "---\n"
-	}
-	return atomicWriteFileChecked(full, []byte(header+body), 0o644, expectedVersion)
-}
-
 func managedLineID(line string) string {
 	match := managedMarkdownLinkPattern.FindStringSubmatch(line)
 	if len(match) != 4 || match[1] == "!" {
 		return ""
 	}
 	return managedIDFromDestination(match[3])
-}
-
-func setOrDelete(fm map[string]any, key, value string) {
-	if strings.TrimSpace(value) == "" {
-		delete(fm, key)
-		return
-	}
-	fm[key] = value
-}
-
-func frontmatterString(value any) string {
-	switch v := value.(type) {
-	case nil:
-		return ""
-	case string:
-		return strings.TrimSpace(v)
-	case bool:
-		return fmt.Sprintf("%t", v)
-	case int, int64, float64:
-		return strings.TrimSpace(fmt.Sprintf("%v", v))
-	default:
-		return strings.TrimSpace(fmt.Sprintf("%v", v))
-	}
 }

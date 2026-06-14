@@ -103,7 +103,11 @@ rm -rf /Applications/Rockion.app
 
 **Workspace**
 
-- Open any folder as a vault; sidebar file tree with icons.
+- Open any folder as a vault. Root folders appear as projects in the sidebar and
+  open through their `dashboard.md` entry page.
+- Favorite pages appear above projects and support drag-to-reorder.
+- Project dashboards support gallery/list layouts, sorting, managed-page
+  creation, reordering, and deletion.
 - Full-text search + quick switcher (`Cmd/Ctrl+P`).
 - Light / dark theme toggle (persisted; defaults to your OS preference).
 - Live re-index on external edits (edit a file in Obsidian/git and the app updates).
@@ -138,6 +142,10 @@ wails dev
 
 `wails dev` generates the Go↔JS bindings into `frontend/wailsjs/`, installs frontend deps,
 starts Vite, and opens the desktop window with hot reload.
+
+Opening the Vite URL directly in a browser shows a UI preview only. Native vault
+access, filesystem dialogs, updates, and other Go-backed features require the
+desktop window created by `wails dev`.
 
 > The first time you build, Wails generates `frontend/wailsjs/` and `frontend/dist/`. These are
 > git-ignored and regenerated on every build — the `frontend/dist/.gitkeep` placeholder only
@@ -176,7 +184,9 @@ during native builds.
 2. Rockion indexes it in the background (`.rockion/index.db`) and watches for changes.
 3. Click a note to edit; type `/` for blocks; `Cmd/Ctrl+P` to jump anywhere.
 
-Deleting `.rockion/` is always safe — it rebuilds from your files on next open.
+The SQLite index at `.rockion/index.db` is disposable and rebuilds on the next
+open. Back up the rest of `.rockion/`: it contains user settings and metadata
+such as icons, covers, Favorites, and dashboard views.
 
 ## How it works under the hood
 
@@ -184,14 +194,15 @@ Deleting `.rockion/` is always safe — it rebuilds from your files on next open
 derived (the SQLite index) or stored in a sidecar — the markdown files only ever contain portable
 markdown.
 
-**Backend (Go, in `internal/` + `app.go`)**
+**Backend (Go, in `internal/` + `app*.go`)**
 
 - `vault` — opens a folder, reads/writes notes, builds the sidebar tree. On read it splits YAML
   frontmatter from the body and derives a title (frontmatter `title` → first `# H1` → filename).
-  Frontmatter is preserved byte-for-byte on save. Path handling rejects root targets, traversal,
-  symlinks, and unsupported note extensions. `PlanTitleRename` derives a collision-free filename
-  from a title (used by `RenameToTitle` so editing the first `# H1` renames the file and rewrites
-  inbound links).
+  Existing frontmatter is preserved byte-for-byte during ordinary saves and dashboard-view
+  changes. Rockion only adds managed-page identity fields when it creates a managed project page.
+  Path handling rejects root targets, traversal, symlinks, and unsupported note extensions.
+  `PlanTitleRename` derives a collision-free filename from a title (used by `RenameToTitle` so
+  editing the first `# H1` renames the file and rewrites inbound links).
 - `db` — opens `<vault>/.rockion/index.db` using **`modernc.org/sqlite`** (pure Go, no cgo → single
   static binary, easy cross-compile). Pragmas and schema are applied statement-by-statement.
 - `indexer` — walks `.md`, `.markdown`, and `.mdx` files, parsing `[[wikilinks]]`, `[md](links)`,
@@ -199,9 +210,9 @@ markdown.
   mutations are serialized and folder deletes remove the full indexed subtree.
 - `search` — FTS5 queries (prefix match on the last term) and backlink lookups. Slice results are
   always returned as `[]T{}` (never nil) so the JSON never serializes to `null`.
-- `app.go` — the Wails binding layer: every method here is callable from JS (`OpenVault`,
-  `ReadNote`, `WriteNote`, `Search`, `Backlinks`, `SaveImage`, `SaveFile`, `SetNoteIcon`, …). A
-  recursive, per-path-debounced `fsnotify` watcher reflects external edits and emits events to the UI.
+- `app*.go` — the Wails binding layer, split by lifecycle, dashboard, media, transfer, and watcher
+  responsibilities. Exported methods are callable from JS (`OpenVault`, `ReadNote`, `WriteNote`,
+  `Search`, `Backlinks`, `SaveImage`, `SaveFile`, `SetNoteIcon`, …).
 
 **Frontend (React + Vite + TS + TipTap, in `frontend/src/`)**
 
@@ -219,6 +230,11 @@ markdown.
   pause autosave and require an explicit choice. Notes and sidecars use atomic replacement writes.
 - **Page icons** are stored in a sidecar `<vault>/.rockion/icons.json` (path → emoji), so picking an
   icon never rewrites your markdown. The tree and link picker read icons from there.
+- **Dashboard views** are stored in `<vault>/.rockion/dashboard-views.json`, so changing layout or
+  sort order does not rewrite user frontmatter. Card content and manual order remain portable
+  Markdown links in `dashboard.md`.
+- **Dashboard covers** load bounded thumbnails on demand; the full validated image is only loaded
+  for the active page cover.
 - **Page links** are plain markdown links. The icon + ↗ badge are added by a ProseMirror
   *decoration* (`PageLinkDecorations`) that looks up the target's icon from a live registry
   (`pageIcons.ts`) — so nothing is baked into the file and link icons update when a page's icon
@@ -228,16 +244,22 @@ markdown.
 - **Theme** is a `data-theme` attribute on `<html>` (set before first paint by an inline script in
   `index.html`, persisted to `localStorage`).
 
-The index and sidecars all live under `<vault>/.rockion/` and are disposable — delete the folder
-and Rockion rebuilds it (you'd only lose page icons, which are cosmetic).
+The rebuildable index and user metadata both live under `<vault>/.rockion/`.
+Only `index.db` is disposable. Vault export includes the metadata sidecars so
+icons, covers, Favorites, and dashboard settings survive backup and restore.
 
 ## Project layout
 
 ```
 rockion/
-├── main.go  app.go           ← Wails entrypoint + bound API methods (JS-callable)
+├── main.go                   ← Wails entrypoint
+├── app.go                    ← application lifecycle + core note API
+├── app_dashboard.go          ← dashboard and managed-page API
+├── app_media.go              ← image, cover, icon, and file-save API
+├── app_transfer.go           ← encrypted vault import/export API
+├── app_watcher.go            ← recursive filesystem watcher + debounce
 ├── internal/
-│   ├── vault/                ← files, frontmatter, icons/covers/sidebar metadata
+│   ├── vault/                ← files, managed pages, assets, and sidecar metadata
 │   ├── db/                   ← SQLite index (modernc, pure Go) + schema
 │   ├── indexer/              ← incremental parse: links, tags, FTS
 │   ├── search/               ← FTS5 search + backlinks
@@ -248,14 +270,16 @@ rockion/
     └── src/
         ├── api.ts            ← typed wrapper over the generated Wails bindings
         ├── App.tsx           ← layout, theme, vault/note state, page list
+        ├── components/
+        │   ├── Dashboard.tsx      ← dashboard state and actions
+        │   ├── DashboardCards.tsx ← gallery/list rendering and lazy thumbnails
+        │   └── Sidebar, Editor, Backlinks, QuickSwitcher, pickers, etc.
         ├── editor/
         │   ├── extensions.ts ← the full TipTap extension set
         │   ├── Callout.ts    ← callout node + markdown round-trip + color cycle
         │   ├── CodeBlock.ts  ← lowlight code block + language/copy/download toolbar
         │   ├── SlashCommand.ts / SlashMenu.tsx / slashItems.ts
         │   └── AddBlockButton.ts  ← gutter "+" button
-        └── components/       ← Sidebar, Editor, Backlinks, QuickSwitcher,
-                                 PagePicker, EmojiPicker, ErrorBoundary
 ```
 
 ## Roadmap (not yet built)

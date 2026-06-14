@@ -618,16 +618,6 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
               Remove
             </button>
           </div>
-          {note.cover.kind === "unsplash" &&
-            note.cover.attributionName &&
-            note.cover.attributionUrl && (
-              <button
-                className="page-cover-attribution"
-                onClick={() => api.openExternal(note.cover?.attributionUrl || "")}
-              >
-                Photo by {note.cover.attributionName} on Unsplash
-              </button>
-            )}
         </div>
       )}
       <div className={`page-header ${note.cover ? "has-cover" : ""}`}>

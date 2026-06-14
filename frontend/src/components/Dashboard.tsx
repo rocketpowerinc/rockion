@@ -2,15 +2,17 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
-  type DragEvent,
-  type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import { api, type DashboardView, type Note, type PageCard, type PageCover } from "../api";
 import { coverBackground } from "../editor/coverStyles.mjs";
+import {
+  reorderedDashboardIDs,
+  sortDashboardCards,
+} from "../editor/dashboardModel.mjs";
 import NewPageModal from "./NewPageModal";
 import CoverPicker from "./CoverPicker";
+import DashboardCards from "./DashboardCards";
 import EmojiPicker from "./EmojiPicker";
 
 interface Props {
@@ -20,6 +22,7 @@ interface Props {
   onRefreshTree: () => void;
   onNoteUpdated: (note: Note) => void;
   onSetIcon: (path: string, icon: string) => void;
+  refreshVersion: number;
 }
 
 const TEMPLATES: { id: string; label: string }[] = [
@@ -35,38 +38,6 @@ const VIEWS: { id: ViewKind; label: string }[] = [
   { id: "list", label: "List" },
 ];
 
-function formatDate(ms: number): string {
-  if (!ms) return "";
-  try {
-    return new Date(ms).toLocaleString(undefined, {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  } catch {
-    return "";
-  }
-}
-
-function CardIcon({ card }: { card: PageCard }) {
-  const icon = card.icon;
-  if (icon && icon.startsWith("data:")) {
-    return <img className="db-card-icon-img" src={icon} alt="" />;
-  }
-  return <span className="db-card-icon">{icon || "📄"}</span>;
-}
-
-function CardDates({ card }: { card: PageCard }) {
-  return (
-    <div className="db-card-meta">
-      <span>Created {formatDate(card.createdAt)}</span>
-      <span>Edited {formatDate(card.modifiedAt)}</span>
-    </div>
-  );
-}
-
 export default function Dashboard({
   note,
   onOpenPage,
@@ -74,6 +45,7 @@ export default function Dashboard({
   onRefreshTree,
   onNoteUpdated,
   onSetIcon,
+  refreshVersion,
 }: Props) {
   const dashboardPath = note.path;
   const [cards, setCards] = useState<PageCard[]>([]);
@@ -82,10 +54,8 @@ export default function Dashboard({
   const [loading, setLoading] = useState(true);
   const [newOpen, setNewOpen] = useState(false);
   const [template, setTemplate] = useState("");
-  const [coverImages, setCoverImages] = useState<Record<string, string>>({});
   const [coverPickerOpen, setCoverPickerOpen] = useState(false);
   const [dashCoverURL, setDashCoverURL] = useState("");
-  const dragId = useRef<string | null>(null);
 
   // Resolve the dashboard page's own cover (color/gradient need no fetch).
   useEffect(() => {
@@ -134,33 +104,6 @@ export default function Dashboard({
     [setCover]
   );
 
-  // Move focus between cards with arrow keys.
-  const onGridKeyDown = (ev: ReactKeyboardEvent) => {
-    if (!["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp"].includes(ev.key)) return;
-    const grid = ev.currentTarget as HTMLElement;
-    const items = Array.from(grid.querySelectorAll<HTMLElement>("[data-card]"));
-    const current = document.activeElement as HTMLElement;
-    const idx = items.indexOf(current);
-    if (idx < 0) {
-      items[0]?.focus();
-      ev.preventDefault();
-      return;
-    }
-    const delta = ev.key === "ArrowRight" || ev.key === "ArrowDown" ? 1 : -1;
-    const next = items[idx + delta];
-    if (next) {
-      next.focus();
-      ev.preventDefault();
-    }
-  };
-
-  const openOnEnter = (path: string) => (ev: ReactKeyboardEvent) => {
-    if (ev.key === "Enter") {
-      ev.preventDefault();
-      onOpenPage(path);
-    }
-  };
-
   const reload = useCallback(async () => {
     try {
       const [loadedCards, loadedView] = await Promise.all([
@@ -180,36 +123,17 @@ export default function Dashboard({
   useEffect(() => {
     setLoading(true);
     void reload();
-  }, [reload, note.version]);
-
-  // Resolve data URLs for local-image card covers.
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const next: Record<string, string> = {};
-      for (const card of cards) {
-        if (card.cover && card.cover.kind === "image") {
-          try {
-            next[card.pageId] = await api.coverImageDataURL(card.path);
-          } catch {
-            /* leave blank */
-          }
-        }
-      }
-      if (!cancelled) setCoverImages(next);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [cards]);
+  }, [reload, note.version, refreshVersion]);
 
   const updateView = useCallback(
     async (patch: Partial<DashboardView>) => {
+      const previous = view;
       const next = { ...view, ...patch };
       setView(next);
       try {
         await api.setDashboardView(dashboardPath, next);
       } catch (reason) {
+        setView(previous);
         onError(`Couldn't save view: ${String(reason)}`);
       }
     },
@@ -217,28 +141,7 @@ export default function Dashboard({
   );
 
   const visibleCards = useMemo(() => {
-    const list = cards.slice();
-    const sortBy = view.sortBy;
-    if (sortBy) {
-      list.sort((a, b) => {
-        let av: string | number;
-        let bv: string | number;
-        if (sortBy === "modified") {
-          av = a.modifiedAt;
-          bv = b.modifiedAt;
-        } else if (sortBy === "created") {
-          av = a.createdAt;
-          bv = b.createdAt;
-        } else {
-          av = a.title.toLowerCase();
-          bv = b.title.toLowerCase();
-        }
-        if (av < bv) return view.sortDir === "desc" ? 1 : -1;
-        if (av > bv) return view.sortDir === "desc" ? -1 : 1;
-        return 0;
-      });
-    }
-    return list;
+    return sortDashboardCards(cards, view) as PageCard[];
   }, [cards, view]);
 
   const createPage = useCallback(
@@ -260,11 +163,7 @@ export default function Dashboard({
   const reorder = useCallback(
     async (fromId: string, toId: string) => {
       if (fromId === toId) return;
-      const ids = cards.map((c) => c.pageId);
-      const from = ids.indexOf(fromId);
-      const to = ids.indexOf(toId);
-      if (from < 0 || to < 0) return;
-      ids.splice(to, 0, ids.splice(from, 1)[0]);
+      const ids = reorderedDashboardIDs(cards, fromId, toId) as string[];
       const byId = new Map(cards.map((c) => [c.pageId, c]));
       setCards(ids.map((id) => byId.get(id)).filter(Boolean) as PageCard[]);
       try {
@@ -277,23 +176,30 @@ export default function Dashboard({
     [cards, dashboardPath, onError, reload]
   );
 
+  const deletePage = useCallback(
+    async (card: PageCard) => {
+      if (
+        !window.confirm(
+          `Delete "${card.title}"? This removes the dashboard entry and its Markdown file.`
+        )
+      ) {
+        return;
+      }
+      try {
+        const href = `?rockion-page=${encodeURIComponent(card.pageId)}`;
+        const updated = await api.deleteManagedPage(dashboardPath, href, "");
+        setCards((current) => current.filter((item) => item.pageId !== card.pageId));
+        onNoteUpdated(updated);
+        onRefreshTree();
+      } catch (reason) {
+        onError(`Couldn't delete page: ${String(reason)}`);
+        await reload();
+      }
+    },
+    [dashboardPath, onError, onNoteUpdated, onRefreshTree, reload]
+  );
+
   const kind = (view.view as ViewKind) || "gallery";
-
-  const cardBackground = (card: PageCard): string =>
-    coverBackground(card.cover, coverImages[card.pageId] || "");
-
-  // --- drag handlers (reorder only) ---
-  const handleDragStart = (id: string) => (e: DragEvent) => {
-    dragId.current = id;
-    e.dataTransfer.effectAllowed = "move";
-  };
-  const handleDropOnCard = (id: string) => (e: DragEvent) => {
-    e.preventDefault();
-    const from = dragId.current;
-    dragId.current = null;
-    if (from) void reorder(from, id);
-  };
-  const allowDrop = (e: DragEvent) => e.preventDefault();
 
   const dashCoverBackground = coverBackground(note.cover, dashCoverURL);
 
@@ -411,60 +317,16 @@ export default function Dashboard({
               Create your first page
             </button>
           </div>
-        ) : kind === "list" ? (
-          <div className="db-list" onKeyDown={onGridKeyDown}>
-            {visibleCards.map((card) => (
-              <div
-                key={card.pageId}
-                className="db-row"
-                data-card
-                tabIndex={0}
-                draggable
-                onDragStart={handleDragStart(card.pageId)}
-                onDragOver={allowDrop}
-                onDrop={handleDropOnCard(card.pageId)}
-                onClick={() => onOpenPage(card.path)}
-                onKeyDown={openOnEnter(card.path)}
-              >
-                <CardIcon card={card} />
-                <span className="db-row-title">{card.title}</span>
-                <span className="db-row-meta">Created {formatDate(card.createdAt)}</span>
-                <span className="db-row-meta">Edited {formatDate(card.modifiedAt)}</span>
-              </div>
-            ))}
-          </div>
         ) : (
-          <div className="db-gallery" onKeyDown={onGridKeyDown}>
-            {visibleCards.map((card) => (
-              <div
-                key={card.pageId}
-                className="db-card"
-                data-card
-                tabIndex={0}
-                draggable
-                onDragStart={handleDragStart(card.pageId)}
-                onDragOver={allowDrop}
-                onDrop={handleDropOnCard(card.pageId)}
-                onClick={() => onOpenPage(card.path)}
-                onKeyDown={openOnEnter(card.path)}
-              >
-                <div
-                  className="db-card-cover"
-                  style={{ background: cardBackground(card) || "var(--hover)" }}
-                />
-                <div className="db-card-body">
-                  <div className="db-card-head">
-                    <CardIcon card={card} />
-                    <span className="db-card-title">{card.title}</span>
-                  </div>
-                  <CardDates card={card} />
-                </div>
-              </div>
-            ))}
-            <button className="db-card db-card-new" onClick={() => setNewOpen(true)}>
-              <span>+ New page</span>
-            </button>
-          </div>
+          <DashboardCards
+            cards={visibleCards}
+            kind={kind}
+            manualOrder={!view.sortBy}
+            onOpen={onOpenPage}
+            onDelete={(card) => void deletePage(card)}
+            onReorder={(fromID, toID) => void reorder(fromID, toID)}
+            onNew={() => setNewOpen(true)}
+          />
         )}
       </div>
 

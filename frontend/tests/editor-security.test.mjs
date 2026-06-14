@@ -189,24 +189,14 @@ test("page covers allow generated and validated image backgrounds", () => {
     ),
     /^url\("data:image\/png;base64,/
   );
-  assert.equal(
-    coverBackground({ kind: "unsplash", value: "https://example.com/tracker.jpg" }),
-    ""
-  );
-  assert.match(
-    coverBackground({
-      kind: "unsplash",
-      value: "https://images.unsplash.com/photo-example?ixid=tracking",
-    }),
-    /^url\("https:\/\/images\.unsplash\.com\//
-  );
+  assert.equal(coverBackground({ kind: "remote", value: "https://example.com" }), "");
 
   const picker = fs.readFileSync(
     new URL("../src/components/CoverPicker.tsx", import.meta.url),
     "utf8"
   );
   assert.match(picker, /Choose an image/);
-  assert.match(picker, /Browse Unsplash/);
+  assert.doesNotMatch(picker, /Browse Unsplash/);
   assert.match(picker, /Remove cover/);
 });
 

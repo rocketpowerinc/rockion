@@ -1,14 +1,8 @@
 package vault
 
 import (
-	"bytes"
-	"crypto/sha256"
 	"errors"
 	"fmt"
-	"image"
-	_ "image/gif"
-	_ "image/jpeg"
-	_ "image/png"
 	"os"
 	"path/filepath"
 	"sort"
@@ -28,10 +22,11 @@ const maxNoteBytes = 32 << 20
 
 // Vault is an opened folder of markdown files.
 type Vault struct {
-	Root      string
-	iconsMu   sync.Mutex
-	coversMu  sync.Mutex
-	sidebarMu sync.Mutex
+	Root             string
+	iconsMu          sync.Mutex
+	coversMu         sync.Mutex
+	sidebarMu        sync.Mutex
+	dashboardViewsMu sync.Mutex
 }
 
 // Open returns a Vault rooted at an existing directory.
@@ -642,44 +637,6 @@ func (v *Vault) Delete(rel string) error {
 	return os.RemoveAll(full)
 }
 
-// SaveImage writes image bytes into assets/ and returns the vault-relative path.
-func (v *Vault) SaveImage(name string, data []byte) (string, error) {
-	const maxImageBytes = 10 << 20
-	if len(data) == 0 || len(data) > maxImageBytes {
-		return "", fmt.Errorf("image must be between 1 byte and %d MB", maxImageBytes>>20)
-	}
-	config, format, err := image.DecodeConfig(bytes.NewReader(data))
-	if err != nil {
-		return "", errors.New("unsupported or invalid image data")
-	}
-	if config.Width <= 0 || config.Height <= 0 || config.Width > 12000 || config.Height > 12000 {
-		return "", errors.New("image dimensions are invalid or too large")
-	}
-	extensions := map[string]string{"png": ".png", "jpeg": ".jpg", "gif": ".gif"}
-	ext, ok := extensions[format]
-	if !ok {
-		return "", fmt.Errorf("unsupported image format: %s", format)
-	}
-	dir, err := v.resolve("assets", true)
-	if err != nil {
-		return "", err
-	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", err
-	}
-	base := sanitize(strings.TrimSuffix(name, filepath.Ext(name)))
-	fname := fmt.Sprintf("%s-%d%s", base, time.Now().UnixNano(), ext)
-	rel := filepath.ToSlash(filepath.Join("assets", fname))
-	full, err := v.resolve(rel, true)
-	if err != nil {
-		return "", err
-	}
-	if err := atomicWriteFile(full, data, 0o644); err != nil {
-		return "", err
-	}
-	return rel, nil
-}
-
 // MarkdownFiles returns all real Markdown files, excluding hidden and generated
 // directories. Symlinked files and directories are never followed.
 func (v *Vault) MarkdownFiles() ([]string, error) {
@@ -775,151 +732,4 @@ func titleFor(rel string, fm map[string]any, body string) string {
 	}
 	base := filepath.Base(rel)
 	return strings.TrimSuffix(base, filepath.Ext(base))
-}
-
-func atomicWriteFile(path string, data []byte, perm os.FileMode) (err error) {
-	return atomicWriteFileChecked(path, data, perm, "")
-}
-
-func createFileExclusive(path string, data []byte, perm os.FileMode) (err error) {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, perm)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		_ = file.Close()
-		if err != nil {
-			_ = os.Remove(path)
-		}
-	}()
-	if _, err = file.Write(data); err != nil {
-		return err
-	}
-	if err = file.Sync(); err != nil {
-		return err
-	}
-	return file.Close()
-}
-
-func renameCaseOnly(from, to string) error {
-	temp, err := os.CreateTemp(filepath.Dir(from), "."+filepath.Base(from)+".rename-*")
-	if err != nil {
-		return err
-	}
-	tempPath := temp.Name()
-	if err := temp.Close(); err != nil {
-		_ = os.Remove(tempPath)
-		return err
-	}
-	if err := os.Remove(tempPath); err != nil {
-		return err
-	}
-	if err := os.Rename(from, tempPath); err != nil {
-		return err
-	}
-	if err := os.Rename(tempPath, to); err != nil {
-		_ = os.Rename(tempPath, from)
-		return err
-	}
-	return nil
-}
-
-func atomicWriteFileChecked(path string, data []byte, perm os.FileMode, expectedVersion string) (err error) {
-	dir := filepath.Dir(path)
-	tmp, err := os.CreateTemp(dir, "."+filepath.Base(path)+".tmp-*")
-	if err != nil {
-		return err
-	}
-	tmpName := tmp.Name()
-	defer func() {
-		_ = tmp.Close()
-		if err != nil {
-			_ = os.Remove(tmpName)
-		}
-	}()
-	if err = tmp.Chmod(perm); err != nil {
-		return err
-	}
-	if _, err = tmp.Write(data); err != nil {
-		return err
-	}
-	if err = tmp.Sync(); err != nil {
-		return err
-	}
-	if err = tmp.Close(); err != nil {
-		return err
-	}
-	if expectedVersion != "" {
-		current, readErr := os.ReadFile(path)
-		if readErr != nil || contentVersion(current) != expectedVersion {
-			return ErrConflict
-		}
-	}
-	if err = replaceFile(tmpName, path); err != nil {
-		return err
-	}
-	return nil
-}
-
-func contentVersion(data []byte) string {
-	return fmt.Sprintf("%x", sha256.Sum256(data))
-}
-
-func ensureNoteOnlyDirectory(root string) error {
-	return filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if path == root {
-			return nil
-		}
-		if entry.Type()&os.ModeSymlink != 0 {
-			return fmt.Errorf("refusing to delete directory containing a symlink: %s", path)
-		}
-		if !entry.IsDir() && !IsMarkdownPath(entry.Name()) {
-			return fmt.Errorf("refusing to delete directory containing a non-note file: %s", path)
-		}
-		return nil
-	})
-}
-
-func recoverBackup(path string) error {
-	backup := path + ".rockion-backup"
-	if _, err := os.Stat(path); err == nil {
-		return nil
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-	info, err := os.Lstat(backup)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
-		return errors.New("invalid Rockion recovery backup")
-	}
-	return os.Rename(backup, path)
-}
-
-func replaceFile(tempPath, destination string) error {
-	if err := os.Rename(tempPath, destination); err == nil {
-		return nil
-	}
-	// Windows does not replace an existing destination with os.Rename.
-	backup := destination + ".rockion-backup"
-	_ = os.Remove(backup)
-	if err := os.Rename(destination, backup); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-	if err := os.Rename(tempPath, destination); err != nil {
-		_ = os.Rename(backup, destination)
-		return err
-	}
-	_ = os.Remove(backup)
-	return nil
 }

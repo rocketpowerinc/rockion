@@ -31,19 +31,5 @@ export function coverBackground(cover, localImage = "") {
   if (cover.kind === "image" && /^data:image\/(?:png|jpeg|gif);base64,/i.test(localImage)) {
     return `url("${localImage}")`;
   }
-  if (cover.kind === "unsplash") {
-    try {
-      const parsed = new URL(cover.value);
-      if (
-        parsed.protocol === "https:" &&
-        parsed.hostname === "images.unsplash.com" &&
-        parsed.searchParams.has("ixid")
-      ) {
-        return `url("${parsed.toString()}")`;
-      }
-    } catch {
-      return "";
-    }
-  }
   return "";
 }

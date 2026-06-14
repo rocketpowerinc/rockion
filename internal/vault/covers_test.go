@@ -2,8 +2,10 @@ package vault
 
 import (
 	"bytes"
+	"encoding/base64"
 	"image"
 	"image/color"
+	_ "image/jpeg"
 	"image/png"
 	"strings"
 	"testing"
@@ -40,6 +42,26 @@ func TestCoverLifecycleAndLocalImageLoading(t *testing.T) {
 	if !strings.HasPrefix(dataURL, "data:image/png;base64,") {
 		t.Fatalf("unexpected cover data URL: %q", dataURL)
 	}
+	thumbnailURL, err := v.CoverThumbnailDataURL("note.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	encodedThumbnail := strings.SplitN(thumbnailURL, ",", 2)
+	if len(encodedThumbnail) != 2 {
+		t.Fatalf("invalid thumbnail data URL: %q", thumbnailURL)
+	}
+	thumbnailBytes, err := base64.StdEncoding.DecodeString(encodedThumbnail[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	thumbnailConfig, _, err := image.DecodeConfig(bytes.NewReader(thumbnailBytes))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if thumbnailConfig.Width > coverThumbnailWidth ||
+		thumbnailConfig.Height > coverThumbnailHeight {
+		t.Fatalf("thumbnail is too large: %dx%d", thumbnailConfig.Width, thumbnailConfig.Height)
+	}
 
 	if err := v.Rename("note.md", "renamed.md"); err != nil {
 		t.Fatal(err)
@@ -67,14 +89,7 @@ func TestCoverValidation(t *testing.T) {
 		{Kind: "color", Value: "red", Position: 50},
 		{Kind: "gradient", Value: "unknown", Position: 50},
 		{Kind: "image", Value: "../outside.png", Position: 50},
-		{
-			Kind:            "unsplash",
-			Value:           "https://example.com/photo.jpg",
-			Position:        50,
-			AttributionName: "Photographer",
-			AttributionURL:  "https://unsplash.com/@photographer",
-			SourceURL:       "https://unsplash.com/photos/example",
-		},
+		{Kind: "remote", Value: "https://example.com/photo.jpg", Position: 50},
 	} {
 		if err := v.SetCover("note.md", cover); err == nil {
 			t.Fatalf("invalid cover was accepted: %#v", cover)

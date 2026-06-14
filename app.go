@@ -4,11 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -18,7 +16,6 @@ import (
 	"rockion/internal/model"
 	"rockion/internal/search"
 	"rockion/internal/vault"
-	"rockion/internal/vaultbackup"
 )
 
 // App is the Wails-bound application struct. Its exported methods are callable from JS.
@@ -193,59 +190,6 @@ func (a *App) ListPages() ([]model.TreeNode, error) {
 	return a.vault.Pages()
 }
 
-// ListDashboardCards returns the managed pages of a dashboard as gallery cards.
-// Uses the write lock because resolving cards can assign missing page IDs.
-func (a *App) ListDashboardCards(dashboardPath string) ([]model.PageCard, error) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if err := a.requireVault(); err != nil {
-		return nil, err
-	}
-	return a.vault.DashboardCards(dashboardPath)
-}
-
-// GetDashboardView reads a dashboard's persisted layout config.
-func (a *App) GetDashboardView(dashboardPath string) (model.DashboardView, error) {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
-	if err := a.requireVault(); err != nil {
-		return model.DashboardView{}, err
-	}
-	return a.vault.DashboardView(dashboardPath)
-}
-
-// SetDashboardView persists a dashboard's layout config to its frontmatter.
-func (a *App) SetDashboardView(dashboardPath string, view model.DashboardView) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if err := a.requireVault(); err != nil {
-		return err
-	}
-	if err := a.vault.SetDashboardView(dashboardPath, view); err != nil {
-		return err
-	}
-	if err := a.indexer.IndexFile(dashboardPath); err != nil {
-		runtime.LogErrorf(a.ctx, "index dashboard view failed: %v", err)
-	}
-	return nil
-}
-
-// ReorderManagedPages rewrites the order of a dashboard's managed links.
-func (a *App) ReorderManagedPages(dashboardPath string, pageIDs []string) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if err := a.requireVault(); err != nil {
-		return err
-	}
-	if err := a.vault.ReorderManagedPages(dashboardPath, pageIDs); err != nil {
-		return err
-	}
-	if err := a.indexer.IndexFile(dashboardPath); err != nil {
-		runtime.LogErrorf(a.ctx, "index reordered dashboard failed: %v", err)
-	}
-	return nil
-}
-
 func (a *App) ListFavorites() ([]model.TreeNode, error) {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
@@ -311,39 +255,6 @@ func (a *App) WriteNote(path, markdown, expectedVersion string) (model.Note, err
 	return a.withCover(saved), nil
 }
 
-func (a *App) CreateSubPage(dashboardPath, title string) (model.Note, error) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if err := a.requireVault(); err != nil {
-		return model.Note{}, err
-	}
-	note, err := a.vault.CreateManagedPage(dashboardPath, title)
-	if err != nil {
-		return model.Note{}, err
-	}
-	if err := a.indexer.IndexFile(note.Path); err != nil {
-		runtime.LogErrorf(a.ctx, "index created note failed: %v", err)
-	}
-	return note, nil
-}
-
-// CreateSubPageFromTemplate creates a managed page seeded from a built-in template.
-func (a *App) CreateSubPageFromTemplate(dashboardPath, title, template string) (model.Note, error) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if err := a.requireVault(); err != nil {
-		return model.Note{}, err
-	}
-	note, err := a.vault.CreateManagedPageFromTemplate(dashboardPath, title, template)
-	if err != nil {
-		return model.Note{}, err
-	}
-	if err := a.indexer.IndexFile(note.Path); err != nil {
-		runtime.LogErrorf(a.ctx, "index created note failed: %v", err)
-	}
-	return note, nil
-}
-
 func (a *App) CreateProject(title string) (model.Note, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -395,6 +306,9 @@ func (a *App) renamePathLocked(oldPath, newPath string) error {
 	}
 	if err := a.vault.RenameFavoritePath(oldPath, newPath, isDir); err != nil {
 		followUpErrs = append(followUpErrs, fmt.Errorf("rename favorite metadata: %w", err))
+	}
+	if err := a.vault.RenameDashboardViewPath(oldPath, newPath, isDir); err != nil {
+		followUpErrs = append(followUpErrs, fmt.Errorf("rename dashboard view metadata: %w", err))
 	}
 	rewritten, rewriteErr := a.vault.RewriteLinksAfterRename(
 		oldPath,
@@ -488,47 +402,13 @@ func (a *App) DeletePath(path string) error {
 	if err := a.vault.RemoveFavoritePath(path, isDir); err != nil {
 		followUpErrs = append(followUpErrs, fmt.Errorf("remove favorite metadata: %w", err))
 	}
+	if err := a.vault.RemoveDashboardViewPath(path, isDir); err != nil {
+		followUpErrs = append(followUpErrs, fmt.Errorf("remove dashboard view metadata: %w", err))
+	}
 	if err := a.indexer.RemovePath(path); err != nil {
 		followUpErrs = append(followUpErrs, fmt.Errorf("remove index path: %w", err))
 	}
 	return errors.Join(followUpErrs...)
-}
-
-func (a *App) DeleteManagedPage(
-	dashboardPath, href, expectedVersion string,
-) (model.Note, error) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if err := a.requireVault(); err != nil {
-		return model.Note{}, err
-	}
-	result, err := a.vault.DeleteManagedPage(dashboardPath, href, expectedVersion)
-	if err != nil {
-		if errors.Is(err, vault.ErrConflict) {
-			return model.Note{}, fmt.Errorf("conflict: %w", err)
-		}
-		return model.Note{}, err
-	}
-	var followUpErrs []error
-	if err := a.vault.RemoveIconPath(result.DeletedPath, false); err != nil {
-		followUpErrs = append(followUpErrs, fmt.Errorf("remove icon metadata: %w", err))
-	}
-	if err := a.vault.RemoveCoverPath(result.DeletedPath, false); err != nil {
-		followUpErrs = append(followUpErrs, fmt.Errorf("remove cover metadata: %w", err))
-	}
-	if err := a.vault.RemoveFavoritePath(result.DeletedPath, false); err != nil {
-		followUpErrs = append(followUpErrs, fmt.Errorf("remove favorite metadata: %w", err))
-	}
-	if err := a.indexer.RemovePath(result.DeletedPath); err != nil {
-		followUpErrs = append(followUpErrs, fmt.Errorf("remove deleted page from index: %w", err))
-	}
-	if err := a.indexer.IndexFile(dashboardPath); err != nil {
-		followUpErrs = append(followUpErrs, fmt.Errorf("index updated dashboard: %w", err))
-	}
-	if err := errors.Join(followUpErrs...); err != nil {
-		return a.withCover(result.Dashboard), err
-	}
-	return a.withCover(result.Dashboard), nil
 }
 
 func (a *App) Search(query string, limit int) ([]model.SearchHit, error) {
@@ -547,310 +427,4 @@ func (a *App) Backlinks(path string) ([]model.SearchHit, error) {
 		return nil, err
 	}
 	return a.search.Backlinks(path)
-}
-
-// SaveImage stores image bytes in assets/ and returns the vault-relative path.
-func (a *App) SaveImage(name string, data []byte) (string, error) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if err := a.requireVault(); err != nil {
-		return "", err
-	}
-	return a.vault.SaveImage(name, data)
-}
-
-// SetNoteCover stores a page cover in vault metadata without changing Markdown.
-func (a *App) SetNoteCover(path string, cover model.PageCover) (model.Note, error) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if err := a.requireVault(); err != nil {
-		return model.Note{}, err
-	}
-	if err := a.vault.SetCover(path, cover); err != nil {
-		return model.Note{}, err
-	}
-	note, err := a.vault.Read(path)
-	if err != nil {
-		return model.Note{}, err
-	}
-	return a.withCover(note), nil
-}
-
-// CoverImageDataURL returns the current page's validated local cover image.
-func (a *App) CoverImageDataURL(path string) (string, error) {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
-	if err := a.requireVault(); err != nil {
-		return "", err
-	}
-	return a.vault.CoverImageDataURL(path)
-}
-
-// SetNoteIcon sets (or clears, if icon == "") the emoji icon for a note.
-func (a *App) SetNoteIcon(path, icon string) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if err := a.requireVault(); err != nil {
-		return err
-	}
-	return a.vault.SetIcon(path, icon)
-}
-
-// SaveFile prompts for a save location and writes content there. Returns the
-// chosen path, or "" if the user cancelled. Backs the code block download button.
-func (a *App) SaveFile(defaultName, content string) (string, error) {
-	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-		DefaultFilename: defaultName,
-		Title:           "Save script",
-	})
-	if err != nil {
-		return "", err
-	}
-	if path == "" {
-		return "", nil // cancelled
-	}
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		return "", err
-	}
-	return path, nil
-}
-
-// ExportVault prompts for a destination and writes an authenticated, encrypted
-// snapshot of the currently open vault. The password is never written to disk.
-func (a *App) ExportVault(password string) (string, error) {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
-	if err := a.requireVault(); err != nil {
-		return "", err
-	}
-	timestamp := time.Now().Format("2006-01-02_150405")
-	defaultName := fmt.Sprintf("%s-%s.rockion", a.vault.Info().Name, timestamp)
-	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-		DefaultFilename: defaultName,
-		Title:           "Export encrypted Rockion vault",
-		Filters: []runtime.FileFilter{
-			{DisplayName: "Rockion Vault Archive (*.rockion)", Pattern: "*.rockion"},
-		},
-	})
-	if err != nil || path == "" {
-		return path, err
-	}
-	if !strings.EqualFold(filepath.Ext(path), ".rockion") {
-		path += ".rockion"
-	}
-	if err := vaultbackup.Export(a.vault.Root, path, password); err != nil {
-		return "", err
-	}
-	return path, nil
-}
-
-// PickVaultImportArchive prompts for the encrypted archive to restore.
-func (a *App) PickVaultImportArchive() (string, error) {
-	return runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
-		Title: "Choose an encrypted Rockion vault",
-		Filters: []runtime.FileFilter{
-			{DisplayName: "Rockion Vault Archive (*.rockion)", Pattern: "*.rockion"},
-		},
-	})
-}
-
-// ImportVault decrypts an archive into a newly created folder and opens it.
-func (a *App) ImportVault(archivePath, password string) (model.VaultInfo, error) {
-	if strings.TrimSpace(archivePath) == "" {
-		return model.VaultInfo{}, errors.New("no archive selected")
-	}
-	parent, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
-		Title: "Choose where to restore the imported vault",
-	})
-	if err != nil {
-		return model.VaultInfo{}, err
-	}
-	if parent == "" {
-		return model.VaultInfo{}, errors.New("no restore location selected")
-	}
-	path, err := vaultbackup.Import(archivePath, parent, password)
-	if err != nil {
-		return model.VaultInfo{}, err
-	}
-	info, err := a.OpenVault(path)
-	if err != nil {
-		return model.VaultInfo{}, fmt.Errorf("vault restored to %s but could not be opened: %w", path, err)
-	}
-	return info, nil
-}
-
-// --- File watching: reflect external edits (Obsidian, git, etc.) ---
-
-func isMarkdownPath(name string) bool {
-	return vault.IsMarkdownPath(name)
-}
-
-func (a *App) startWatcher() {
-	w, err := fsnotify.NewWatcher()
-	if err != nil {
-		return
-	}
-	if err := addWatchDirs(w, a.vault.Root); err != nil {
-		_ = w.Close()
-		runtime.LogErrorf(a.ctx, "watcher setup failed: %v", err)
-		return
-	}
-	a.watcher = w
-
-	debounce := newKeyedDebouncer(300 * time.Millisecond)
-	a.watcherDebounce = debounce
-	ix := a.indexer
-	root := a.vault.Root
-	a.watcherWG.Add(1)
-	go func() {
-		defer a.watcherWG.Done()
-		defer func() {
-			if r := recover(); r != nil {
-				runtime.LogErrorf(a.ctx, "watcher panicked: %v", r)
-			}
-		}()
-		for {
-			select {
-			case ev, ok := <-w.Events:
-				if !ok {
-					return
-				}
-				event := ev
-				if shouldSkipWatchPath(event.Name, a.vault.Root) {
-					continue
-				}
-				info, statErr := os.Stat(event.Name)
-				isDir := statErr == nil && info.IsDir()
-				if isDir && event.Op&fsnotify.Create != 0 {
-					if err := addWatchDirs(w, event.Name); err != nil {
-						runtime.LogErrorf(a.ctx, "watch nested directory failed: %v", err)
-					}
-				}
-				if !isDir && !isMarkdownPath(event.Name) &&
-					event.Op&(fsnotify.Remove|fsnotify.Rename) == 0 {
-					continue
-				}
-				debounce.Do(event.Name, func() {
-					rel, err := filepath.Rel(root, event.Name)
-					if err != nil || rel == "." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-						return
-					}
-					rel = filepath.ToSlash(rel)
-					if event.Op&(fsnotify.Remove|fsnotify.Rename) != 0 {
-						if err := ix.RemovePath(rel); err != nil {
-							runtime.LogErrorf(a.ctx, "remove index path failed: %v", err)
-						}
-					} else {
-						info, err := os.Stat(event.Name)
-						if err == nil && info.IsDir() {
-							if err := ix.Rebuild(); err != nil {
-								runtime.LogErrorf(a.ctx, "rebuild after directory change failed: %v", err)
-							}
-						} else if isMarkdownPath(rel) {
-							if err := ix.IndexFile(rel); err != nil {
-								runtime.LogErrorf(a.ctx, "index changed file failed: %v", err)
-							}
-						}
-					}
-					runtime.EventsEmit(a.ctx, "vault:changed", rel)
-				})
-			case _, ok := <-w.Errors:
-				if !ok {
-					return
-				}
-			}
-		}
-	}()
-}
-
-func addWatchDirs(w *fsnotify.Watcher, root string) error {
-	return filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return nil
-		}
-		if entry.Type()&os.ModeSymlink != 0 {
-			if entry.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !entry.IsDir() {
-			return nil
-		}
-		if path != root {
-			name := entry.Name()
-			if strings.HasPrefix(name, ".") || name == "node_modules" || name == "assets" {
-				return filepath.SkipDir
-			}
-		}
-		return w.Add(path)
-	})
-}
-
-func shouldSkipWatchPath(path, root string) bool {
-	rel, err := filepath.Rel(root, path)
-	if err != nil || rel == "." {
-		return false
-	}
-	for _, part := range strings.Split(filepath.Clean(rel), string(filepath.Separator)) {
-		if strings.HasPrefix(part, ".") || part == "node_modules" || part == "assets" {
-			return true
-		}
-	}
-	return false
-}
-
-type debounceEntry struct {
-	timer *time.Timer
-	done  sync.Once
-}
-
-type keyedDebouncer struct {
-	mu     sync.Mutex
-	delay  time.Duration
-	timers map[string]*debounceEntry
-	wg     sync.WaitGroup
-	closed bool
-}
-
-func newKeyedDebouncer(delay time.Duration) *keyedDebouncer {
-	return &keyedDebouncer{delay: delay, timers: map[string]*debounceEntry{}}
-}
-
-func (d *keyedDebouncer) Do(key string, fn func()) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	if d.closed {
-		return
-	}
-	if previous := d.timers[key]; previous != nil && previous.timer.Stop() {
-		previous.done.Do(d.wg.Done)
-	}
-	entry := &debounceEntry{}
-	d.wg.Add(1)
-	entry.timer = time.AfterFunc(d.delay, func() {
-		defer entry.done.Do(d.wg.Done)
-		d.mu.Lock()
-		if d.closed {
-			d.mu.Unlock()
-			return
-		}
-		delete(d.timers, key)
-		d.mu.Unlock()
-		fn()
-	})
-	d.timers[key] = entry
-}
-
-func (d *keyedDebouncer) Close() {
-	d.mu.Lock()
-	d.closed = true
-	for key, entry := range d.timers {
-		if entry.timer.Stop() {
-			entry.done.Do(d.wg.Done)
-		}
-		delete(d.timers, key)
-	}
-	d.mu.Unlock()
-	d.wg.Wait()
 }

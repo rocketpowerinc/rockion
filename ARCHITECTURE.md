@@ -40,7 +40,7 @@ without lag.
 │  └───────────────┬─────────────────────────┘  │
 └──────────────────┼─────────────────────────────┘
                    ▼
-        Vault folder on disk (.md + assets/ + .rockion/index.db)
+        Vault folder on disk (.md + assets/ + .rockion metadata)
 ```
 
 ---
@@ -51,14 +51,15 @@ without lag.
 
 | Package    | Responsibility |
 |------------|----------------|
-| `app`      | Wails app lifecycle, holds service handles, exposes bound methods to JS. |
+| `app*.go`  | Wails lifecycle and bound APIs, split into core notes, dashboards, media, transfer, and watcher modules. |
 | `vault`    | Open/create a vault, resolve paths, safe read/write of `.md`, move/rename/delete, list tree. |
 | `db`       | SQLite connection, migrations, schema. Uses `modernc.org/sqlite` (pure Go, no cgo → easy cross-compile). |
 | `indexer`  | Walks the vault, parses frontmatter + links, upserts rows into SQLite. Incremental on file change. |
 | `search`   | Full-text search via SQLite FTS5; title/path search; backlink queries. |
-| `app.go` watcher | Recursive `fsnotify` watcher → per-path debounced reindex → frontend events. |
+| `app_watcher.go` | Recursive `fsnotify` watcher → per-path debounced reindex → frontend events. |
 | `vault` media | Validates decoded image bytes, caps size/dimensions, and writes into `assets/`. |
-| `vault` covers | Stores page cover metadata in `.rockion/covers.json`; validates generated styles, local assets, and Unsplash attribution fields. |
+| `vault` covers | Stores page cover metadata in `.rockion/covers.json`; validates generated styles and local uploaded assets. |
+| `vault` dashboard views | Stores layout and sort preferences in `.rockion/dashboard-views.json` without rewriting Markdown frontmatter. |
 
 ### Why these choices
 
@@ -125,6 +126,10 @@ ReadNote(path string) (Note, error)        // returns markdown + parsed frontmat
 WriteNote(path, markdown, version string) (Note, error) // conflict-checked autosave
 CreateProject(title string) (Note, error)    // root folder + dashboard.md
 CreateSubPage(dashboard, title string) (Note, error) // managed project page
+ListDashboardCards(dashboard string) ([]PageCard, error)
+GetDashboardView(dashboard string) (DashboardView, error)
+SetDashboardView(dashboard string, view DashboardView) error
+ReorderManagedPages(dashboard string, pageIDs []string) error
 RenamePath(old, new string) error          // updates links, icons, and index
 DeletePath(path string) error
 DeleteManagedPage(dashboard, href, version string) (Note, error)
@@ -133,6 +138,7 @@ Backlinks(path string) ([]SearchHit, error)
 SaveImage(path string, data []byte) (string, error)  // returns vault-relative asset path
 SetNoteCover(path string, cover PageCover) (Note, error)
 CoverImageDataURL(path string) (string, error) // validated local cover for webview
+CoverThumbnailDataURL(path string) (string, error) // bounded dashboard thumbnail
 ```
 
 Project pages remain ordinary Markdown files. Rockion stores a stable
@@ -140,14 +146,17 @@ Project pages remain ordinary Markdown files. Rockion stores a stable
 link query. This lets links follow title and filename changes without a
 proprietary dashboard format. Custom link labels remain unchanged. Removing a
 managed link in the editor restores it on save; deleting its linked page uses
-the dashboard link's context menu so the link and file are removed together.
+the dashboard card action so the link and file are removed together.
+
+Dashboard layout and sorting are not stored in Markdown frontmatter. They live
+in `.rockion/dashboard-views.json`; legacy frontmatter settings are read for
+compatibility but are never rewritten. Manual card order remains the order of
+managed links in `dashboard.md`, while title/date sorting is derived in the UI
+and disables drag reordering.
 
 Page covers do not modify Markdown. Their metadata is stored in the exported
 vault under `.rockion/covers.json`, while uploaded cover images live in
-`assets/`. Solid colors and gradients are generated locally. A production
-Unsplash search must use a Rockion-controlled credential proxy, retain the
-returned CDN URL and tracking identifier, trigger the download endpoint when a
-cover is selected, and display photographer attribution.
+`assets/`. Solid colors and gradients are generated locally.
 
 Events emitted Go → JS: `vault:changed` (file changed externally), `index:progress`.
 
@@ -215,9 +224,13 @@ rockion/
 ├── wails.json               ← Wails project config
 ├── go.mod / go.sum
 ├── main.go                  ← Wails entrypoint
-├── app.go                   ← App struct + bound methods
+├── app.go                   ← App struct, lifecycle, and core note methods
+├── app_dashboard.go         ← dashboard + managed-page methods
+├── app_media.go             ← image, cover, icon, and file methods
+├── app_transfer.go          ← encrypted vault import/export
+├── app_watcher.go           ← recursive watcher + debounce
 ├── internal/
-│   ├── vault/vault.go
+│   ├── vault/               ← split filesystem, assets, dashboards, covers, icons
 │   ├── db/db.go  db/schema.sql
 │   ├── indexer/indexer.go
 │   ├── search/search.go
@@ -234,6 +247,8 @@ rockion/
         ├── components/
         │   ├── Sidebar.tsx
         │   ├── Editor.tsx
+        │   ├── Dashboard.tsx
+        │   ├── DashboardCards.tsx
         │   ├── Backlinks.tsx
         │   └── QuickSwitcher.tsx
         ├── editor/

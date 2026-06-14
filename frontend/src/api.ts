@@ -9,6 +9,7 @@ import {
   WindowSetDarkTheme,
   WindowSetLightTheme,
 } from "../wailsjs/runtime/runtime";
+import { hasWailsRuntime } from "./runtimeBridge.mjs";
 
 export interface VaultInfo {
   path: string;
@@ -41,9 +42,6 @@ export interface PageCover {
   kind: string;
   value: string;
   position: number;
-  attributionName?: string;
-  attributionUrl?: string;
-  sourceUrl?: string;
 }
 
 export interface PageCard {
@@ -84,6 +82,7 @@ export interface UpdateInfo {
 }
 
 export const api = {
+  isNativeRuntime: (): boolean => hasWailsRuntime(),
   pickVault: (): Promise<VaultInfo> => App.PickVault(),
   openVault: (path: string): Promise<VaultInfo> => App.OpenVault(path),
   listTree: (): Promise<TreeNode[]> => App.ListTree(),
@@ -128,6 +127,8 @@ export const api = {
   setNoteCover: (path: string, cover: PageCover): Promise<Note> =>
     App.SetNoteCover(path, cover),
   coverImageDataURL: (path: string): Promise<string> => App.CoverImageDataURL(path),
+  coverThumbnailDataURL: (path: string): Promise<string> =>
+    App.CoverThumbnailDataURL(path),
   // SaveFile opens a native save dialog and writes content; returns chosen path ("" if cancelled).
   saveFile: (name: string, content: string): Promise<string> => App.SaveFile(name, content),
   exportVault: (password: string): Promise<string> => App.ExportVault(password),
@@ -138,14 +139,25 @@ export const api = {
   setNoteIcon: (path: string, icon: string): Promise<void> => App.SetNoteIcon(path, icon),
   checkForUpdates: (): Promise<UpdateInfo> => App.CheckForUpdates(),
   installUpdate: (): Promise<UpdateInfo> => App.InstallUpdate(),
-  openExternal: (url: string): void => BrowserOpenURL(url),
-  setWindowTheme: (theme: "light" | "dark"): void =>
-    theme === "dark" ? WindowSetDarkTheme() : WindowSetLightTheme(),
+  openExternal: (url: string): void => {
+    if (hasWailsRuntime()) {
+      BrowserOpenURL(url);
+      return;
+    }
+    const opened = window.open(url, "_blank", "noopener,noreferrer");
+    if (opened) opened.opener = null;
+  },
+  setWindowTheme: (theme: "light" | "dark"): void => {
+    if (!hasWailsRuntime()) return;
+    theme === "dark" ? WindowSetDarkTheme() : WindowSetLightTheme();
+  },
   confirmClose: (): Promise<void> => App.ConfirmClose(),
 };
 
 export const onVaultChanged = (cb: (path: string) => void) =>
-  EventsOn("vault:changed", cb);
+  hasWailsRuntime() ? EventsOn("vault:changed", cb) : () => {};
 
-export const onIndexReady = (cb: () => void) => EventsOn("index:ready", cb);
-export const onBeforeClose = (cb: () => void) => EventsOn("app:before-close", cb);
+export const onIndexReady = (cb: () => void) =>
+  hasWailsRuntime() ? EventsOn("index:ready", cb) : () => {};
+export const onBeforeClose = (cb: () => void) =>
+  hasWailsRuntime() ? EventsOn("app:before-close", cb) : () => {};

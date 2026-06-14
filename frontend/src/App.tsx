@@ -25,10 +25,12 @@ import {
 } from "./writingLanguage";
 
 export default function App() {
+  const nativeRuntime = api.isNativeRuntime();
   const [vault, setVault] = useState<VaultInfo | null>(null);
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [pages, setPages] = useState<TreeNode[]>([]);
   const [favorites, setFavorites] = useState<TreeNode[]>([]);
+  const [vaultRevision, setVaultRevision] = useState(0);
   const [note, setNote] = useState<Note | null>(null);
   const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -170,6 +172,7 @@ export default function App() {
   );
 
   const openVault = useCallback(async () => {
+    if (!nativeRuntime) return;
     if (!(await flushEditor())) return;
     try {
       const info = await api.pickVault();
@@ -181,7 +184,7 @@ export default function App() {
       console.error("openVault failed:", e);
       setError(`Couldn't open vault: ${String(e)}`);
     }
-  }, [flushEditor, refreshTree]);
+  }, [flushEditor, nativeRuntime, refreshTree]);
 
   const checkForUpdate = useCallback(async () => {
     try {
@@ -335,8 +338,14 @@ export default function App() {
 
   // React to external vault changes and index readiness.
   useEffect(() => {
-    const off1 = onIndexReady(() => void refreshTree());
-    const off2 = onVaultChanged(() => void refreshTree());
+    const off1 = onIndexReady(() => {
+      setVaultRevision((revision) => revision + 1);
+      void refreshTree();
+    });
+    const off2 = onVaultChanged(() => {
+      setVaultRevision((revision) => revision + 1);
+      void refreshTree();
+    });
     return () => {
       off1?.();
       off2?.();
@@ -364,8 +373,14 @@ export default function App() {
         <img className="hero-img" src="/Rockion-Hero.png" alt="Rockion" />
         <h1>Rockion</h1>
         <p>A local-first markdown workspace. Your notes stay plain files on disk.</p>
-        <button className="primary" onClick={openVault}>
-          Open a vault folder
+        {!nativeRuntime && (
+          <p className="browser-preview-note">
+            Browser preview mode. Vault access and native file dialogs are available
+            in the Rockion desktop window started by <code>wails dev</code>.
+          </p>
+        )}
+        <button className="primary" onClick={openVault} disabled={!nativeRuntime}>
+          {nativeRuntime ? "Open a vault folder" : "Desktop runtime required"}
         </button>
       </div>
     );
@@ -409,6 +424,7 @@ export default function App() {
               setNote((current) => (current?.path === updated.path ? updated : current))
             }
             onSetIcon={setIcon}
+            refreshVersion={vaultRevision}
           />
         ) : (
           <Editor

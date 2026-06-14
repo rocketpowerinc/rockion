@@ -24,10 +24,8 @@ All notable changes to Rockion are documented here. This project adheres to
   sidebar, and the two stay in sync.
 - Breadcrumbs reset when you move into a different project, so the current project's
   dashboard is always the root of the trail.
-
-### Removed
-- Drop the page "Date" property — it had no behavior and went unused.
-
+- Dashboard image covers now use bounded thumbnails that load only when their
+  cards approach the viewport.
 - Expand the page icon gallery to more than 100 categorized emoji choices and
   add keyword search with aliases such as house, home, code, work, and money.
 - Show each target page's live icon beside internal dashboard links, including
@@ -43,7 +41,27 @@ All notable changes to Rockion are documented here. This project adheres to
   its entry together. Direct deletion of project pages is blocked to prevent
   orphaned dashboard state.
 
+### Changed
+- Split the main Wails, vault filesystem/media, and dashboard UI modules into
+  focused files before further dashboard expansion.
+- Store dashboard layout and sorting preferences in
+  `.rockion/dashboard-views.json` instead of rewriting dashboard frontmatter.
+
+### Removed
+- Remove the Unsplash cover option and remote-cover rendering. Covers now use
+  built-in colors, gradients, or validated images uploaded into the vault.
+- Drop the page "Date" property — it had no behavior and went unused.
+
 ### Fixed
+- Allow the Vite page at `localhost:5173` to render as an explicit browser
+  preview without a Wails bridge; native vault actions stay disabled until the
+  frontend runs inside the desktop window.
+- Restore managed-page deletion from dashboard cards, removing the Markdown
+  file and authoritative dashboard entry together.
+- Refresh an open dashboard after external vault changes and restrict drag
+  reordering to manual-order views so sorted displays cannot corrupt link order.
+- Preserve existing dashboard frontmatter byte-for-byte when changing layout
+  or sort settings.
 - Raise the cover action controls above the overlapping page header so both
   Change cover and Remove remain clickable.
 - Remove the corner arrow badge from authoritative managed dashboard entries

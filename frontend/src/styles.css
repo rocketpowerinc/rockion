@@ -79,6 +79,18 @@ body {
   color: var(--text-muted);
   max-width: 420px;
 }
+.welcome .browser-preview-note {
+  max-width: 520px;
+  margin: 4px auto 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--hover);
+  line-height: 1.45;
+}
+.browser-preview-note code {
+  color: var(--text);
+}
 button.primary,
 .primary {
   background: var(--accent);
@@ -494,8 +506,7 @@ button.primary,
 .page-cover-actions:focus-within {
   opacity: 1;
 }
-.page-cover-actions button,
-.page-cover-attribution {
+.page-cover-actions button {
   border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 6px;
   background: rgba(25, 25, 25, 0.72);
@@ -507,12 +518,6 @@ button.primary,
 .page-cover-actions button {
   min-height: 32px;
   padding: 7px 11px;
-}
-.page-cover-attribution {
-  position: absolute;
-  left: 14px;
-  bottom: 14px;
-  padding: 5px 8px;
 }
 .page-header {
   position: relative;
@@ -719,30 +724,14 @@ button.primary,
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
-.cover-upload,
-.cover-unsplash {
+.cover-upload {
   padding: 18px 12px;
   text-align: center;
 }
-.cover-upload p,
-.cover-unsplash p {
+.cover-upload p {
   margin: 0 0 14px;
   color: var(--text-muted);
   font-size: 13px;
-}
-.cover-unsplash button {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 7px 11px;
-  background: var(--bg);
-  color: var(--text);
-  cursor: pointer;
-}
-.cover-unsplash span {
-  display: block;
-  margin-top: 9px;
-  color: var(--text-muted);
-  font-size: 11px;
 }
 .cover-picker-error {
   margin: 6px 4px;
@@ -1742,6 +1731,7 @@ mark {
   gap: 14px;
 }
 .db-card {
+  position: relative;
   border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
@@ -1751,6 +1741,29 @@ mark {
   display: flex;
   flex-direction: column;
   transition: box-shadow 0.12s, border-color 0.12s;
+}
+.db-card-delete {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  width: 28px;
+  height: 26px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  color: var(--text-muted);
+  opacity: 0;
+  cursor: pointer;
+}
+.db-card:hover .db-card-delete,
+.db-card:focus-within .db-card-delete,
+.db-card-delete:focus-visible {
+  opacity: 1;
+}
+.db-card-delete:hover {
+  color: var(--danger, #e5484d);
+  border-color: currentColor;
 }
 .db-card:hover {
   border-color: var(--text-muted);
@@ -1808,12 +1821,23 @@ mark {
   flex-direction: column;
 }
 .db-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 8px 6px;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
+}
+.db-row-delete {
+  position: static;
+  flex: 0 0 auto;
+  opacity: 0;
+}
+.db-row:hover .db-row-delete,
+.db-row:focus-within .db-row-delete,
+.db-row-delete:focus-visible {
+  opacity: 1;
 }
 .db-row:hover {
   background: var(--hover);

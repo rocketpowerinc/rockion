@@ -7,7 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	"net/url"
+	"image/jpeg"
+	"image/png"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -16,7 +17,12 @@ import (
 	"rockion/internal/model"
 )
 
-const maxCoverSidecarBytes = 4 << 20
+const (
+	maxCoverSidecarBytes = 4 << 20
+	maxCoverImagePixels  = 40_000_000
+	coverThumbnailWidth  = 640
+	coverThumbnailHeight = 360
+)
 
 var coverColorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 
@@ -41,7 +47,7 @@ func (v *Vault) Cover(rel string) *model.PageCover {
 	defer v.coversMu.Unlock()
 	rel = filepath.ToSlash(filepath.Clean(filepath.FromSlash(rel)))
 	cover, ok := v.readCovers()[rel]
-	if !ok {
+	if !ok || !supportedCoverKind(cover.Kind) {
 		return nil
 	}
 	copy := cover
@@ -72,7 +78,7 @@ func (v *Vault) SetCover(rel string, cover model.PageCover) error {
 }
 
 // CoverImageDataURL returns a validated local cover image for display in the
-// Wails webview. Remote Unsplash images are deliberately not proxied.
+// Wails webview.
 func (v *Vault) CoverImageDataURL(rel string) (string, error) {
 	cover := v.Cover(rel)
 	if cover == nil || cover.Kind != "image" {
@@ -95,6 +101,49 @@ func (v *Vault) CoverImageDataURL(rel string) (string, error) {
 		return "", errors.New("unsupported cover image format")
 	}
 	return "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(data), nil
+}
+
+// CoverThumbnailDataURL returns a bounded preview for dashboard cards. It
+// avoids transferring full-size cover files through the Wails bridge.
+func (v *Vault) CoverThumbnailDataURL(rel string) (string, error) {
+	cover := v.Cover(rel)
+	if cover == nil || cover.Kind != "image" {
+		return "", errors.New("page does not have a local image cover")
+	}
+	full, _, err := v.validateCoverAsset(cover.Value)
+	if err != nil {
+		return "", err
+	}
+	file, err := os.Open(full)
+	if err != nil {
+		return "", err
+	}
+	source, format, err := image.Decode(file)
+	closeErr := file.Close()
+	if err != nil {
+		return "", errors.New("cover image could not be decoded")
+	}
+	if closeErr != nil {
+		return "", closeErr
+	}
+
+	bounds := source.Bounds()
+	width, height := thumbnailDimensions(bounds.Dx(), bounds.Dy())
+	thumbnail := image.NewRGBA(image.Rect(0, 0, width, height))
+	scaleThumbnail(thumbnail, source)
+
+	var encoded bytes.Buffer
+	mime := "image/jpeg"
+	if format == "png" || format == "gif" {
+		mime = "image/png"
+		err = png.Encode(&encoded, thumbnail)
+	} else {
+		err = jpeg.Encode(&encoded, thumbnail, &jpeg.Options{Quality: 78})
+	}
+	if err != nil {
+		return "", err
+	}
+	return "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(encoded.Bytes()), nil
 }
 
 func (v *Vault) RenameCoverPath(oldRel, newRel string, isDir bool) error {
@@ -154,14 +203,14 @@ func (v *Vault) validateCover(cover model.PageCover) error {
 		if _, _, err := v.validateCoverAsset(cover.Value); err != nil {
 			return err
 		}
-	case "unsplash":
-		if err := validateUnsplashCover(cover); err != nil {
-			return err
-		}
 	default:
 		return errors.New("unknown cover type")
 	}
 	return nil
+}
+
+func supportedCoverKind(kind string) bool {
+	return kind == "color" || kind == "gradient" || kind == "image"
 }
 
 func (v *Vault) validateCoverAsset(rel string) (string, string, error) {
@@ -189,7 +238,8 @@ func (v *Vault) validateCoverAsset(rel string) (string, string, error) {
 	}
 	config, format, err := image.DecodeConfig(bytes.NewReader(data))
 	if err != nil || config.Width <= 0 || config.Height <= 0 ||
-		config.Width > 12000 || config.Height > 12000 {
+		config.Width > 12000 || config.Height > 12000 ||
+		config.Width > maxCoverImagePixels/config.Height {
 		return "", "", errors.New("cover image is invalid or too large")
 	}
 	switch format {
@@ -200,28 +250,28 @@ func (v *Vault) validateCoverAsset(rel string) (string, string, error) {
 	}
 }
 
-func validateUnsplashCover(cover model.PageCover) error {
-	imageURL, err := url.Parse(cover.Value)
-	if err != nil || imageURL.Scheme != "https" || imageURL.Host != "images.unsplash.com" {
-		return errors.New("invalid Unsplash image URL")
+func thumbnailDimensions(width, height int) (int, int) {
+	if width <= coverThumbnailWidth && height <= coverThumbnailHeight {
+		return width, height
 	}
-	if imageURL.Query().Get("ixid") == "" {
-		return errors.New("Unsplash image URL is missing its tracking identifier")
-	}
-	for name, raw := range map[string]string{
-		"attribution URL": cover.AttributionURL,
-		"source URL":      cover.SourceURL,
-	} {
-		parsed, err := url.Parse(raw)
-		if err != nil || parsed.Scheme != "https" ||
-			(parsed.Host != "unsplash.com" && parsed.Host != "www.unsplash.com") {
-			return fmt.Errorf("invalid Unsplash %s", name)
+	scaleWidth := float64(coverThumbnailWidth) / float64(width)
+	scaleHeight := float64(coverThumbnailHeight) / float64(height)
+	scale := min(scaleWidth, scaleHeight)
+	return max(1, int(float64(width)*scale)), max(1, int(float64(height)*scale))
+}
+
+func scaleThumbnail(destination *image.RGBA, source image.Image) {
+	sourceBounds := source.Bounds()
+	targetBounds := destination.Bounds()
+	for y := targetBounds.Min.Y; y < targetBounds.Max.Y; y++ {
+		sourceY := sourceBounds.Min.Y +
+			(y-targetBounds.Min.Y)*sourceBounds.Dy()/targetBounds.Dy()
+		for x := targetBounds.Min.X; x < targetBounds.Max.X; x++ {
+			sourceX := sourceBounds.Min.X +
+				(x-targetBounds.Min.X)*sourceBounds.Dx()/targetBounds.Dx()
+			destination.Set(x, y, source.At(sourceX, sourceY))
 		}
 	}
-	if strings.TrimSpace(cover.AttributionName) == "" {
-		return errors.New("Unsplash photographer attribution is required")
-	}
-	return nil
 }
 
 func (v *Vault) readCovers() map[string]model.PageCover {

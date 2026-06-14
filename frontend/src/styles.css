@@ -842,6 +842,15 @@ button.primary,
   height: 1.6em;
   margin-top: 0.4em;
 }
+.rk-prose ul[data-type="taskList"] li > label input[type="checkbox"] {
+  margin: 0;
+  transform: translateY(2px);
+}
+.rk-prose ul[data-type="taskList"] li[data-checked="true"] > div > :not(ul):not(ol) {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
 .rk-prose blockquote {
   border-left: 3px solid var(--border);
   margin: 0.6em 0;

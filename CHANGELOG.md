@@ -53,6 +53,8 @@ All notable changes to Rockion are documented here. This project adheres to
 - Drop the page "Date" property — it had no behavior and went unused.
 
 ### Fixed
+- Align to-do checkboxes with their first text line and strike through only the
+  checked item’s own content, leaving nested child tasks independently styled.
 - Make every Block menu “Turn into” conversion structural and reliable,
   including bullet/numbered lists to to-do lists, lists to headings, and task
   lists back to ordinary text or list blocks without losing item content.

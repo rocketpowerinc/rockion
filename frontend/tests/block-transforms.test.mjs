@@ -135,3 +135,18 @@ test("the block menu uses structural replacement rather than list toggles", () =
   assert.match(source, /insertContentAt/);
   assert.doesNotMatch(source, /toggleTaskList|toggleBulletList|setHeading/);
 });
+
+test("task checkbox alignment and checked text styling stay enabled", () => {
+  const styles = fs.readFileSync(
+    new URL("../src/styles.css", import.meta.url),
+    "utf8"
+  );
+  assert.match(
+    styles,
+    /li > label input\[type="checkbox"\][\s\S]*transform:\s*translateY\(2px\)/
+  );
+  assert.match(
+    styles,
+    /li\[data-checked="true"\] > div > :not\(ul\):not\(ol\)[\s\S]*text-decoration:\s*line-through/
+  );
+});

@@ -355,7 +355,7 @@ func templateTagFolder(tag string) (string, error) {
 	case "bookmarks":
 		return "Bookmarks", nil
 	}
-	folder, err := projectName(tag)
+	folder, err := ProjectName(tag)
 	if err != nil {
 		return "", fmt.Errorf("invalid template tag folder: %w", err)
 	}

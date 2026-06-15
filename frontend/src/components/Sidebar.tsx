@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import type { TreeNode } from "../api";
+import type { Note, TreeNode } from "../api";
 import {
   writingLanguageLabel,
   type WritingLanguage,
@@ -16,6 +16,7 @@ interface Props {
   activePath: string | null;
   onOpen: (path: string) => void;
   onSetIcon: (path: string, icon: string) => void;
+  onRenameProject: (dashboardPath: string, title: string) => Promise<Note>;
   onNewProject: () => void;
   onGoHome: () => void;
   onOpenVault: () => void;
@@ -37,6 +38,7 @@ export default function Sidebar({
   activePath,
   onOpen,
   onSetIcon,
+  onRenameProject,
   onNewProject,
   onGoHome,
   onOpenVault,
@@ -143,44 +145,22 @@ export default function Sidebar({
             />
           ))}
         </SidebarSection>
-        <SidebarSection title="Folders">
+        <SidebarSection title="Projects">
           {!error && folders.length === 0 && (
-            <div className="sidebar-section-empty">Create a folder in the vault to add it here.</div>
+            <div className="sidebar-section-empty">Create a project to add it here.</div>
           )}
           {folders.map((node) => (
-            <div
+            <ProjectRow
               key={node.path}
-              className={`tree-row folder ${
-                activePath === node.entryPath ? "is-active" : ""
-              }`}
-            >
-              <button
-                className="tree-icon-btn"
-                title="Change project icon"
-                onClick={() => setIconPickerFor(node.path)}
-              >
-                {node.icon && node.icon.startsWith("data:") ? (
-                  <img className="tree-icon-img" src={node.icon} alt="" />
-                ) : (
-                  <span className="tree-icon">{node.icon || "📁"}</span>
-                )}
-              </button>
-              <button
-                className="folder-open-btn"
-                onClick={() => onOpen(node.entryPath || `${node.path}/dashboard.md`)}
-              >
-                {node.name}
-              </button>
-              {iconPickerFor === node.path && (
-                <EmojiPicker
-                  onClose={() => setIconPickerFor(null)}
-                  onPick={(icon) => {
-                    setIconPickerFor(null);
-                    onSetIcon(node.entryPath || `${node.path}/dashboard.md`, icon);
-                  }}
-                />
-              )}
-            </div>
+              node={node}
+              activePath={activePath}
+              iconPickerOpen={iconPickerFor === node.path}
+              onOpen={onOpen}
+              onOpenIconPicker={() => setIconPickerFor(node.path)}
+              onCloseIconPicker={() => setIconPickerFor(null)}
+              onSetIcon={onSetIcon}
+              onRenameProject={onRenameProject}
+            />
           ))}
         </SidebarSection>
         {rootNotes.length > 0 && (
@@ -322,6 +302,135 @@ function SidebarSection({
       </button>
       {(!collapsible || open) && children}
     </section>
+  );
+}
+
+function ProjectRow({
+  node,
+  activePath,
+  iconPickerOpen,
+  onOpen,
+  onOpenIconPicker,
+  onCloseIconPicker,
+  onSetIcon,
+  onRenameProject,
+}: {
+  node: TreeNode;
+  activePath: string | null;
+  iconPickerOpen: boolean;
+  onOpen: (path: string) => void;
+  onOpenIconPicker: () => void;
+  onCloseIconPicker: () => void;
+  onSetIcon: (path: string, icon: string) => void;
+  onRenameProject: (dashboardPath: string, title: string) => Promise<Note>;
+}) {
+  const dashboardPath = node.entryPath || `${node.path}/dashboard.md`;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(node.name);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setName(node.name);
+  }, [node.name, node.path]);
+
+  async function saveRename() {
+    if (saving) return;
+    const desired = name.trim();
+    if (!desired || desired === node.name) {
+      setName(node.name);
+      setEditing(false);
+      return;
+    }
+    setSaving(true);
+    try {
+      await onRenameProject(dashboardPath, desired);
+      setEditing(false);
+    } catch {
+      setName(node.name);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div
+      className={`tree-row folder project-row ${
+        activePath === dashboardPath ? "is-active" : ""
+      }`}
+    >
+      <button
+        className="tree-icon-btn"
+        title="Change project icon"
+        onClick={onOpenIconPicker}
+      >
+        {node.icon && node.icon.startsWith("data:") ? (
+          <img className="tree-icon-img" src={node.icon} alt="" />
+        ) : (
+          <span className="tree-icon">{node.icon || "📁"}</span>
+        )}
+      </button>
+      {editing ? (
+        <input
+          className="project-name-input"
+          value={name}
+          disabled={saving}
+          aria-label="Project name"
+          autoFocus
+          onChange={(event) => setName(event.target.value)}
+          onBlur={() => void saveRename()}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              event.currentTarget.blur();
+            } else if (event.key === "Escape") {
+              setName(node.name);
+              setEditing(false);
+            }
+          }}
+        />
+      ) : (
+        <button className="folder-open-btn" onClick={() => onOpen(dashboardPath)}>
+          {node.name}
+        </button>
+      )}
+      {!editing && (
+        <div className="project-row-actions">
+          <button
+            className="project-more-button"
+            title={`Project options for ${node.name}`}
+            aria-label={`Project options for ${node.name}`}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            ⋯
+          </button>
+          {menuOpen && (
+            <div className="project-row-menu" role="menu">
+              <button
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setEditing(true);
+                }}
+              >
+                Rename
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+      {iconPickerOpen && (
+        <EmojiPicker
+          onClose={onCloseIconPicker}
+          onPick={(icon) => {
+            onCloseIconPicker();
+            onSetIcon(dashboardPath, icon);
+          }}
+        />
+      )}
+    </div>
   );
 }
 

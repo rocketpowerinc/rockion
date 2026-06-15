@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"rockion/internal/db"
+	"rockion/internal/indexer"
 	"rockion/internal/vault"
 )
 
@@ -78,6 +80,57 @@ func TestRenameToTitleUpdatesManagedLinkWithoutFilenameChange(t *testing.T) {
 	}
 	if !strings.Contains(dashboard.Markdown, "[Question?](Other/Question.md?") {
 		t.Fatalf("managed dashboard label was not updated: %q", dashboard.Markdown)
+	}
+}
+
+func TestReplaceFirstHeadingPreservesDashboardBody(t *testing.T) {
+	got := replaceFirstHeading("# Old\r\n\r\nKeep this.\r\n", "New")
+	want := "# New\r\n\r\nKeep this.\r\n"
+	if got != want {
+		t.Fatalf("dashboard heading replacement changed the body:\n got %q\nwant %q", got, want)
+	}
+
+	got = replaceFirstHeading("No heading\n", "New")
+	want = "# New\n\nNo heading\n"
+	if got != want {
+		t.Fatalf("missing dashboard heading was not inserted:\n got %q\nwant %q", got, want)
+	}
+}
+
+func TestRenameProjectMovesFolderAndUpdatesDashboardTitle(t *testing.T) {
+	opened, err := vault.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := opened.CreateProject("Old Project"); err != nil {
+		t.Fatal(err)
+	}
+	database, err := db.Open(opened.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	ix := indexer.New(opened, database)
+	if err := ix.Rebuild(); err != nil {
+		t.Fatal(err)
+	}
+
+	app := NewApp()
+	app.vault = opened
+	app.db = database
+	app.indexer = ix
+	renamed, err := app.RenameProject("Old Project/dashboard.md", "New Project")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if renamed.Path != "New Project/dashboard.md" || renamed.Title != "New Project" {
+		t.Fatalf("renamed dashboard = %#v", renamed)
+	}
+	if _, err := os.Stat(filepath.Join(opened.Root, "Old Project")); !os.IsNotExist(err) {
+		t.Fatalf("old project still exists: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(opened.Root, "New Project", "dashboard.md")); err != nil {
+		t.Fatalf("renamed dashboard missing: %v", err)
 	}
 }
 

@@ -32,6 +32,7 @@ interface Props {
   onError: (message: string | null) => void;
   onRefreshTree: () => void;
   onNoteUpdated: (note: Note) => void;
+  onRenameProject: (dashboardPath: string, title: string) => Promise<Note>;
   onSetIcon: (path: string, icon: string) => void;
   refreshVersion: number;
 }
@@ -49,6 +50,7 @@ export default function Dashboard({
   onError,
   onRefreshTree,
   onNoteUpdated,
+  onRenameProject,
   onSetIcon,
   refreshVersion,
 }: Props) {
@@ -64,12 +66,18 @@ export default function Dashboard({
   const [coverRepositioning, setCoverRepositioning] = useState(false);
   const [coverDraftPosition, setCoverDraftPosition] = useState(50);
   const [coverPositionSaving, setCoverPositionSaving] = useState(false);
+  const [projectTitle, setProjectTitle] = useState(note.title);
+  const [projectRenameSaving, setProjectRenameSaving] = useState(false);
   const coverDrag = useRef({
     pointerId: -1,
     startY: 0,
     startPosition: 50,
     height: 1,
   });
+
+  useEffect(() => {
+    setProjectTitle(note.title);
+  }, [note.path, note.title]);
 
   // Resolve the dashboard page's own cover (color/gradient need no fetch).
   useEffect(() => {
@@ -118,6 +126,32 @@ export default function Dashboard({
     () => setCover({ kind: "", value: "", position: 50 }),
     [setCover]
   );
+
+  const renameProject = useCallback(async () => {
+    const desired = projectTitle.trim();
+    if (!desired || desired === note.title || projectRenameSaving) {
+      setProjectTitle(note.title);
+      return;
+    }
+    setProjectRenameSaving(true);
+    try {
+      const renamed = await onRenameProject(note.path, desired);
+      setProjectTitle(renamed.title);
+      onError(null);
+    } catch (reason) {
+      setProjectTitle(note.title);
+      onError(`Couldn't rename project: ${String(reason)}`);
+    } finally {
+      setProjectRenameSaving(false);
+    }
+  }, [
+    note.path,
+    note.title,
+    onError,
+    onRenameProject,
+    projectRenameSaving,
+    projectTitle,
+  ]);
 
   const startCoverReposition = useCallback(() => {
     setCoverDraftPosition(note.cover?.position ?? 50);
@@ -329,8 +363,8 @@ export default function Dashboard({
           )}
         </div>
       )}
-      <div className="db-content">
-        <div className="db-header">
+      <div className={`db-content ${note.cover ? "has-cover" : ""}`}>
+        <div className={`db-header ${note.cover ? "has-cover" : ""}`}>
           <div className="db-title">
             <button
               className="db-title-icon-btn"
@@ -352,7 +386,23 @@ export default function Dashboard({
                 }}
               />
             )}
-            <h1>{note.title}</h1>
+            <input
+              className="db-title-input"
+              value={projectTitle}
+              disabled={projectRenameSaving}
+              aria-label="Project name"
+              onChange={(event) => setProjectTitle(event.target.value)}
+              onBlur={() => void renameProject()}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  event.currentTarget.blur();
+                } else if (event.key === "Escape") {
+                  setProjectTitle(note.title);
+                  event.currentTarget.blur();
+                }
+              }}
+            />
             {!note.cover && (
               <button className="db-add-cover" onClick={() => setCoverPickerOpen(true)}>
                 Add cover

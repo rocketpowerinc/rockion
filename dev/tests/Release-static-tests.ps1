@@ -70,6 +70,17 @@ console.log(lock.packages[""].version);
     if ($wails.'frontend:install' -ne 'npm ci') {
         Add-Failure 'wails.json must use npm ci for reproducible installs.'
     }
+    if ($package.packageManager -ne 'npm@11.17.0') {
+        Add-Failure "package.json must pin packageManager to npm@11.17.0; found '$($package.packageManager)'."
+    }
+    $nvmVersion = (Get-Content -Raw -LiteralPath (Join-Path $RepoRoot '.nvmrc')).Trim()
+    if ($nvmVersion -ne '24.16.0') {
+        Add-Failure ".nvmrc must pin Node.js 24.16.0; found '$nvmVersion'."
+    }
+    $goMod = Get-Content -Raw -LiteralPath (Join-Path $RepoRoot 'go.mod')
+    if (-not $goMod.Contains('toolchain go1.26.4')) {
+        Add-Failure 'go.mod must pin toolchain go1.26.4.'
+    }
 } catch {
     Add-Failure "Release metadata is invalid JSON: $($_.Exception.Message)"
 }
@@ -100,6 +111,11 @@ foreach ($requiredText in @(
     'build-anduinos',
     'test-anduinos',
     'choco install nsis',
+    'NSIS_VERSION: "3.12.0"',
+    '--version="$env:NSIS_VERSION"',
+    'NODE_VERSION: "24.16.0"',
+    'NPM_VERSION: "11.17.0"',
+    'GO_VERSION: "1.26.4"',
     'makensis.exe',
     'GITHUB_PATH',
     'draft: false',
@@ -155,6 +171,9 @@ if (-not (Test-Path -LiteralPath $anduinosWorkflowPath)) {
     $anduinosWorkflow = Get-Content -Raw -LiteralPath $anduinosWorkflowPath
     foreach ($requiredText in @(
         'workflow_dispatch:',
+        'NODE_VERSION: "24.16.0"',
+        'NPM_VERSION: "11.17.0"',
+        'GO_VERSION: "1.26.4"',
         'Build AnduinOS package (amd64)',
         'runs-on: ubuntu-24.04',
         'wails build -platform linux/amd64 -clean -trimpath -tags webkit2_41',
@@ -238,6 +257,9 @@ if (-not (Test-Path -LiteralPath (Join-Path $RepoRoot 'frontend\public\.gitkeep'
 
 $releaseCoordinator = Get-Content -Raw -LiteralPath (Join-Path $RepoRoot 'dev\windows-create-release.ps1')
 foreach ($requiredText in @(
+    '$RequiredGoVersion = ''go1.26.4''',
+    '$RequiredNodeVersion = ''v24.16.0''',
+    '$RequiredNpmVersion = ''11.17.0''',
     'git ls-remote --refs --tags origin',
     '$attempt -le 3',
     'Git reported:',
@@ -246,6 +268,36 @@ foreach ($requiredText in @(
 )) {
     if (-not $releaseCoordinator.Contains($requiredText)) {
         Add-Failure "Release coordinator is missing resilient remote-tag handling: $requiredText"
+    }
+}
+
+$ciWorkflow = Get-Content -Raw -LiteralPath (Join-Path $RepoRoot '.github\workflows\ci.yml')
+foreach ($requiredText in @(
+    'NODE_VERSION: "24.16.0"',
+    'NPM_VERSION: "11.17.0"',
+    'GO_VERSION: "1.26.4"',
+    'npm audit --audit-level=moderate',
+    'govulncheck@v1.3.0 -tags webkit2_41 ./...'
+)) {
+    if (-not $ciWorkflow.Contains($requiredText)) {
+        Add-Failure "CI workflow is missing pinned security configuration: $requiredText"
+    }
+}
+
+$dependabotPath = Join-Path $RepoRoot '.github\dependabot.yml'
+if (-not (Test-Path -LiteralPath $dependabotPath)) {
+    Add-Failure 'Dependabot configuration is missing.'
+} else {
+    $dependabot = Get-Content -Raw -LiteralPath $dependabotPath
+    foreach ($requiredText in @(
+        'package-ecosystem: npm',
+        'package-ecosystem: gomod',
+        'package-ecosystem: github-actions',
+        'interval: weekly'
+    )) {
+        if (-not $dependabot.Contains($requiredText)) {
+            Add-Failure "Dependabot configuration is missing: $requiredText"
+        }
     }
 }
 if ($releaseCoordinator.Contains('git ls-remote --exit-code')) {

@@ -65,6 +65,21 @@ foreach ($command in @('git', 'go', 'node', 'npm', 'wails')) {
 }
 
 $RequiredWailsVersion = 'v2.12.0'
+$RequiredGoVersion = 'go1.26.4'
+$RequiredNodeVersion = 'v24.16.0'
+$RequiredNpmVersion = '11.17.0'
+$InstalledGoVersion = (& go version).Trim()
+$InstalledNodeVersion = (& node --version).Trim()
+$InstalledNpmVersion = (& npm --version).Trim()
+if ($InstalledGoVersion -notmatch [regex]::Escape($RequiredGoVersion)) {
+    Stop-Release "Go $RequiredGoVersion is required; found '$InstalledGoVersion'."
+}
+if ($InstalledNodeVersion -ne $RequiredNodeVersion) {
+    Stop-Release "Node.js $RequiredNodeVersion is required; found '$InstalledNodeVersion'."
+}
+if ($InstalledNpmVersion -ne $RequiredNpmVersion) {
+    Stop-Release "npm $RequiredNpmVersion is required; found '$InstalledNpmVersion'."
+}
 $WailsVersionOutput = (& wails version 2>&1 | Out-String)
 $VersionMatch = [regex]::Match($WailsVersionOutput, 'v\d+\.\d+\.\d+')
 $InstalledWailsVersion = if ($VersionMatch.Success) { $VersionMatch.Value } else { '' }

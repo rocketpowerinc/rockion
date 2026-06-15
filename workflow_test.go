@@ -43,6 +43,35 @@ func TestGitHubWorkflowsAreValidAndActionsArePinned(t *testing.T) {
 	}
 }
 
+func TestDependabotConfigIsValid(t *testing.T) {
+	path := filepath.Join(".github", "dependabot.yml")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var config struct {
+		Version int `yaml:"version"`
+		Updates []struct {
+			Ecosystem string `yaml:"package-ecosystem"`
+		} `yaml:"updates"`
+	}
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		t.Fatalf("%s is not valid YAML: %v", path, err)
+	}
+	if config.Version != 2 {
+		t.Fatalf("unexpected Dependabot version: %d", config.Version)
+	}
+	found := map[string]bool{}
+	for _, update := range config.Updates {
+		found[update.Ecosystem] = true
+	}
+	for _, ecosystem := range []string{"npm", "gomod", "github-actions"} {
+		if !found[ecosystem] {
+			t.Errorf("Dependabot is missing %s updates", ecosystem)
+		}
+	}
+}
+
 func isCommitSHA(value string) bool {
 	if len(value) != 40 {
 		return false

@@ -50,7 +50,7 @@ func Open(root string) (*Vault, error) {
 
 // Create makes a new vault directory under an existing parent folder.
 func Create(parent, title string) (*Vault, error) {
-	name, err := projectName(strings.TrimSpace(title))
+	name, err := ProjectName(strings.TrimSpace(title))
 	if err != nil {
 		return nil, errors.New(
 			strings.NewReplacer("project", "vault", "Project", "Vault").Replace(err.Error()),
@@ -465,7 +465,7 @@ func (v *Vault) WriteExpected(rel, markdown, expectedVersion string) error {
 // CreateProject creates a root project folder with its dashboard entry page.
 func (v *Vault) CreateProject(title string) (note model.Note, err error) {
 	title = strings.TrimSpace(title)
-	name, err := projectName(title)
+	name, err := ProjectName(title)
 	if err != nil {
 		return model.Note{}, err
 	}
@@ -495,7 +495,8 @@ func (v *Vault) CreateProject(title string) (note model.Note, err error) {
 	return v.Read(rel)
 }
 
-func projectName(title string) (string, error) {
+// ProjectName validates and normalizes a user-visible root project name.
+func ProjectName(title string) (string, error) {
 	if strings.TrimSpace(title) == "" {
 		return "", errors.New("project name is required")
 	}

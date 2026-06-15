@@ -136,6 +136,74 @@ test("the block menu uses structural replacement rather than list toggles", () =
   assert.doesNotMatch(source, /toggleTaskList|toggleBulletList|setHeading/);
 });
 
+test("the block menu opens to the left of its drag handle", () => {
+  const menu = fs.readFileSync(
+    new URL("../src/editor/BlockMenu.tsx", import.meta.url),
+    "utf8"
+  );
+  const styles = fs.readFileSync(
+    new URL("../src/styles.css", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(
+    menu,
+    /handleRect\.left\s*-\s*BLOCK_MENU_GAP\s*-\s*BLOCK_MENU_WIDTH/
+  );
+  assert.match(
+    styles,
+    /\.block-submenu\s*\{[\s\S]*right:\s*100%[\s\S]*margin-right:\s*4px/
+  );
+});
+
+test("the color menu stays open and exposes white as the first text color", () => {
+  const menu = fs.readFileSync(
+    new URL("../src/editor/BlockMenu.tsx", import.meta.url),
+    "utf8"
+  );
+  const marks = fs.readFileSync(
+    new URL("../src/editor/colorMarks.ts", import.meta.url),
+    "utf8"
+  );
+  const styles = fs.readFileSync(
+    new URL("../src/styles.css", import.meta.url),
+    "utf8"
+  );
+
+  const applyColor = menu.slice(
+    menu.indexOf("const applyColor"),
+    menu.indexOf("const clearBackgroundColor")
+  );
+  assert.doesNotMatch(applyColor, /close\(\)/);
+  const clearBackground = menu.slice(
+    menu.indexOf("const clearBackgroundColor"),
+    menu.indexOf("const clearColor")
+  );
+  assert.match(clearBackground, /\.unsetMark\("bgColor"\)/);
+  assert.doesNotMatch(clearBackground, /\.unsetMark\("textColor"\)/);
+  assert.match(menu, />\s*Remove background\s*</);
+  assert.match(
+    marks,
+    /TEXT_COLORS[\s\S]*\{\s*name:\s*"White",\s*value:\s*"#ffffff"\s*\}/
+  );
+  for (const color of [
+    "Gray",
+    "Blue",
+    "Indigo",
+    "Lavender",
+    "Teal",
+    "Lime",
+    "Gold",
+    "Coral",
+  ]) {
+    assert.match(marks, new RegExp(`name:\\s*"${color}"`));
+  }
+  assert.match(
+    styles,
+    /\.rk-prose ::selection\s*\{[\s\S]*color:\s*currentColor/
+  );
+});
+
 test("task checkbox alignment and checked text styling stay enabled", () => {
   const styles = fs.readFileSync(
     new URL("../src/styles.css", import.meta.url),

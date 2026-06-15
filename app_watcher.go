@@ -1,8 +1,10 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -116,6 +118,41 @@ func addWatchDirs(watcher *fsnotify.Watcher, root string) error {
 		}
 		return watcher.Add(path)
 	})
+}
+
+// removeWatchDirs releases Windows directory handles before a folder move.
+// Watches are removed deepest-first because child watches outlive their parent.
+func removeWatchDirs(watcher *fsnotify.Watcher, root string) error {
+	dirs := []string{}
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return nil
+		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			if entry.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if entry.IsDir() {
+			dirs = append(dirs, path)
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	sort.Slice(dirs, func(i, j int) bool {
+		return len(dirs[i]) > len(dirs[j])
+	})
+	var removeErrs []error
+	for _, dir := range dirs {
+		if err := watcher.Remove(dir); err != nil &&
+			!errors.Is(err, os.ErrNotExist) {
+			removeErrs = append(removeErrs, err)
+		}
+	}
+	return errors.Join(removeErrs...)
 }
 
 func shouldSkipWatchPath(path, root string) bool {

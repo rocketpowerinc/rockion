@@ -322,8 +322,25 @@ func (a *App) renamePathLocked(oldPath, newPath string) error {
 	if err != nil {
 		return fmt.Errorf("find links to rewrite: %w", err)
 	}
+	oldFull := filepath.Join(a.vault.Root, filepath.FromSlash(oldPath))
+	newFull := filepath.Join(a.vault.Root, filepath.FromSlash(newPath))
+	watchesRemoved := false
+	if isDir && a.watcher != nil {
+		if err := removeWatchDirs(a.watcher, oldFull); err != nil {
+			runtime.LogErrorf(a.ctx, "release project watches before rename failed: %v", err)
+		}
+		watchesRemoved = true
+	}
 	if err := a.vault.Rename(oldPath, newPath); err != nil {
+		if watchesRemoved {
+			_ = addWatchDirs(a.watcher, oldFull)
+		}
 		return err
+	}
+	if watchesRemoved {
+		if err := addWatchDirs(a.watcher, newFull); err != nil {
+			runtime.LogErrorf(a.ctx, "restore project watches after rename failed: %v", err)
+		}
 	}
 	var followUpErrs []error
 	if err := a.vault.RenameIconPath(oldPath, newPath, isDir); err != nil {
@@ -401,6 +418,81 @@ func (a *App) RenameToTitle(path, title string) (model.Note, error) {
 		return model.Note{}, err
 	}
 	return a.withCover(note), nil
+}
+
+// RenameProject updates a root project's dashboard title and folder name.
+func (a *App) RenameProject(dashboardPath, title string) (model.Note, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if err := a.requireVault(); err != nil {
+		return model.Note{}, err
+	}
+
+	clean := filepath.ToSlash(filepath.Clean(filepath.FromSlash(dashboardPath)))
+	parts := strings.Split(clean, "/")
+	if len(parts) != 2 || !strings.EqualFold(parts[1], "dashboard.md") {
+		return model.Note{}, errors.New("project dashboard must be directly inside a root project")
+	}
+	newProject, err := vault.ProjectName(strings.TrimSpace(title))
+	if err != nil {
+		return model.Note{}, err
+	}
+
+	original, err := a.vault.Read(clean)
+	if err != nil {
+		return model.Note{}, err
+	}
+	updatedMarkdown := replaceFirstHeading(original.Markdown, strings.TrimSpace(title))
+	if err := a.vault.WriteExpected(clean, updatedMarkdown, original.Version); err != nil {
+		return model.Note{}, err
+	}
+	if a.indexer != nil {
+		if err := a.indexer.IndexFile(clean); err != nil {
+			_ = a.vault.Write(clean, original.Markdown)
+			return model.Note{}, fmt.Errorf("index project title: %w", err)
+		}
+	}
+
+	oldProject := parts[0]
+	newDashboard := filepath.ToSlash(filepath.Join(newProject, "dashboard.md"))
+	if oldProject != newProject {
+		if err := a.renamePathLocked(oldProject, newProject); err != nil {
+			// The filesystem move happens before metadata/index follow-up work.
+			// If the destination now exists, keep the successful rename and
+			// report the follow-up failure only in the native log.
+			if moved, statErr := a.vault.IsDir(newProject); statErr == nil && moved {
+				runtime.LogErrorf(a.ctx, "project renamed with follow-up warnings: %v", err)
+			} else {
+				_ = a.vault.Write(clean, original.Markdown)
+				if a.indexer != nil {
+					_ = a.indexer.IndexFile(clean)
+				}
+				return model.Note{}, err
+			}
+		}
+	}
+
+	note, err := a.vault.Read(newDashboard)
+	if err != nil {
+		return model.Note{}, err
+	}
+	return a.withCover(note), nil
+}
+
+func replaceFirstHeading(markdown, title string) string {
+	lines := strings.SplitAfter(markdown, "\n")
+	for i, line := range lines {
+		content := strings.TrimSuffix(strings.TrimSuffix(line, "\n"), "\r")
+		if strings.HasPrefix(content, "# ") {
+			suffix := line[len(content):]
+			lines[i] = "# " + title + suffix
+			return strings.Join(lines, "")
+		}
+	}
+	if markdown == "" {
+		return "# " + title + "\n\n"
+	}
+	return "# " + title + "\n\n" + markdown
 }
 
 func (a *App) DeletePath(path string) error {

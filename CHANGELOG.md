@@ -6,6 +6,21 @@ All notable changes to Rockion are documented here. This project adheres to
 ## [Unreleased]
 
 ### Added
+- Rename projects from a hover-only three-dot menu in the sidebar, and relabel
+  the sidebar's Folders section as Projects.
+- Release active filesystem watches before renaming project directories on
+  Windows, then restore watches at the new location.
+- Make project names directly editable from dashboard headers. Renaming updates
+  the root project folder, dashboard heading, open navigation paths, links, and
+  associated icon, cover, favorite, and dashboard-view metadata.
+- Position project icons at page-icon scale so they overlap project covers in
+  the same way as regular page icons.
+- Add a dedicated Remove background action to the block color menu so a
+  background tint can be cleared without removing the selected text color.
+- Expand the block color picker with gray, blue, indigo, lavender, teal, lime,
+  gold, and coral text colors plus matching translucent backgrounds.
+- Open block action menus and their nested submenus to the left of the drag
+  handle so they no longer cover the block text being edited.
 - Add image-cover repositioning to pages and project dashboards. Users can drag
   the cover vertically, save or cancel the framing, and see the saved position
   reflected in dashboard gallery thumbnails.
@@ -77,6 +92,13 @@ All notable changes to Rockion are documented here. This project adheres to
   orphaned dashboard state.
 
 ### Changed
+- Keep the block color palette open after applying colors, add white as the
+  first text swatch, and preserve marked text colors while text is selected.
+- Pin the release toolchain to Node.js 24.16.0 LTS, npm 11.17.0, Go
+  toolchain 1.26.4, Wails 2.12.0, and NSIS 3.12.0. CI now runs the pinned npm
+  version and audits both npm and Go dependencies.
+- Add weekly Dependabot update groups for frontend packages, Go modules, and
+  GitHub Actions while retaining lockfile- and commit-SHA-based builds.
 - Move dashboard page-template selection into the New page dialog, directly
   below the page-title field, for both New page entry points.
 - Replace hard-coded Blank, Task, and Meeting Note template logic with seeded

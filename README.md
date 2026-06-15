@@ -129,7 +129,8 @@ download, verify, and apply the matching update directly.
 ## Prerequisites
 
 - **Go** 1.26.4
-- **Node** 20.19+ or 22.12+
+- **Node.js** 24.16.0 LTS (also recorded in `.nvmrc`)
+- **npm** 11.17.0
 - **Wails CLI v2.12.0**: `go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0`
 - Platform deps for Wails development (WebView2 on Windows, WebKitGTK on Linux). Run `wails doctor` to check.
 

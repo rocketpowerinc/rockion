@@ -114,6 +114,8 @@ export const api = {
   ): Promise<Note> => App.CreateSubPageFromTemplate(dashboardPath, title, template),
   createProject: (title: string): Promise<Note> => App.CreateProject(title),
   renamePath: (oldPath: string, newPath: string): Promise<void> => App.RenamePath(oldPath, newPath),
+  renameProject: (dashboardPath: string, title: string): Promise<Note> =>
+    App.RenameProject(dashboardPath, title),
   // Rename a note so its filename matches its title (first H1); returns the moved note.
   renameToTitle: (path: string, title: string): Promise<Note> => App.RenameToTitle(path, title),
   deletePath: (path: string): Promise<void> => App.DeletePath(path),

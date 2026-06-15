@@ -9,6 +9,10 @@ interface Props {
 
 type Sub = null | "turn" | "color";
 
+const BLOCK_MENU_WIDTH = 184;
+const BLOCK_MENU_GAP = 6;
+const VIEWPORT_GUTTER = 8;
+
 interface MenuState {
   x: number;
   y: number;
@@ -63,7 +67,14 @@ export default function BlockMenu({ editor }: Props) {
       // menu, so don't open at all for it.
       const block = view.state.doc.nodeAt(from);
       if (from === 0 && block?.type.name === "heading") return;
-      setMenu({ x: handleRect.right + 6, y: handleRect.top, from });
+      setMenu({
+        x: Math.max(
+          VIEWPORT_GUTTER,
+          handleRect.left - BLOCK_MENU_GAP - BLOCK_MENU_WIDTH
+        ),
+        y: handleRect.top,
+        from,
+      });
       setSub(null);
     };
     document.addEventListener("click", onClick, true);
@@ -114,7 +125,15 @@ export default function BlockMenu({ editor }: Props) {
       .setTextSelection({ from: menu.from + 1, to: to - 1 })
       .setMark(markName, attrs)
       .run();
-    close();
+  };
+
+  const clearBackgroundColor = () => {
+    editor
+      .chain()
+      .focus()
+      .setTextSelection({ from: menu.from + 1, to: to - 1 })
+      .unsetMark("bgColor")
+      .run();
   };
 
   const clearColor = () => {
@@ -125,7 +144,6 @@ export default function BlockMenu({ editor }: Props) {
       .unsetMark("textColor")
       .unsetMark("bgColor")
       .run();
-    close();
   };
 
   const duplicate = () => {
@@ -215,8 +233,12 @@ export default function BlockMenu({ editor }: Props) {
               />
             ))}
           </div>
+          <button className="block-menu-item" onClick={clearBackgroundColor}>
+            Remove background
+          </button>
+          <div className="block-menu-sep" />
           <button className="block-menu-item" onClick={clearColor}>
-            Default
+            Reset all colors
           </button>
         </div>
       )}

@@ -2,6 +2,8 @@ module rockion
 
 go 1.26.0
 
+toolchain go1.26.4
+
 require (
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/wailsapp/wails/v2 v2.12.0

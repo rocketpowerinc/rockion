@@ -116,6 +116,44 @@ test("external vault revisions reload an open dashboard", () => {
   assert.match(dashboard, /\[reload, note\.version, refreshVersion\]/);
 });
 
+test("project dashboards expose editable names and cover-overlapping icons", () => {
+  const app = fs.readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
+  const dashboard = fs.readFileSync(
+    new URL("../src/components/Dashboard.tsx", import.meta.url),
+    "utf8"
+  );
+  const styles = fs.readFileSync(
+    new URL("../src/styles.css", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(dashboard, /onRenameProject\(note\.path,\s*desired\)/);
+  assert.match(dashboard, /className="db-title-input"/);
+  assert.match(dashboard, /aria-label="Project name"/);
+  assert.match(app, /const renameProject = useCallback/);
+  assert.match(app, /api\.renameProject\(dashboardPath,\s*title\)/);
+  assert.match(styles, /\.db-header\.has-cover\s*\{[\s\S]*margin-top:\s*-34px/);
+  assert.match(styles, /\.db-title-icon\s*\{[\s\S]*font-size:\s*46px/);
+});
+
+test("sidebar labels root folders as projects and exposes hover rename controls", () => {
+  const sidebar = fs.readFileSync(
+    new URL("../src/components/Sidebar.tsx", import.meta.url),
+    "utf8"
+  );
+  const styles = fs.readFileSync(
+    new URL("../src/styles.css", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(sidebar, /<SidebarSection title="Projects">/);
+  assert.doesNotMatch(sidebar, /<SidebarSection title="Folders">/);
+  assert.match(sidebar, /className="project-more-button"/);
+  assert.match(sidebar, />\s*Rename\s*</);
+  assert.match(sidebar, /className="project-name-input"/);
+  assert.match(styles, /\.project-row:hover \.project-more-button[\s\S]*opacity:\s*1/);
+});
+
 test("dashboard templates are loaded from the vault into the new-page modal", () => {
   const dashboard = fs.readFileSync(
     new URL("../src/components/Dashboard.tsx", import.meta.url),

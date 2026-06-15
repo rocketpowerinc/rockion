@@ -421,6 +421,41 @@ export default function App() {
     [refreshTree]
   );
 
+  const renameProject = useCallback(
+    async (dashboardPath: string, title: string) => {
+      try {
+        const renamed = await api.renameProject(dashboardPath, title);
+        const previousProject = dashboardPath.replace(/\/dashboard\.md$/i, "");
+        const renamedProject = renamed.path.replace(/\/dashboard\.md$/i, "");
+        setNote((current) =>
+          current?.path === dashboardPath ||
+          current?.path.startsWith(`${previousProject}/`)
+            ? current.path === dashboardPath
+              ? renamed
+              : {
+                  ...current,
+                  path: `${renamedProject}${current.path.slice(previousProject.length)}`,
+                }
+            : current
+        );
+        setNavigationHistory((current) =>
+          current.map((path) =>
+            path === previousProject || path.startsWith(`${previousProject}/`)
+              ? `${renamedProject}${path.slice(previousProject.length)}`
+              : path
+          )
+        );
+        await refreshTree();
+        setError(null);
+        return renamed;
+      } catch (reason) {
+        setError(`Couldn't rename project: ${String(reason)}`);
+        throw reason;
+      }
+    },
+    [refreshTree]
+  );
+
   // Global keyboard shortcuts.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -518,6 +553,7 @@ export default function App() {
         activePath={note?.path ?? null}
         onOpen={openNote}
         onSetIcon={setIcon}
+        onRenameProject={renameProject}
         onNewProject={newProject}
         onGoHome={() => void goToVaultHome()}
         onOpenVault={openVault}
@@ -544,6 +580,7 @@ export default function App() {
             onNoteUpdated={(updated) =>
               setNote((current) => (current?.path === updated.path ? updated : current))
             }
+            onRenameProject={renameProject}
             onSetIcon={setIcon}
             refreshVersion={vaultRevision}
           />

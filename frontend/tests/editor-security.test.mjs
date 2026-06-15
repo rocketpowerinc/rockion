@@ -104,9 +104,11 @@ test("selected text exposes inline formatting and link controls", () => {
   ]) {
     assert.match(toolbar, new RegExp(command));
   }
-  assert.match(toolbar, /from !== to/);
-  assert.match(toolbar, /!locked && current\.isEditable/);
+  assert.match(toolbar, /const \{ from, to, empty \} = editor\.state\.selection/);
+  assert.match(toolbar, /locked \|\| !editor\.isEditable \|\| empty/);
   assert.match(toolbar, /className="selection-link-form"/);
+  assert.match(toolbar, /createPortal/);
+  assert.doesNotMatch(toolbar, /\bBubbleMenu\b/);
   assert.match(editor, /<SelectionToolbar editor=\{editor\} locked=\{pageSettings\.locked\}/);
   assert.match(extensions, /\bUnderline\b/);
   assert.match(underline, /tag:\s*"u"/);

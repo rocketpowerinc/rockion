@@ -5,6 +5,11 @@ All notable changes to Rockion are documented here. This project adheres to
 
 ## [Unreleased]
 
+### Fixed
+- Prevent intermittent project-navigation crashes by replacing Tiptap's
+  DOM-reparenting BubbleMenu with a React-owned portal for the selection
+  toolbar.
+
 ### Changed
 - Remove New sub-page from the editor slash-command menu. New managed pages
   continue to be created from their project dashboard.

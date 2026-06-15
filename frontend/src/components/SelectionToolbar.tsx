@@ -1,5 +1,13 @@
-import { useEffect, useState, type FormEvent, type MouseEvent } from "react";
-import { BubbleMenu, type Editor } from "@tiptap/react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type MouseEvent,
+} from "react";
+import { createPortal } from "react-dom";
+import type { Editor } from "@tiptap/react";
 import { normalizeExternalHref } from "../editor/externalLinks.mjs";
 
 interface Props {
@@ -11,12 +19,65 @@ export default function SelectionToolbar({ editor, locked }: Props) {
   const [linkEditing, setLinkEditing] = useState(false);
   const [href, setHref] = useState("");
   const [linkError, setLinkError] = useState("");
+  const [position, setPosition] = useState({ left: 0, top: 0 });
+  const [visible, setVisible] = useState(false);
+  const [, setRevision] = useState(0);
+  const toolbarRef = useRef<HTMLDivElement>(null);
+
+  const update = useCallback(() => {
+    if (!editor || editor.isDestroyed) {
+      setVisible(false);
+      return;
+    }
+    const { from, to, empty } = editor.state.selection;
+    const toolbarFocused = !!toolbarRef.current?.contains(document.activeElement);
+    if (locked || !editor.isEditable || empty || (!editor.isFocused && !toolbarFocused)) {
+      setVisible(false);
+      return;
+    }
+    try {
+      const start = editor.view.coordsAtPos(from);
+      const end = editor.view.coordsAtPos(to);
+      const center = Math.max(150, Math.min(window.innerWidth - 150, (start.left + end.right) / 2));
+      const above = Math.min(start.top, end.top) - 46;
+      setPosition({
+        left: center,
+        top: above >= 8 ? above : Math.max(start.bottom, end.bottom) + 8,
+      });
+      setVisible(true);
+      setRevision((value) => value + 1);
+    } catch {
+      setVisible(false);
+    }
+  }, [editor, locked]);
 
   useEffect(() => {
     setLinkEditing(false);
     setHref("");
     setLinkError("");
-  }, [editor?.state.selection.from, editor?.state.selection.to]);
+    setVisible(false);
+  }, [editor]);
+
+  useEffect(() => {
+    if (!editor) return;
+    const refresh = () => update();
+    const refreshAfterBlur = () => window.setTimeout(update, 0);
+    editor.on("selectionUpdate", refresh);
+    editor.on("transaction", refresh);
+    editor.on("focus", refresh);
+    editor.on("blur", refreshAfterBlur);
+    window.addEventListener("resize", refresh);
+    window.addEventListener("scroll", refresh, true);
+    update();
+    return () => {
+      editor.off("selectionUpdate", refresh);
+      editor.off("transaction", refresh);
+      editor.off("focus", refresh);
+      editor.off("blur", refreshAfterBlur);
+      window.removeEventListener("resize", refresh);
+      window.removeEventListener("scroll", refresh, true);
+    };
+  }, [editor, update]);
 
   if (!editor) return null;
 
@@ -28,6 +89,7 @@ export default function SelectionToolbar({ editor, locked }: Props) {
     setHref(editor?.getAttributes("link").href || "");
     setLinkError("");
     setLinkEditing(true);
+    window.setTimeout(update, 0);
   }
 
   function saveLink(event: FormEvent) {
@@ -65,14 +127,14 @@ export default function SelectionToolbar({ editor, locked }: Props) {
     </button>
   );
 
-  return (
-    <BubbleMenu
-      editor={editor}
+  if (!visible && !linkEditing) return null;
+
+  return createPortal(
+    <div
+      ref={toolbarRef}
       className="selection-toolbar"
-      tippyOptions={{ duration: 100, placement: "top", maxWidth: "none" }}
-      shouldShow={({ editor: current, from, to }) =>
-        !locked && current.isEditable && from !== to
-      }
+      style={{ left: position.left, top: position.top }}
+      onMouseDown={() => window.setTimeout(update, 0)}
     >
       {linkEditing ? (
         <form className="selection-link-form" onSubmit={saveLink}>
@@ -124,6 +186,7 @@ export default function SelectionToolbar({ editor, locked }: Props) {
           </button>
         </>
       )}
-    </BubbleMenu>
+    </div>,
+    document.body
   );
 }

@@ -1373,6 +1373,8 @@ button.primary,
   cursor: default;
 }
 .selection-toolbar {
+  position: fixed;
+  z-index: 90;
   display: flex;
   align-items: center;
   gap: 2px;
@@ -1381,6 +1383,7 @@ button.primary,
   border-radius: 8px;
   background: var(--bg);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  transform: translateX(-50%);
 }
 .selection-toolbar > button,
 .selection-link-form button {

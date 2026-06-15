@@ -5,6 +5,8 @@ All notable changes to Rockion are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [0.1.13] - 2026-06-15
+
 ### Added
 - Add a collapsible sidebar that persists its compact or expanded state and
   keeps core vault controls available from the compact rail.
@@ -348,3 +350,4 @@ First release. A working local-first markdown editor: Notion-style UI over plain
 [0.1.10]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.10
 [0.1.11]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.11
 [0.1.12]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.12
+[0.1.13]: https://github.com/rocketpowerinc/rockion/releases/tag/v0.1.13

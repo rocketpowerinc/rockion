@@ -161,6 +161,36 @@ function Invoke-AnduinOSPackagePreflight {
     Write-Host 'The amd64 package installed and launched on the AnduinOS baseline.' -ForegroundColor Green
 }
 
+function Stop-NodeVersionMismatch {
+    param(
+        [string]$Required,
+        [string]$Found
+    )
+
+    $RequiredBare = $Required.TrimStart('v')
+    Write-Host "[ERROR] Node.js $Required is required; found '$Found'." -ForegroundColor Red
+    Write-Host
+    Write-Host 'Rockion releases are pinned to the same Node.js version used by GitHub Actions.' -ForegroundColor Yellow
+    if (Get-Command nvm -ErrorAction SilentlyContinue) {
+        Write-Host 'Run these commands, then start the release again:' -ForegroundColor Yellow
+        Write-Host "  nvm install $RequiredBare" -ForegroundColor Cyan
+        Write-Host "  nvm use $RequiredBare" -ForegroundColor Cyan
+    } elseif (Get-Command fnm -ErrorAction SilentlyContinue) {
+        Write-Host 'Run these commands, then start the release again:' -ForegroundColor Yellow
+        Write-Host "  fnm install $RequiredBare" -ForegroundColor Cyan
+        Write-Host "  fnm use $RequiredBare" -ForegroundColor Cyan
+    } elseif (Get-Command volta -ErrorAction SilentlyContinue) {
+        Write-Host 'Run this command, then start the release again:' -ForegroundColor Yellow
+        Write-Host "  volta install node@$RequiredBare" -ForegroundColor Cyan
+    } else {
+        Write-Host 'Install or activate Node.js 24.16.0, then start the release again.' -ForegroundColor Yellow
+        Write-Host 'For example, install nvm-windows and run:' -ForegroundColor Yellow
+        Write-Host "  nvm install $RequiredBare" -ForegroundColor Cyan
+        Write-Host "  nvm use $RequiredBare" -ForegroundColor Cyan
+    }
+    exit 1
+}
+
 if ($Publish -and $SkipPublish) {
     Stop-Release 'Use either -Publish or -SkipPublish, not both.'
 }
@@ -207,7 +237,7 @@ if ($InstalledGoVersion -notmatch [regex]::Escape($RequiredGoVersion)) {
     Stop-Release "Go $RequiredGoVersion is required; found '$InstalledGoVersion'."
 }
 if ($InstalledNodeVersion -ne $RequiredNodeVersion) {
-    Stop-Release "Node.js $RequiredNodeVersion is required; found '$InstalledNodeVersion'."
+    Stop-NodeVersionMismatch -Required $RequiredNodeVersion -Found $InstalledNodeVersion
 }
 if ($InstalledNpmVersion -ne $RequiredNpmVersion) {
     Stop-Release "npm $RequiredNpmVersion is required; found '$InstalledNpmVersion'."

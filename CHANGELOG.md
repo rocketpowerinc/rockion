@@ -10,6 +10,8 @@ All notable changes to Rockion are documented here. This project adheres to
   keeps core vault controls available from the compact rail.
 - Add AnduinOS package preflight mode to the Windows release coordinator so
   release and Linux package test orchestration live in one script.
+- Add clearer release-script guidance when the active Node.js version does not
+  match the pinned release toolchain.
 
 ### Fixed
 - Prevent intermittent project-navigation crashes by replacing Tiptap's

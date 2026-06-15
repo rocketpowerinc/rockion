@@ -12,6 +12,7 @@ All notable changes to Rockion are documented here. This project adheres to
   release and Linux package test orchestration live in one script.
 - Add clearer release-script guidance when the active Node.js version does not
   match the pinned release toolchain.
+- Pin the local and CI frontend toolchain to Node.js 26.3.0 and npm 11.16.0.
 
 ### Fixed
 - Prevent intermittent project-navigation crashes by replacing Tiptap's

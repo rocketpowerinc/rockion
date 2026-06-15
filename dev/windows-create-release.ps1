@@ -183,7 +183,7 @@ function Stop-NodeVersionMismatch {
         Write-Host 'Run this command, then start the release again:' -ForegroundColor Yellow
         Write-Host "  volta install node@$RequiredBare" -ForegroundColor Cyan
     } else {
-        Write-Host 'Install or activate Node.js 24.16.0, then start the release again.' -ForegroundColor Yellow
+        Write-Host "Install or activate Node.js $RequiredBare, then start the release again." -ForegroundColor Yellow
         Write-Host 'For example, install nvm-windows and run:' -ForegroundColor Yellow
         Write-Host "  nvm install $RequiredBare" -ForegroundColor Cyan
         Write-Host "  nvm use $RequiredBare" -ForegroundColor Cyan
@@ -228,8 +228,8 @@ foreach ($command in @('git', 'go', 'node', 'npm', 'wails')) {
 
 $RequiredWailsVersion = 'v2.12.0'
 $RequiredGoVersion = 'go1.26.4'
-$RequiredNodeVersion = 'v24.16.0'
-$RequiredNpmVersion = '11.17.0'
+$RequiredNodeVersion = 'v26.3.0'
+$RequiredNpmVersion = '11.16.0'
 $InstalledGoVersion = (& go version).Trim()
 $InstalledNodeVersion = (& node --version).Trim()
 $InstalledNpmVersion = (& npm --version).Trim()

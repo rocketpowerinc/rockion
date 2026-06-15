@@ -70,12 +70,12 @@ console.log(lock.packages[""].version);
     if ($wails.'frontend:install' -ne 'npm ci') {
         Add-Failure 'wails.json must use npm ci for reproducible installs.'
     }
-    if ($package.packageManager -ne 'npm@11.17.0') {
-        Add-Failure "package.json must pin packageManager to npm@11.17.0; found '$($package.packageManager)'."
+    if ($package.packageManager -ne 'npm@11.16.0') {
+        Add-Failure "package.json must pin packageManager to npm@11.16.0; found '$($package.packageManager)'."
     }
     $nvmVersion = (Get-Content -Raw -LiteralPath (Join-Path $RepoRoot '.nvmrc')).Trim()
-    if ($nvmVersion -ne '24.16.0') {
-        Add-Failure ".nvmrc must pin Node.js 24.16.0; found '$nvmVersion'."
+    if ($nvmVersion -ne '26.3.0') {
+        Add-Failure ".nvmrc must pin Node.js 26.3.0; found '$nvmVersion'."
     }
     $goMod = Get-Content -Raw -LiteralPath (Join-Path $RepoRoot 'go.mod')
     if (-not $goMod.Contains('toolchain go1.26.4')) {
@@ -113,8 +113,8 @@ foreach ($requiredText in @(
     'choco install nsis',
     'NSIS_VERSION: "3.12.0"',
     '--version="$env:NSIS_VERSION"',
-    'NODE_VERSION: "24.16.0"',
-    'NPM_VERSION: "11.17.0"',
+    'NODE_VERSION: "26.3.0"',
+    'NPM_VERSION: "11.16.0"',
     'GO_VERSION: "1.26.4"',
     'makensis.exe',
     'GITHUB_PATH',
@@ -171,8 +171,8 @@ if (-not (Test-Path -LiteralPath $anduinosWorkflowPath)) {
     $anduinosWorkflow = Get-Content -Raw -LiteralPath $anduinosWorkflowPath
     foreach ($requiredText in @(
         'workflow_dispatch:',
-        'NODE_VERSION: "24.16.0"',
-        'NPM_VERSION: "11.17.0"',
+        'NODE_VERSION: "26.3.0"',
+        'NPM_VERSION: "11.16.0"',
         'GO_VERSION: "1.26.4"',
         'Build AnduinOS package (amd64)',
         'runs-on: ubuntu-24.04',
@@ -259,8 +259,8 @@ if (-not (Test-Path -LiteralPath (Join-Path $RepoRoot 'frontend\public\.gitkeep'
 $releaseCoordinator = Get-Content -Raw -LiteralPath (Join-Path $RepoRoot 'dev\windows-create-release.ps1')
 foreach ($requiredText in @(
     '$RequiredGoVersion = ''go1.26.4''',
-    '$RequiredNodeVersion = ''v24.16.0''',
-    '$RequiredNpmVersion = ''11.17.0''',
+    '$RequiredNodeVersion = ''v26.3.0''',
+    '$RequiredNpmVersion = ''11.16.0''',
     'Stop-NodeVersionMismatch',
     'nvm install $RequiredBare',
     'fnm install $RequiredBare',
@@ -290,8 +290,8 @@ foreach ($requiredText in @(
 
 $ciWorkflow = Get-Content -Raw -LiteralPath (Join-Path $RepoRoot '.github\workflows\ci.yml')
 foreach ($requiredText in @(
-    'NODE_VERSION: "24.16.0"',
-    'NPM_VERSION: "11.17.0"',
+    'NODE_VERSION: "26.3.0"',
+    'NPM_VERSION: "11.16.0"',
     'GO_VERSION: "1.26.4"',
     'npm audit --audit-level=moderate',
     'govulncheck@v1.3.0 -tags webkit2_41 ./...'

@@ -46,6 +46,11 @@ export interface PageCover {
   position: number;
 }
 
+export interface PageSettings {
+  locked: boolean;
+  fullWidth: boolean;
+}
+
 export interface PageCard {
   pageId: string;
   path: string;
@@ -140,6 +145,9 @@ export const api = {
   saveImage: (name: string, data: number[]): Promise<string> => App.SaveImage(name, data),
   setNoteCover: (path: string, cover: PageCover): Promise<Note> =>
     App.SetNoteCover(path, cover),
+  getPageSettings: (path: string): Promise<PageSettings> => App.GetPageSettings(path),
+  setPageSettings: (path: string, settings: PageSettings): Promise<void> =>
+    App.SetPageSettings(path, settings),
   coverImageDataURL: (path: string): Promise<string> => App.CoverImageDataURL(path),
   coverThumbnailDataURL: (path: string): Promise<string> =>
     App.CoverThumbnailDataURL(path),

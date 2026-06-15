@@ -355,6 +355,9 @@ func (a *App) renamePathLocked(oldPath, newPath string) error {
 	if err := a.vault.RenameDashboardViewPath(oldPath, newPath, isDir); err != nil {
 		followUpErrs = append(followUpErrs, fmt.Errorf("rename dashboard view metadata: %w", err))
 	}
+	if err := a.vault.RenamePageSettingsPath(oldPath, newPath, isDir); err != nil {
+		followUpErrs = append(followUpErrs, fmt.Errorf("rename page settings metadata: %w", err))
+	}
 	rewritten, rewriteErr := a.vault.RewriteLinksAfterRename(
 		oldPath,
 		newPath,
@@ -524,6 +527,9 @@ func (a *App) DeletePath(path string) error {
 	}
 	if err := a.vault.RemoveDashboardViewPath(path, isDir); err != nil {
 		followUpErrs = append(followUpErrs, fmt.Errorf("remove dashboard view metadata: %w", err))
+	}
+	if err := a.vault.RemovePageSettingsPath(path, isDir); err != nil {
+		followUpErrs = append(followUpErrs, fmt.Errorf("remove page settings metadata: %w", err))
 	}
 	if err := a.indexer.RemovePath(path); err != nil {
 		followUpErrs = append(followUpErrs, fmt.Errorf("remove index path: %w", err))

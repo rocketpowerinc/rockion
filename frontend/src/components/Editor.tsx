@@ -10,7 +10,13 @@ import {
 } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { editorExtensions } from "../editor/extensions";
-import { api, onVaultChanged, type Note, type PageCover } from "../api";
+import {
+  api,
+  onVaultChanged,
+  type Note,
+  type PageCover,
+  type PageSettings,
+} from "../api";
 import PagePicker, { type PageRef } from "./PagePicker";
 import EmojiPicker from "./EmojiPicker";
 import type { WritingLanguage } from "../writingLanguage";
@@ -28,6 +34,8 @@ import CoverRepositionControls from "./CoverRepositionControls";
 import { coverBackground } from "../editor/coverStyles.mjs";
 import { coverPositionFromDrag } from "../editor/coverPosition.mjs";
 import PageTag from "./PageTag";
+import SelectionToolbar from "./SelectionToolbar";
+import { isExternalHref } from "../editor/externalLinks.mjs";
 
 interface Props {
   note: Note | null;
@@ -98,6 +106,7 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
   const renameInFlight = useRef<Promise<void> | null>(null);
   const syncTitleRef = useRef<() => Promise<void>>(async () => {});
   const onNoteRenamedRef = useRef(onNoteRenamed);
+  const pageOptionsRef = useRef<HTMLDivElement>(null);
   onNoteRenamedRef.current = onNoteRenamed;
   const [linkPickerOpen, setLinkPickerOpen] = useState(false);
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
@@ -109,6 +118,12 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
   const [coverRepositioning, setCoverRepositioning] = useState(false);
   const [coverDraftPosition, setCoverDraftPosition] = useState(50);
   const [coverPositionSaving, setCoverPositionSaving] = useState(false);
+  const [pageOptionsOpen, setPageOptionsOpen] = useState(false);
+  const [pageSettings, setPageSettingsState] = useState<PageSettings>({
+    locked: false,
+    fullWidth: false,
+  });
+  const [pageSettingsSaving, setPageSettingsSaving] = useState(false);
   const coverDrag = useRef({
     pointerId: -1,
     startY: 0,
@@ -163,6 +178,53 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
     editor.view.dom.setAttribute("lang", writingLanguage);
     void refreshSpellcheck(editor, writingLanguage);
   }, [editor, writingLanguage]);
+
+  useEffect(() => {
+    editor?.setEditable(!pageSettings.locked);
+  }, [editor, pageSettings.locked]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setPageOptionsOpen(false);
+    setPageSettingsState({ locked: false, fullWidth: false });
+    if (!note?.path) return () => {};
+    void api
+      .getPageSettings(note.path)
+      .then((settings) => {
+        if (!cancelled) {
+          setPageSettingsState({
+            locked: !!settings?.locked,
+            fullWidth: !!settings?.fullWidth,
+          });
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setSaveError(`Couldn't load page settings: ${String(error)}`);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [note?.path]);
+
+  useEffect(() => {
+    if (!pageOptionsOpen) return;
+    const closeOutside = (event: MouseEvent) => {
+      if (!pageOptionsRef.current?.contains(event.target as Node)) {
+        setPageOptionsOpen(false);
+      }
+    };
+    const closeEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPageOptionsOpen(false);
+    };
+    document.addEventListener("mousedown", closeOutside);
+    document.addEventListener("keydown", closeEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeOutside);
+      document.removeEventListener("keydown", closeEscape);
+    };
+  }, [pageOptionsOpen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -283,6 +345,30 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
     }
   }, [clearRenameTimer, editor, markdownNow]);
   syncTitleRef.current = syncTitle;
+
+  const updatePageSettings = useCallback(
+    async (patch: Partial<PageSettings>) => {
+      if (!note || pageSettingsSaving) return;
+      if (patch.locked && !(await saveNowRef.current())) {
+        setSaveError("The page could not be locked because pending edits were not saved.");
+        return;
+      }
+      const previous = pageSettings;
+      const next = { ...pageSettings, ...patch };
+      setPageSettingsState(next);
+      setPageSettingsSaving(true);
+      try {
+        await api.setPageSettings(note.path, next);
+        setSaveError(null);
+      } catch (error) {
+        setPageSettingsState(previous);
+        setSaveError(`Couldn't update page settings: ${String(error)}`);
+      } finally {
+        setPageSettingsSaving(false);
+      }
+    },
+    [note, pageSettings, pageSettingsSaving]
+  );
 
   // Insert an uploaded image at the cursor and persist to assets/.
   async function saveAndInsert(file: File) {
@@ -591,7 +677,7 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
     const anchor = (event.target as HTMLElement)?.closest?.("a");
     if (anchor) {
       const href = anchor.getAttribute("href") || "";
-      if (/^https?:\/\//i.test(href) || /^mailto:/i.test(href)) {
+      if (isExternalHref(href)) {
         event.preventDefault();
         api.openExternal(href);
       } else if (href && !/^(tel:|#)/i.test(href) && !/^[a-z][a-z0-9+.-]*:/i.test(href)) {
@@ -712,7 +798,11 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
           )}
         </div>
       )}
-      <div className={`page-header ${note.cover ? "has-cover" : ""}`}>
+      <div
+        className={`page-header ${note.cover ? "has-cover" : ""} ${
+          pageSettings.fullWidth ? "is-full-width" : ""
+        }`}
+      >
         {!note.cover && (
           <button
             className="add-cover-button"
@@ -737,6 +827,44 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
         >
           {isFavorite ? "★" : "☆"}
         </button>
+        <div className="page-options" ref={pageOptionsRef}>
+          <button
+            className="page-options-button"
+            title="Page options"
+            aria-label="Page options"
+            aria-haspopup="menu"
+            aria-expanded={pageOptionsOpen}
+            onClick={() => setPageOptionsOpen((open) => !open)}
+          >
+            ⋯
+          </button>
+          {pageOptionsOpen && (
+            <div className="page-options-menu" role="menu">
+              <button
+                role="menuitemcheckbox"
+                aria-checked={pageSettings.locked}
+                disabled={pageSettingsSaving}
+                onClick={() =>
+                  void updatePageSettings({ locked: !pageSettings.locked })
+                }
+              >
+                <span>{pageSettings.locked ? "Unlock page" : "Lock page"}</span>
+                <span className={`menu-toggle ${pageSettings.locked ? "is-on" : ""}`} />
+              </button>
+              <button
+                role="menuitemcheckbox"
+                aria-checked={pageSettings.fullWidth}
+                disabled={pageSettingsSaving}
+                onClick={() =>
+                  void updatePageSettings({ fullWidth: !pageSettings.fullWidth })
+                }
+              >
+                <span>Full width</span>
+                <span className={`menu-toggle ${pageSettings.fullWidth ? "is-on" : ""}`} />
+              </button>
+            </div>
+          )}
+        </div>
         <button
           className="page-icon"
           title="Change page icon"
@@ -759,10 +887,16 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
         )}
       </div>
       {saveError && <div className="save-error">{saveError}</div>}
-      <div className="editor-wrap" onClick={handleWrapClick}>
+      <div
+        className={`editor-wrap ${pageSettings.fullWidth ? "is-full-width" : ""} ${
+          pageSettings.locked ? "is-locked" : ""
+        }`}
+        onClick={handleWrapClick}
+      >
         <EditorContent editor={editor} />
       </div>
       <BlockMenu editor={editor} />
+      <SelectionToolbar editor={editor} locked={pageSettings.locked} />
       <PagePicker
         open={linkPickerOpen}
         pages={pages ?? []}

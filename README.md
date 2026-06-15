@@ -136,6 +136,19 @@ download, verify, and apply the matching update directly.
 
 ## Develop
 
+On Windows, use the development coordinator from the repository root:
+
+```powershell
+.\dev\windows-dev.ps1
+```
+
+It stops stale Rockion development processes, uses a writable repository-local
+Go build cache, then starts Wails and Vite in the foreground. This avoids the
+misleading Vite `EPIPE` error that appears when Wails exits and closes Vite's
+output pipe.
+
+On macOS or Linux:
+
 ```bash
 # from the repo root
 wails dev

@@ -24,6 +24,12 @@ type PageCover struct {
 	Position int    `json:"position"`
 }
 
+// PageSettings stores Rockion-specific page presentation and editing state.
+type PageSettings struct {
+	Locked    bool `json:"locked"`
+	FullWidth bool `json:"fullWidth"`
+}
+
 // Note is a markdown file with parsed metadata.
 type Note struct {
 	Path        string         `json:"path"`

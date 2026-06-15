@@ -5,7 +5,23 @@ All notable changes to Rockion are documented here. This project adheres to
 
 ## [Unreleased]
 
+### Changed
+- Remove New sub-page from the editor slash-command menu. New managed pages
+  continue to be created from their project dashboard.
+
 ### Added
+- Render external links in an unmistakable theme-aware blue and open them in
+  the system browser. Bare domains such as `example.com` are safely normalized
+  to HTTPS when added from the selection toolbar.
+- Add a text-selection toolbar with bold, italic, underline, strikethrough,
+  inline code, and inline link editing. The toolbar stays hidden on locked
+  pages.
+- Add a Windows development launcher that clears stale Rockion dev processes
+  and uses a repository-local Go cache, preventing misleading Vite EPIPE
+  failures when Wails exits during startup.
+- Add persisted page options beside the favorite star: Lock page prevents
+  editing until unlocked, while Full width expands the page header and editor
+  across the available content area.
 - Rename projects from a hover-only three-dot menu in the sidebar, and relabel
   the sidebar's Folders section as Projects.
 - Release active filesystem watches before renaming project directories on

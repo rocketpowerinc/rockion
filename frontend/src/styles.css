@@ -996,6 +996,11 @@ button.primary,
   margin-top: -34px;
   padding-top: 0;
 }
+.page-header.is-full-width,
+.editor-wrap.is-full-width {
+  max-width: none;
+  width: 100%;
+}
 .add-cover-button {
   position: absolute;
   top: 15px;
@@ -1033,6 +1038,91 @@ button.primary,
 }
 .favorite-button.is-favorite {
   color: #e6a700;
+}
+.page-options {
+  position: absolute;
+  top: 48px;
+  right: 16px;
+}
+.page-options-button {
+  display: flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  padding: 0 0 7px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 24px;
+  line-height: 1;
+}
+.page-options-button:hover,
+.page-options-button[aria-expanded="true"] {
+  background: var(--hover);
+  color: var(--text);
+}
+.page-options-menu {
+  position: absolute;
+  top: 38px;
+  right: 0;
+  z-index: 70;
+  width: 210px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
+}
+.page-options-menu button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 9px;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+}
+.page-options-menu button:hover:not(:disabled) {
+  background: var(--hover);
+}
+.page-options-menu button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+.menu-toggle {
+  position: relative;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 17px;
+  border-radius: 999px;
+  background: var(--border);
+}
+.menu-toggle::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 120ms ease;
+}
+.menu-toggle.is-on {
+  background: var(--accent);
+}
+.menu-toggle.is-on::after {
+  transform: translateX(13px);
 }
 .page-header-tag {
   position: absolute;
@@ -1278,6 +1368,90 @@ button.primary,
 }
 .editor-empty {
   color: var(--text-muted);
+}
+.editor-wrap.is-locked .rk-prose {
+  cursor: default;
+}
+.selection-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+.selection-toolbar > button,
+.selection-link-form button {
+  min-width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 5px;
+  padding: 0 8px;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+}
+.selection-toolbar > button:hover,
+.selection-toolbar > button.is-active,
+.selection-link-form button:hover {
+  background: var(--hover);
+}
+.selection-toolbar > button[aria-label="Bold"] {
+  font-weight: 800;
+}
+.selection-toolbar > button[aria-label="Italic"] {
+  font-style: italic;
+}
+.selection-toolbar > button[aria-label="Underline"] {
+  text-decoration: underline;
+}
+.selection-toolbar > button[aria-label="Strikethrough"] {
+  text-decoration: line-through;
+}
+.selection-toolbar-separator {
+  width: 1px;
+  height: 20px;
+  margin: 0 2px;
+  background: var(--border);
+}
+.selection-link-form {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.selection-link-form input {
+  width: 220px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 0 8px;
+  outline: none;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+}
+.selection-link-form input:focus {
+  border-color: var(--accent);
+}
+.selection-link-error {
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 0;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid rgba(220, 38, 38, 0.35);
+  border-radius: 5px;
+  background: var(--bg);
+  color: #dc2626;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  font-size: 11px;
+  line-height: 1.35;
 }
 .rk-prose:focus {
   outline: none;
@@ -1536,14 +1710,18 @@ button.primary,
   color: var(--text-muted);
   font-size: 13px;
 }
-/* Web links use a restrained Notion-like blue. */
-.rk-prose a {
-  color: #2f80c9;
+/* Web links stay visibly blue even when the selected text had a custom color.
+   Internal Rockion page links are styled separately below. */
+.rk-prose a:not(.page-link) {
+  color: #2587e8 !important;
   cursor: pointer;
   text-decoration: none;
 }
-.rk-prose a:hover {
+.rk-prose a:not(.page-link):hover {
   text-decoration: underline;
+}
+:root[data-theme="dark"] .rk-prose a:not(.page-link) {
+  color: #58a6ff !important;
 }
 /* Internal page links: managed dashboard entries are authoritative; ordinary
    embedded page links retain the small arrow badge. */

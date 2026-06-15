@@ -105,6 +105,28 @@ test("opened managed pages show their template tag beside the favorite star", ()
   assert.match(styles, /\.page-header-tag\s*\{[\s\S]*right:\s*98px/);
 });
 
+test("page options persist lock and full-width presentation", () => {
+  const api = fs.readFileSync(new URL("../src/api.ts", import.meta.url), "utf8");
+  const editor = fs.readFileSync(
+    new URL("../src/components/Editor.tsx", import.meta.url),
+    "utf8"
+  );
+  const styles = fs.readFileSync(
+    new URL("../src/styles.css", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(api, /getPageSettings/);
+  assert.match(api, /setPageSettings/);
+  assert.match(editor, /className="page-options-button"/);
+  assert.match(editor, /Lock page/);
+  assert.match(editor, /Unlock page/);
+  assert.match(editor, />Full width</);
+  assert.match(editor, /editor\?\.setEditable\(!pageSettings\.locked\)/);
+  assert.match(editor, /saveNowRef\.current\(\)/);
+  assert.match(styles, /\.page-header\.is-full-width,[\s\S]*\.editor-wrap\.is-full-width/);
+});
+
 test("external vault revisions reload an open dashboard", () => {
   const app = fs.readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
   const dashboard = fs.readFileSync(

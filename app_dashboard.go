@@ -119,6 +119,9 @@ func (a *App) DeleteManagedPage(
 	if err := a.vault.RemoveFavoritePath(result.DeletedPath, false); err != nil {
 		followUpErrs = append(followUpErrs, fmt.Errorf("remove favorite metadata: %w", err))
 	}
+	if err := a.vault.RemovePageSettingsPath(result.DeletedPath, false); err != nil {
+		followUpErrs = append(followUpErrs, fmt.Errorf("remove page settings metadata: %w", err))
+	}
 	if err := a.indexer.RemovePath(result.DeletedPath); err != nil {
 		followUpErrs = append(followUpErrs, fmt.Errorf("remove deleted page from index: %w", err))
 	}

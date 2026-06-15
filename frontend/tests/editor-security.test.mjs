@@ -29,6 +29,10 @@ import {
   coverGradients,
 } from "../src/editor/coverStyles.mjs";
 import {
+  isExternalHref,
+  normalizeExternalHref,
+} from "../src/editor/externalLinks.mjs";
+import {
   emojiCatalog,
   searchEmojis,
 } from "../src/editor/emojiCatalog.mjs";
@@ -70,6 +74,69 @@ test("links have a removable context menu", () => {
   assert.match(source, /rockion:delete-managed-page/);
   assert.match(source, /removeMark\(range\.from,\s*range\.to,\s*linkType\)/);
   assert.match(source, /setMeta\("preventAutolink",\s*true\)/);
+});
+
+test("selected text exposes inline formatting and link controls", () => {
+  const toolbar = fs.readFileSync(
+    new URL("../src/components/SelectionToolbar.tsx", import.meta.url),
+    "utf8"
+  );
+  const extensions = fs.readFileSync(
+    new URL("../src/editor/extensions.ts", import.meta.url),
+    "utf8"
+  );
+  const underline = fs.readFileSync(
+    new URL("../src/editor/Underline.ts", import.meta.url),
+    "utf8"
+  );
+  const editor = fs.readFileSync(
+    new URL("../src/components/Editor.tsx", import.meta.url),
+    "utf8"
+  );
+
+  for (const command of [
+    "toggleBold",
+    "toggleItalic",
+    "toggleUnderline",
+    "toggleStrike",
+    "toggleCode",
+    "setLink",
+  ]) {
+    assert.match(toolbar, new RegExp(command));
+  }
+  assert.match(toolbar, /from !== to/);
+  assert.match(toolbar, /!locked && current\.isEditable/);
+  assert.match(toolbar, /className="selection-link-form"/);
+  assert.match(editor, /<SelectionToolbar editor=\{editor\} locked=\{pageSettings\.locked\}/);
+  assert.match(extensions, /\bUnderline\b/);
+  assert.match(underline, /tag:\s*"u"/);
+  assert.match(underline, /return \["u",\s*mergeAttributes\(HTMLAttributes\),\s*0\]/);
+});
+
+test("external links are normalized, styled blue, and opened outside Rockion", () => {
+  assert.equal(normalizeExternalHref("example.com"), "https://example.com");
+  assert.equal(normalizeExternalHref("www.example.com/path"), "https://www.example.com/path");
+  assert.equal(normalizeExternalHref("https://example.com"), "https://example.com");
+  assert.equal(normalizeExternalHref("mailto:user@example.com"), "mailto:user@example.com");
+  assert.equal(normalizeExternalHref("javascript:alert(1)"), "");
+  assert.equal(isExternalHref("https://example.com"), true);
+  assert.equal(isExternalHref("../Page.md"), false);
+
+  const editor = fs.readFileSync(
+    new URL("../src/components/Editor.tsx", import.meta.url),
+    "utf8"
+  );
+  const toolbar = fs.readFileSync(
+    new URL("../src/components/SelectionToolbar.tsx", import.meta.url),
+    "utf8"
+  );
+  const styles = fs.readFileSync(
+    new URL("../src/styles.css", import.meta.url),
+    "utf8"
+  );
+  assert.match(toolbar, /normalizeExternalHref\(href\)/);
+  assert.match(editor, /isExternalHref\(href\)[\s\S]*api\.openExternal\(href\)/);
+  assert.match(styles, /\.rk-prose a:not\(\.page-link\)[\s\S]*#2587e8 !important/);
 });
 
 test("only local and explicitly embedded image sources are allowed", () => {
@@ -169,13 +236,13 @@ test("sub-pages use portable relative markdown links", () => {
   assert.equal(isInternalNoteHref("New Page.md#section"), true);
 });
 
-test("the slash menu includes new sub-page creation", () => {
+test("the slash menu excludes sub-page creation", () => {
   const source = fs.readFileSync(
     new URL("../src/editor/slashItems.ts", import.meta.url),
     "utf8"
   );
-  assert.match(source, /title:\s*"New sub-page"/);
-  assert.match(source, /rockion:new-sub-page/);
+  assert.doesNotMatch(source, /title:\s*"New sub-page"/);
+  assert.doesNotMatch(source, /rockion:new-sub-page/);
 });
 
 test("the sidebar plus button creates projects rather than root notes", () => {

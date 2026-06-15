@@ -4,6 +4,16 @@ These scripts are designed to be launched from Windows PowerShell. They resolve
 the repository root automatically, so they can be run from any working
 directory.
 
+## Start development mode
+
+```powershell
+.\dev\windows-dev.ps1
+```
+
+The launcher stops stale Rockion Wails/Vite processes, sets a writable local Go
+build cache, and starts `wails dev` in the foreground. Pass `-KeepExisting` only
+when intentionally running another development session.
+
 ## Run all release checks
 
 ```powershell

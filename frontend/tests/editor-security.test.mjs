@@ -259,6 +259,27 @@ test("the sidebar plus button creates projects rather than root notes", () => {
   assert.doesNotMatch(app, /setNewPageDir/);
 });
 
+test("the sidebar can collapse into a compact control rail", () => {
+  const app = fs.readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
+  const sidebar = fs.readFileSync(
+    new URL("../src/components/Sidebar.tsx", import.meta.url),
+    "utf8"
+  );
+  const styles = fs.readFileSync(
+    new URL("../src/styles.css", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(app, /rockion-sidebar-collapsed/);
+  assert.match(app, /sidebarCollapsed \? "sidebar-collapsed" : ""/);
+  assert.match(sidebar, /collapsed: boolean/);
+  assert.match(sidebar, /onToggleCollapsed/);
+  assert.match(sidebar, /Expand sidebar/);
+  assert.match(sidebar, /Collapse sidebar/);
+  assert.match(styles, /\.app\.sidebar-collapsed/);
+  assert.match(styles, /\.sidebar\.is-collapsed \.tree[\s\S]*display:\s*none/);
+});
+
 test("page covers allow generated and validated image backgrounds", () => {
   assert.equal(
     coverBackground({ kind: "color", value: "#336699" }),

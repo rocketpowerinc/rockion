@@ -241,7 +241,8 @@ foreach ($removedPath in @(
     'dev\windows-test-appimages.ps1',
     '.github\workflows\debian-preflight.yml',
     'dev\linux\package-deb.sh',
-    'dev\windows-test-debian-package.ps1'
+    'dev\windows-test-debian-package.ps1',
+    'dev\windows-test-anduinos-package.ps1'
 )) {
     if (Test-Path -LiteralPath (Join-Path $RepoRoot $removedPath)) {
         Add-Failure "Removed packaging file still exists: $removedPath"
@@ -260,6 +261,18 @@ foreach ($requiredText in @(
     '$RequiredGoVersion = ''go1.26.4''',
     '$RequiredNodeVersion = ''v24.16.0''',
     '$RequiredNpmVersion = ''11.17.0''',
+    '[switch]$AnduinOSPreflightOnly',
+    'Invoke-AnduinOSPackagePreflight',
+    'gh workflow run anduinos-preflight.yml',
+    '--event workflow_dispatch',
+    '$_.headSha -eq $LocalCommit',
+    'gh run watch $RunId',
+    'git status --porcelain',
+    'git ls-remote --heads origin',
+    '$ExistingRunIds -notcontains $_.databaseId',
+    '$attempt -le 12',
+    'Workflow dispatch attempt $attempt failed; retrying in 5 seconds.',
+    'GitHub has not indexed the AnduinOS workflow yet',
     'git ls-remote --refs --tags origin',
     '$attempt -le 3',
     'Git reported:',
@@ -302,9 +315,6 @@ if (-not (Test-Path -LiteralPath $dependabotPath)) {
 }
 if ($releaseCoordinator.Contains('git ls-remote --exit-code')) {
     Add-Failure 'Release coordinator must not depend on the special git ls-remote --exit-code status for missing tags.'
-}
-if ($releaseCoordinator.Contains('workflow run anduinos-preflight.yml')) {
-    Add-Failure 'Release coordinator must not build the AnduinOS package twice; the preflight is standalone.'
 }
 foreach ($requiredText in @(
     '.*\.pem$',
@@ -372,38 +382,6 @@ foreach ($installerCheck in $installerChecks) {
     }
     if ($installer.IndexOf($installerCheck.VerifyMarker) -gt $installer.IndexOf($installerCheck.ExecuteMarker)) {
         Add-Failure "$($installerCheck.Path) executes the artifact before checksum verification."
-    }
-}
-
-$anduinosCoordinatorPath = Join-Path $RepoRoot 'dev\windows-test-anduinos-package.ps1'
-if (-not (Test-Path -LiteralPath $anduinosCoordinatorPath)) {
-    Add-Failure 'The Windows AnduinOS package preflight coordinator is missing.'
-} else {
-    $anduinosCoordinator = Get-Content -Raw -LiteralPath $anduinosCoordinatorPath
-    foreach ($requiredText in @(
-        'gh workflow run anduinos-preflight.yml',
-        '--event workflow_dispatch',
-        '$_.headSha -eq $LocalCommit',
-        'gh run watch $RunId',
-        'git status --porcelain',
-        'git ls-remote --heads origin',
-        '$ExistingRunIds -notcontains $_.databaseId',
-        '$attempt -le 12',
-        'Workflow dispatch attempt $attempt failed; retrying in 5 seconds.',
-        'GitHub has not indexed the AnduinOS workflow yet'
-    )) {
-        if (-not $anduinosCoordinator.Contains($requiredText)) {
-            Add-Failure "AnduinOS package preflight coordinator is missing required behavior: $requiredText"
-        }
-    }
-    foreach ($forbiddenText in @(
-        'git tag',
-        'gh release',
-        'npm version'
-    )) {
-        if ($anduinosCoordinator.Contains($forbiddenText)) {
-            Add-Failure "AnduinOS package preflight coordinator must not modify release state: $forbiddenText"
-        }
     }
 }
 

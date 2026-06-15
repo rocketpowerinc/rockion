@@ -45,6 +45,13 @@ export default function App() {
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [newVaultOpen, setNewVaultOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("rockion-sidebar-collapsed") === "true";
+    } catch {
+      return false;
+    }
+  });
   const [savedVaults, setSavedVaults] = useState<SavedVault[]>(() =>
     loadVaultHistory()
   );
@@ -87,6 +94,14 @@ export default function App() {
       /* localStorage unavailable */
     }
   }, [writingLanguage]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("rockion-sidebar-collapsed", String(sidebarCollapsed));
+    } catch {
+      /* localStorage unavailable */
+    }
+  }, [sidebarCollapsed]);
 
   const toggleTheme = useCallback(
     () => setTheme((current) => (current === "dark" ? "light" : "dark")),
@@ -542,7 +557,7 @@ export default function App() {
   }
 
   return (
-    <div className="app">
+    <div className={`app ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
       <Sidebar
         vaultName={vault.name}
         tree={tree}
@@ -550,10 +565,12 @@ export default function App() {
         error={error}
         theme={theme}
         writingLanguage={writingLanguage}
+        collapsed={sidebarCollapsed}
         activePath={note?.path ?? null}
         onOpen={openNote}
         onSetIcon={setIcon}
         onRenameProject={renameProject}
+        onToggleCollapsed={() => setSidebarCollapsed((collapsed) => !collapsed)}
         onNewProject={newProject}
         onGoHome={() => void goToVaultHome()}
         onOpenVault={openVault}

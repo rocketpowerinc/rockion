@@ -5,6 +5,12 @@ All notable changes to Rockion are documented here. This project adheres to
 
 ## [Unreleased]
 
+### Added
+- Add a collapsible sidebar that persists its compact or expanded state and
+  keeps core vault controls available from the compact rail.
+- Add AnduinOS package preflight mode to the Windows release coordinator so
+  release and Linux package test orchestration live in one script.
+
 ### Fixed
 - Prevent intermittent project-navigation crashes by replacing Tiptap's
   DOM-reparenting BubbleMenu with a React-owned portal for the selection

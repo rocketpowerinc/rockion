@@ -13,10 +13,12 @@ interface Props {
   error?: string | null;
   theme: "light" | "dark";
   writingLanguage: WritingLanguage;
+  collapsed: boolean;
   activePath: string | null;
   onOpen: (path: string) => void;
   onSetIcon: (path: string, icon: string) => void;
   onRenameProject: (dashboardPath: string, title: string) => Promise<Note>;
+  onToggleCollapsed: () => void;
   onNewProject: () => void;
   onGoHome: () => void;
   onOpenVault: () => void;
@@ -35,10 +37,12 @@ export default function Sidebar({
   error,
   theme,
   writingLanguage,
+  collapsed,
   activePath,
   onOpen,
   onSetIcon,
   onRenameProject,
+  onToggleCollapsed,
   onNewProject,
   onGoHome,
   onOpenVault,
@@ -88,12 +92,35 @@ export default function Sidebar({
   }
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${collapsed ? "is-collapsed" : ""}`}>
       <div className="sidebar-head">
-        <button className="vault-name" onClick={onOpenVault} title="Open another vault">
+        <button
+          className="vault-name"
+          onClick={onOpenVault}
+          title={vaultName || "Open another vault"}
+          tabIndex={collapsed ? -1 : 0}
+        >
           {vaultName || "Open vault…"}
         </button>
         <div className="sidebar-head-actions">
+          <button
+            className="icon-btn sidebar-collapse-button"
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-expanded={!collapsed}
+            onClick={onToggleCollapsed}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d={collapsed ? "M9 6l6 6-6 6" : "M15 6l-6 6 6 6"}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
           <button
             className="icon-btn"
             title="Back to vault home"
@@ -115,7 +142,7 @@ export default function Sidebar({
           </button>
         </div>
       </div>
-      <nav className="tree">
+      <nav className="tree" aria-hidden={collapsed}>
         {error && <div className="tree-empty tree-error">{error}</div>}
         <SidebarSection title="Favorites">
           {favorites.length === 0 && (

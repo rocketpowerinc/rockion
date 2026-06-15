@@ -36,13 +36,13 @@ development, never for a release.
 Commit and push the branch you want to test, then run:
 
 ```powershell
-.\dev\windows-test-anduinos-package.ps1
+.\dev\windows-create-release.ps1 -AnduinOSPreflightOnly
 ```
 
-This starts `.github/workflows/anduinos-preflight.yml`, which builds the amd64
-`.deb` against Ubuntu 24.04/WebKitGTK 4.1, installs it on a clean runner, and
-launches Rockion. It does not build Windows or macOS packages, update version
-metadata, create a tag, or publish a release.
+This starts `.github/workflows/anduinos-preflight.yml` from the main release
+coordinator. It builds the amd64 `.deb` against Ubuntu 24.04/WebKitGTK 4.1,
+installs it on a clean runner, and launches Rockion. It does not build Windows
+or macOS packages, update version metadata, create a tag, or publish a release.
 
 Use `-Ref branch-name` to test another pushed branch or `-NoWait` to start the
 workflow without watching it finish.
@@ -57,7 +57,8 @@ The script prompts for a semantic version, updates Rockion's version metadata
 and changelog, runs the full test suite, creates a release commit and annotated
 tag, then pushes them. Pushing the tag starts `.github/workflows/release.yml`.
 
-GitHub Actions builds these native packages:
+After verification passes, GitHub Actions starts these native build jobs in
+parallel:
 
 - Windows x64
 - macOS Apple Silicon

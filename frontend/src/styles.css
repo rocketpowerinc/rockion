@@ -442,6 +442,9 @@ button.primary,
   grid-template-columns: 260px 1fr;
   height: 100%;
 }
+.app.sidebar-collapsed {
+  grid-template-columns: 52px 1fr;
+}
 .sidebar {
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border);
@@ -449,6 +452,7 @@ button.primary,
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
+  transition: width 140ms ease;
 }
 .sidebar-head {
   display: flex;
@@ -460,6 +464,12 @@ button.primary,
   background: var(--bg-sidebar);
   z-index: 10;
 }
+.sidebar.is-collapsed .sidebar-head {
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 10px 8px;
+}
 .vault-name {
   background: none;
   border: none;
@@ -469,6 +479,13 @@ button.primary,
   font-size: 14px;
   padding: 4px 6px;
   border-radius: 5px;
+}
+.sidebar.is-collapsed .vault-name {
+  pointer-events: none;
+  visibility: hidden;
+  width: 0;
+  height: 0;
+  padding: 0;
 }
 .vault-name:hover {
   background: var(--hover);
@@ -497,6 +514,10 @@ button.primary,
   align-items: center;
   gap: 2px;
 }
+.sidebar.is-collapsed .sidebar-head-actions {
+  flex-direction: column;
+  gap: 6px;
+}
 /* ---- Tree ---- */
 .tree {
   flex: 1;
@@ -504,6 +525,9 @@ button.primary,
   overflow-y: auto;
   padding-bottom: 12px;
   font-size: 14px;
+}
+.sidebar.is-collapsed .tree {
+  display: none;
 }
 .sidebar-section {
   margin: 2px 0 12px;
@@ -544,6 +568,11 @@ button.primary,
   padding: 8px 10px 10px;
   border-top: 1px solid var(--border);
 }
+.sidebar.is-collapsed .sidebar-footer {
+  display: flex;
+  justify-content: center;
+  padding: 8px;
+}
 .settings-button {
   display: flex;
   align-items: center;
@@ -577,6 +606,10 @@ button.primary,
   border-radius: 9px;
   background: var(--bg);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.26);
+}
+.sidebar.is-collapsed .settings-menu {
+  bottom: 10px;
+  left: 44px;
 }
 
 /* ---- Encrypted vault import/export ---- */

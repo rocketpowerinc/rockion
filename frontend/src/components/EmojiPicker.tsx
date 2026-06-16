@@ -1,4 +1,11 @@
-import { useMemo, useRef, useState, type ChangeEvent } from "react";
+import {
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type CSSProperties,
+} from "react";
 import { api } from "../api";
 import { searchEmojis } from "../editor/emojiCatalog.mjs";
 
@@ -11,8 +18,30 @@ interface Props {
 // Emoji picker + custom image upload for setting a page icon.
 export default function EmojiPicker({ onPick, onClose, assetName = "icon" }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
+  // Position with fixed coordinates so no scrolling ancestor (e.g. the dashboard)
+  // can clip the popover and hide the upload/remove footer. Anchored to the icon
+  // that opened it (the element right before the picker in the DOM).
+  const [style, setStyle] = useState<CSSProperties>({ visibility: "hidden" });
   const matches = useMemo(() => searchEmojis(query), [query]);
+
+  useLayoutEffect(() => {
+    const width = popoverRef.current?.offsetWidth || 330;
+    const anchor = overlayRef.current?.previousElementSibling as HTMLElement | null;
+    const rect = anchor?.getBoundingClientRect();
+    let left = 56;
+    let top = 110;
+    if (rect && rect.width > 0) {
+      left = rect.left;
+      top = rect.bottom + 6;
+    }
+    left = Math.max(8, Math.min(left, window.innerWidth - width - 8));
+    top = Math.max(8, top);
+    const maxHeight = Math.max(220, window.innerHeight - top - 12);
+    setStyle({ position: "fixed", top, left, maxHeight, visibility: "visible" });
+  }, []);
 
   async function onFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -28,8 +57,13 @@ export default function EmojiPicker({ onPick, onClose, assetName = "icon" }: Pro
 
   return (
     <>
-      <div className="emoji-overlay" onClick={onClose} />
-      <div className="emoji-popover" onClick={(e) => e.stopPropagation()}>
+      <div className="emoji-overlay" ref={overlayRef} onClick={onClose} />
+      <div
+        className="emoji-popover"
+        ref={popoverRef}
+        style={style}
+        onClick={(e) => e.stopPropagation()}
+      >
         <input
           className="emoji-search"
           type="search"

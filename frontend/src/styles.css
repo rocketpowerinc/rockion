@@ -1233,9 +1233,9 @@ button.primary,
   z-index: 60;
 }
 .emoji-popover {
-  position: absolute;
-  top: 104px;
-  left: 56px;
+  /* position/top/left/max-height are set inline (fixed, anchored to the icon)
+     so no scrolling ancestor can clip the popover and hide the footer. */
+  position: fixed;
   z-index: 61;
   width: 330px;
   background: var(--bg);
@@ -1243,6 +1243,11 @@ button.primary,
   border-radius: 10px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
   padding: 8px;
+  /* Lay out as a column so the emoji grid scrolls internally and the
+     upload/remove footer stays pinned. */
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 130px);
 }
 .emoji-search {
   width: 100%;
@@ -1266,6 +1271,8 @@ button.primary,
   gap: 3px;
   max-height: 280px;
   overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 .emoji-cell {
   min-width: 34px;
@@ -1291,6 +1298,7 @@ button.primary,
   display: flex;
   gap: 6px;
   margin-top: 6px;
+  flex: 0 0 auto;
 }
 .emoji-action {
   flex: 1;

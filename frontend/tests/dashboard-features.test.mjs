@@ -122,9 +122,12 @@ test("page options persist lock and full-width presentation", () => {
   assert.match(editor, /Lock page/);
   assert.match(editor, /Unlock page/);
   assert.match(editor, />Full width</);
-  assert.match(editor, /editor\?\.setEditable\(!pageSettings\.locked\)/);
+  assert.match(editor, /editor\.setEditable\(!pageSettings\.locked\)/);
+  assert.match(editor, /editor\.view\.dom\.toggleAttribute\("data-locked",\s*pageSettings\.locked\)/);
   assert.match(editor, /saveNowRef\.current\(\)/);
   assert.match(styles, /\.page-header\.is-full-width,[\s\S]*\.editor-wrap\.is-full-width/);
+  assert.match(styles, /\.rk-prose\[data-locked\] > \*:hover[\s\S]*background-color:\s*transparent/);
+  assert.match(styles, /\.editor-wrap\.is-locked \.add-block-button[\s\S]*display:\s*none !important/);
 });
 
 test("external vault revisions reload an open dashboard", () => {
@@ -168,7 +171,7 @@ test("sidebar labels root folders as projects and exposes hover rename controls"
     "utf8"
   );
 
-  assert.match(sidebar, /<SidebarSection title="Projects">/);
+  assert.match(sidebar, /<SidebarSection title="Projects" collapsed=\{collapsed\}>/);
   assert.doesNotMatch(sidebar, /<SidebarSection title="Folders">/);
   assert.match(sidebar, /className="project-more-button"/);
   assert.match(sidebar, />\s*Rename\s*</);

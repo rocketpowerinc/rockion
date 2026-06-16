@@ -21,6 +21,7 @@ import { LinkContextMenu } from "./LinkContextMenu";
 import { MarkdownLinkCleanup } from "./MarkdownLinkCleanup";
 import { TextColor, BgColor } from "./colorMarks";
 import { Underline } from "./Underline";
+import { PageTitlePlainText } from "./PageTitlePlainText";
 
 // The full set of TipTap extensions that make up the Rockion editor.
 export const editorExtensions = [
@@ -45,6 +46,7 @@ export const editorExtensions = [
   TextColor,
   BgColor,
   Underline,
+  PageTitlePlainText,
   // Round-trips the document to/from GitHub-Flavored Markdown on disk.
   // html is enabled so colored runs persist as portable <span style> markup.
   Markdown.configure({

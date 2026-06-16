@@ -15,11 +15,18 @@ All notable changes to Rockion are documented here. This project adheres to
 - Add clearer release-script guidance when the active Node.js version does not
   match the pinned release toolchain.
 - Pin the local and CI frontend toolchain to Node.js 26.3.0 and npm 11.16.0.
+- Keep Favorites and Projects available as icon-only navigation when the
+  sidebar is collapsed.
 
 ### Fixed
 - Prevent intermittent project-navigation crashes by replacing Tiptap's
   DOM-reparenting BubbleMenu with a React-owned portal for the selection
   toolbar.
+- Allow selected heading text to be linked from the inline toolbar without
+  treating linked H1 Markdown as the page filename.
+- Keep the first H1 page title plain text only, while still allowing users to
+  rename pages by editing the title text.
+- Suppress block hover highlighting and block-editing handles on locked pages.
 
 ### Changed
 - Remove New sub-page from the editor slash-command menu. New managed pages

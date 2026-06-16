@@ -63,6 +63,7 @@ class AddBlockView {
   private handleMove = () => {
     const view = this.view;
     if (this.dragging) return;
+    if (!view.editable) return this.hide();
     if (!view.dom.isConnected) return this.hide();
 
     // Mirror the drag grip: the "+" only appears when the library shows the grip

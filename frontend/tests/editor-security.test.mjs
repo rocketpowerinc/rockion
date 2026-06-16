@@ -85,6 +85,10 @@ test("selected text exposes inline formatting and link controls", () => {
     new URL("../src/editor/extensions.ts", import.meta.url),
     "utf8"
   );
+  const pageTitlePlainText = fs.readFileSync(
+    new URL("../src/editor/PageTitlePlainText.ts", import.meta.url),
+    "utf8"
+  );
   const underline = fs.readFileSync(
     new URL("../src/editor/Underline.ts", import.meta.url),
     "utf8"
@@ -105,12 +109,22 @@ test("selected text exposes inline formatting and link controls", () => {
     assert.match(toolbar, new RegExp(command));
   }
   assert.match(toolbar, /const \{ from, to, empty \} = editor\.state\.selection/);
-  assert.match(toolbar, /locked \|\| !editor\.isEditable \|\| empty/);
+  assert.match(toolbar, /locked \|\|[\s\S]*!editor\.isEditable \|\|[\s\S]*empty/);
+  assert.match(toolbar, /selectionTouchesPageTitle\(editor\.state\)/);
   assert.match(toolbar, /className="selection-link-form"/);
+  assert.match(toolbar, /if \(editor\.isActive\("link"\)\) command = command\.extendMarkRange\("link"\)/);
+  assert.match(toolbar, /command\.setLink\(\{ href: value \}\)\.run\(\)/);
   assert.match(toolbar, /createPortal/);
   assert.doesNotMatch(toolbar, /\bBubbleMenu\b/);
   assert.match(editor, /<SelectionToolbar editor=\{editor\} locked=\{pageSettings\.locked\}/);
+  assert.ok(editor.includes("function plainHeadingTitle(value: string): string"));
+  assert.ok(editor.includes('return m ? plainHeadingTitle(m[1]) : "";'));
   assert.match(extensions, /\bUnderline\b/);
+  assert.match(extensions, /\bPageTitlePlainText\b/);
+  assert.match(pageTitlePlainText, /name: "pageTitlePlainText"/);
+  assert.match(pageTitlePlainText, /titleHeadingRange/);
+  assert.match(pageTitlePlainText, /selectionTouchesPageTitle/);
+  assert.match(pageTitlePlainText, /newState\.tr\.removeMark\(range\.from,\s*range\.to\)/);
   assert.match(underline, /tag:\s*"u"/);
   assert.match(underline, /return \["u",\s*mergeAttributes\(HTMLAttributes\),\s*0\]/);
 });
@@ -276,8 +290,13 @@ test("the sidebar can collapse into a compact control rail", () => {
   assert.match(sidebar, /onToggleCollapsed/);
   assert.match(sidebar, /Expand sidebar/);
   assert.match(sidebar, /Collapse sidebar/);
+  assert.match(sidebar, /<SidebarSection title="Favorites" collapsed=\{collapsed\}>/);
+  assert.match(sidebar, /<SidebarSection title="Projects" collapsed=\{collapsed\}>/);
   assert.match(styles, /\.app\.sidebar-collapsed/);
-  assert.match(styles, /\.sidebar\.is-collapsed \.tree[\s\S]*display:\s*none/);
+  assert.match(styles, /\.sidebar\.is-collapsed \.sidebar-row-button/);
+  assert.match(styles, /\.sidebar\.is-collapsed \.sidebar-section\.is-compact \.sidebar-section-title\[title="Favorites"\]::before/);
+  const collapsedTreeBlock = styles.match(/\.sidebar\.is-collapsed \.tree\s*\{[^}]*\}/)?.[0] || "";
+  assert.doesNotMatch(collapsedTreeBlock, /display:\s*none/);
 });
 
 test("page covers allow generated and validated image backgrounds", () => {

@@ -145,6 +145,10 @@ test("the block menu opens to the left of its drag handle", () => {
     new URL("../src/styles.css", import.meta.url),
     "utf8"
   );
+  const addBlock = fs.readFileSync(
+    new URL("../src/editor/AddBlockButton.ts", import.meta.url),
+    "utf8"
+  );
 
   assert.match(
     menu,
@@ -154,6 +158,7 @@ test("the block menu opens to the left of its drag handle", () => {
     styles,
     /\.block-submenu\s*\{[\s\S]*right:\s*100%[\s\S]*margin-right:\s*4px/
   );
+  assert.match(addBlock, /if \(!view\.editable\) return this\.hide\(\)/);
 });
 
 test("the color menu stays open and exposes white as the first text color", () => {

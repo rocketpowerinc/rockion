@@ -9,6 +9,7 @@ import {
 import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/react";
 import { normalizeExternalHref } from "../editor/externalLinks.mjs";
+import { selectionTouchesPageTitle } from "../editor/PageTitlePlainText";
 
 interface Props {
   editor: Editor | null;
@@ -31,7 +32,13 @@ export default function SelectionToolbar({ editor, locked }: Props) {
     }
     const { from, to, empty } = editor.state.selection;
     const toolbarFocused = !!toolbarRef.current?.contains(document.activeElement);
-    if (locked || !editor.isEditable || empty || (!editor.isFocused && !toolbarFocused)) {
+    if (
+      locked ||
+      !editor.isEditable ||
+      empty ||
+      selectionTouchesPageTitle(editor.state) ||
+      (!editor.isFocused && !toolbarFocused)
+    ) {
       setVisible(false);
       return;
     }
@@ -94,8 +101,11 @@ export default function SelectionToolbar({ editor, locked }: Props) {
 
   function saveLink(event: FormEvent) {
     event.preventDefault();
+    if (!editor) return;
+    let command = editor.chain().focus();
     if (!href.trim()) {
-      editor?.chain().focus().extendMarkRange("link").unsetLink().run();
+      if (editor.isActive("link")) command = command.extendMarkRange("link");
+      command.unsetLink().run();
       setLinkEditing(false);
       return;
     }
@@ -104,7 +114,8 @@ export default function SelectionToolbar({ editor, locked }: Props) {
       setLinkError("Enter a web address such as example.com or https://example.com.");
       return;
     }
-    editor?.chain().focus().extendMarkRange("link").setLink({ href: value }).run();
+    if (editor.isActive("link")) command = command.extendMarkRange("link");
+    command.setLink({ href: value }).run();
     setLinkEditing(false);
   }
 

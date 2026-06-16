@@ -142,9 +142,9 @@ export default function Sidebar({
           </button>
         </div>
       </div>
-      <nav className="tree" aria-hidden={collapsed}>
+      <nav className="tree">
         {error && <div className="tree-empty tree-error">{error}</div>}
-        <SidebarSection title="Favorites">
+        <SidebarSection title="Favorites" collapsed={collapsed}>
           {favorites.length === 0 && (
             <div className="sidebar-section-empty">Star a page to keep it here.</div>
           )}
@@ -172,7 +172,7 @@ export default function Sidebar({
             />
           ))}
         </SidebarSection>
-        <SidebarSection title="Projects">
+        <SidebarSection title="Projects" collapsed={collapsed}>
           {!error && folders.length === 0 && (
             <div className="sidebar-section-empty">Create a project to add it here.</div>
           )}
@@ -199,11 +199,11 @@ export default function Sidebar({
           >
             {unsortedOpen &&
               rootNotes.map((node) => (
-                <PageRow
-                  key={node.path}
-                  node={node}
-                  activePath={activePath}
-                  onOpen={onOpen}
+            <PageRow
+              key={node.path}
+              node={node}
+              activePath={activePath}
+              onOpen={onOpen}
                 />
               ))}
           </SidebarSection>
@@ -309,20 +309,23 @@ function SidebarSection({
   children,
   collapsible = false,
   open = true,
+  collapsed = false,
   onToggle,
 }: {
   title: string;
   children: ReactNode;
   collapsible?: boolean;
   open?: boolean;
+  collapsed?: boolean;
   onToggle?: () => void;
 }) {
   return (
-    <section className="sidebar-section">
+    <section className={`sidebar-section ${collapsed ? "is-compact" : ""}`}>
       <button
         className="sidebar-section-title"
         disabled={!collapsible}
         onClick={onToggle}
+        title={title}
       >
         {collapsible && <span className="sidebar-section-chevron">{open ? "▾" : "▸"}</span>}
         {title}
@@ -417,7 +420,12 @@ function ProjectRow({
           }}
         />
       ) : (
-        <button className="folder-open-btn" onClick={() => onOpen(dashboardPath)}>
+        <button
+          className="folder-open-btn"
+          onClick={() => onOpen(dashboardPath)}
+          title={node.name}
+          aria-label={node.name}
+        >
           {node.name}
         </button>
       )}
@@ -488,6 +496,7 @@ function PageRow({
         dragging ? "is-dragging" : ""
       }`}
       onClick={() => onOpen(node.path)}
+      title={node.name}
       draggable={draggable}
       onDragStart={(event) => {
         event.dataTransfer.effectAllowed = "move";

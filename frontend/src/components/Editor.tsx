@@ -68,12 +68,21 @@ const TITLE_SYNC_MS = 1200;
 // The note's title is the first non-empty line, and only when it's an ATX H1
 // ("# Title"). Anything else (frontmatter, a paragraph) yields no title, so the
 // file is left alone.
+function plainHeadingTitle(value: string): string {
+  return value
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/<a\s+[^>]*>(.*?)<\/a>/gi, "$1")
+    .replace(/[`*_~]/g, "")
+    .trim();
+}
+
 function firstHeadingTitle(markdown: string): string {
   for (const raw of markdown.split("\n")) {
     const line = raw.trim();
     if (line === "") continue;
     const m = line.match(/^#\s+(.+)$/);
-    return m ? m[1].trim() : "";
+    return m ? plainHeadingTitle(m[1]) : "";
   }
   return "";
 }
@@ -180,7 +189,9 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
   }, [editor, writingLanguage]);
 
   useEffect(() => {
-    editor?.setEditable(!pageSettings.locked);
+    if (!editor) return;
+    editor.setEditable(!pageSettings.locked);
+    editor.view.dom.toggleAttribute("data-locked", pageSettings.locked);
   }, [editor, pageSettings.locked]);
 
   useEffect(() => {

@@ -527,7 +527,8 @@ button.primary,
   font-size: 14px;
 }
 .sidebar.is-collapsed .tree {
-  display: none;
+  padding-bottom: 8px;
+  overflow-x: hidden;
 }
 .sidebar-section {
   margin: 2px 0 12px;
@@ -552,6 +553,26 @@ button.primary,
 }
 .sidebar-section-title:disabled {
   opacity: 1;
+}
+.sidebar.is-collapsed .sidebar-section {
+  margin: 6px 0 10px;
+}
+.sidebar.is-collapsed .sidebar-section-title {
+  justify-content: center;
+  padding: 3px 0;
+  font-size: 0;
+  letter-spacing: 0;
+}
+.sidebar.is-collapsed .sidebar-section-title::before {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1;
+}
+.sidebar.is-collapsed .sidebar-section.is-compact .sidebar-section-title[title="Favorites"]::before {
+  content: "★";
+}
+.sidebar.is-collapsed .sidebar-section.is-compact .sidebar-section-title[title="Projects"]::before {
+  content: "●";
 }
 .sidebar-section-chevron {
   width: 10px;
@@ -711,6 +732,28 @@ button.primary,
   background: none;
   font: inherit;
   text-align: left;
+}
+.sidebar.is-collapsed .sidebar-row-button,
+.sidebar.is-collapsed .tree-row.folder {
+  justify-content: center;
+  width: 36px;
+  height: 32px;
+  margin: 2px auto;
+  padding: 4px;
+}
+.sidebar.is-collapsed .tree-row-label,
+.sidebar.is-collapsed .folder-open-btn,
+.sidebar.is-collapsed .favorite-drag-handle,
+.sidebar.is-collapsed .project-row-actions,
+.sidebar.is-collapsed .sidebar-section-empty {
+  display: none;
+}
+.sidebar.is-collapsed .tree-icon,
+.sidebar.is-collapsed .tree-icon-img {
+  margin-right: 0;
+}
+.sidebar.is-collapsed .tree-icon-btn {
+  pointer-events: none;
 }
 .tree-row-label {
   min-width: 0;
@@ -1903,6 +1946,9 @@ button.primary,
 .rk-prose > *:hover {
   background-color: color-mix(in srgb, var(--hover) 55%, transparent);
 }
+.rk-prose[data-locked] > *:hover {
+  background-color: transparent;
+}
 
 /* The global drag handle that follows the hovered block. */
 .drag-handle {
@@ -1929,6 +1975,11 @@ button.primary,
 .drag-handle.hide {
   display: none;
   pointer-events: none;
+}
+.rk-prose[data-locked] ~ .drag-handle,
+.editor-wrap.is-locked .drag-handle,
+.editor-wrap.is-locked .add-block-button {
+  display: none !important;
 }
 
 /* Notion-style "+" add-block button (left gutter). */

@@ -1,4 +1,4 @@
-// A tiny global registry mapping note path -> icon (emoji or data: URL).
+// A tiny global registry mapping note path -> icon (emoji or image asset).
 // App keeps this in sync with the vault; the page-link decorations read from it
 // so link icons are resolved live (never baked into the markdown on disk).
 

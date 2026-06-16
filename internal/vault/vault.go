@@ -274,7 +274,7 @@ func (v *Vault) dashboardPath(folder string) (string, error) {
 func sidebarHidden(name string) bool {
 	return strings.HasPrefix(name, ".") ||
 		strings.EqualFold(name, "node_modules") ||
-		strings.EqualFold(name, "assets")
+		strings.EqualFold(name, assetRootDir)
 }
 
 func IsMarkdownPath(name string) bool {
@@ -690,7 +690,7 @@ func (v *Vault) MarkdownFiles() ([]string, error) {
 			return nil
 		}
 		if d.IsDir() {
-			if hidden(d.Name()) || d.Name() == "assets" {
+			if hidden(d.Name()) || strings.EqualFold(d.Name(), assetRootDir) {
 				return filepath.SkipDir
 			}
 			return nil

@@ -1,6 +1,9 @@
 package main
 
 import (
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -23,6 +26,47 @@ func TestKeyedDebouncerKeepsIndependentPaths(t *testing.T) {
 	debouncer.Close()
 	if first.Load() != 1 || second.Load() != 1 {
 		t.Fatalf("events were dropped or duplicated: first=%d second=%d", first.Load(), second.Load())
+	}
+}
+
+func TestVaultAssetHandlerServesOnlyActiveVaultAssets(t *testing.T) {
+	opened, err := vault.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(opened.Root, "Assets", "Videos"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	videoPath := filepath.Join(opened.Root, "Assets", "Videos", "clip.mp4")
+	if err := os.WriteFile(videoPath, []byte("video"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	app := NewApp()
+	app.vault = opened
+	server := httptest.NewServer(app.vaultAssetMiddleware()(http.NotFoundHandler()))
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/Assets/Videos/clip.mp4")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK || string(body) != "video" {
+		t.Fatalf("asset response = %d %q", resp.StatusCode, string(body))
+	}
+
+	resp, err = http.Get(server.URL + "/Project/page.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("non-asset path was served: %d", resp.StatusCode)
 	}
 }
 

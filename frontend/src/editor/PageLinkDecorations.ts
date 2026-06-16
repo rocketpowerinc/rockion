@@ -3,6 +3,7 @@ import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { getPageIcon, isInternalNoteHref } from "./pageIcons";
 import { managedPageIDFromHref } from "./pagePaths.mjs";
+import { imageIconURL, isImageIcon } from "./imageIcons.mjs";
 
 // Renders a live icon before each internal page link. Ordinary embedded links
 // receive a ↗ badge; authoritative managed dashboard entries do not.
@@ -82,9 +83,9 @@ function buildIcon(href: string, managed: boolean): HTMLElement {
   span.contentEditable = "false";
 
   const icon = getPageIcon(href);
-  if (icon && icon.startsWith("data:")) {
+  if (isImageIcon(icon)) {
     const img = document.createElement("img");
-    img.src = icon;
+    img.src = imageIconURL(icon);
     img.className = "pli-img";
     img.alt = "";
     span.appendChild(img);

@@ -143,6 +143,9 @@ export const api = {
   backlinks: (path: string): Promise<SearchHit[]> => App.Backlinks(path),
   // SaveImage takes a Go []byte; Wails marshals a number[] / base64. We pass an array.
   saveImage: (name: string, data: number[]): Promise<string> => App.SaveImage(name, data),
+  saveVideo: (name: string, data: number[]): Promise<string> => App.SaveVideo(name, data),
+  openAssetInFolder: (path: string): Promise<void> => App.OpenAssetInFolder(path),
+  deleteAsset: (path: string): Promise<void> => App.DeleteAsset(path),
   setNoteCover: (path: string, cover: PageCover): Promise<Note> =>
     App.SetNoteCover(path, cover),
   getPageSettings: (path: string): Promise<PageSettings> => App.GetPageSettings(path),
@@ -157,7 +160,7 @@ export const api = {
   pickVaultImportArchive: (): Promise<string> => App.PickVaultImportArchive(),
   importVault: (archivePath: string, password: string): Promise<VaultInfo> =>
     App.ImportVault(archivePath, password),
-  // SetNoteIcon stores an emoji icon for a note ("" clears it).
+  // SetNoteIcon stores an emoji or vault image asset path for a note ("" clears it).
   setNoteIcon: (path: string, icon: string): Promise<void> => App.SetNoteIcon(path, icon),
   checkForUpdates: (): Promise<UpdateInfo> => App.CheckForUpdates(),
   installUpdate: (): Promise<UpdateInfo> => App.InstallUpdate(),

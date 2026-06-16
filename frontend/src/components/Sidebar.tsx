@@ -4,6 +4,7 @@ import {
   writingLanguageLabel,
   type WritingLanguage,
 } from "../writingLanguage";
+import { imageIconURL, isImageIcon } from "../editor/imageIcons.mjs";
 import EmojiPicker from "./EmojiPicker";
 
 interface Props {
@@ -181,6 +182,7 @@ export default function Sidebar({
               key={node.path}
               node={node}
               activePath={activePath}
+              collapsed={collapsed}
               iconPickerOpen={iconPickerFor === node.path}
               onOpen={onOpen}
               onOpenIconPicker={() => setIconPickerFor(node.path)}
@@ -338,6 +340,7 @@ function SidebarSection({
 function ProjectRow({
   node,
   activePath,
+  collapsed,
   iconPickerOpen,
   onOpen,
   onOpenIconPicker,
@@ -347,6 +350,7 @@ function ProjectRow({
 }: {
   node: TreeNode;
   activePath: string | null;
+  collapsed: boolean;
   iconPickerOpen: boolean;
   onOpen: (path: string) => void;
   onOpenIconPicker: () => void;
@@ -391,11 +395,12 @@ function ProjectRow({
     >
       <button
         className="tree-icon-btn"
-        title="Change project icon"
-        onClick={onOpenIconPicker}
+        title={collapsed ? node.name : "Change project icon"}
+        aria-label={collapsed ? `Open ${node.name}` : "Change project icon"}
+        onClick={collapsed ? () => onOpen(dashboardPath) : onOpenIconPicker}
       >
-        {node.icon && node.icon.startsWith("data:") ? (
-          <img className="tree-icon-img" src={node.icon} alt="" />
+        {isImageIcon(node.icon) ? (
+          <img className="tree-icon-img" src={imageIconURL(node.icon)} alt="" />
         ) : (
           <span className="tree-icon">{node.icon || "📁"}</span>
         )}
@@ -459,6 +464,7 @@ function ProjectRow({
       {iconPickerOpen && (
         <EmojiPicker
           onClose={onCloseIconPicker}
+          assetName={node.name || "project-icon"}
           onPick={(icon) => {
             onCloseIconPicker();
             onSetIcon(dashboardPath, icon);
@@ -515,8 +521,8 @@ function PageRow({
       }}
     >
       {favorite && <span className="favorite-drag-handle" aria-hidden="true">⋮⋮</span>}
-      {node.icon && node.icon.startsWith("data:") ? (
-        <img className="tree-icon-img" src={node.icon} alt="" />
+      {isImageIcon(node.icon) ? (
+        <img className="tree-icon-img" src={imageIconURL(node.icon)} alt="" />
       ) : (
         <span className="tree-icon">{node.icon || "📄"}</span>
       )}

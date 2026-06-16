@@ -157,8 +157,7 @@ test("external links are normalized, styled blue, and opened outside Rockion", (
 
 test("only local and explicitly embedded image sources are allowed", () => {
   for (const source of [
-    "assets/image.png",
-    "./assets/image.png",
+    "Assets/Images/image.png",
     "../shared/image.png",
     "/Rockion-Hero.png",
     "blob:local-preview",
@@ -175,6 +174,89 @@ test("only local and explicitly embedded image sources are allowed", () => {
     "data:text/html;base64,PGgxPkJhZDwvaDE+",
   ]) {
     assert.equal(isSafeImageSource(source), false, source);
+  }
+});
+
+test("MP4 uploads render as local video assets with asset actions", () => {
+  const api = fs.readFileSync(new URL("../src/api.ts", import.meta.url), "utf8");
+  const editor = fs.readFileSync(
+    new URL("../src/components/Editor.tsx", import.meta.url),
+    "utf8"
+  );
+  const videoAsset = fs.readFileSync(
+    new URL("../src/editor/VideoAsset.ts", import.meta.url),
+    "utf8"
+  );
+  const emojiPicker = fs.readFileSync(
+    new URL("../src/components/EmojiPicker.tsx", import.meta.url),
+    "utf8"
+  );
+  const slashItems = fs.readFileSync(
+    new URL("../src/editor/slashItems.ts", import.meta.url),
+    "utf8"
+  );
+  const styles = fs.readFileSync(
+    new URL("../src/styles.css", import.meta.url),
+    "utf8"
+  );
+  const index = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
+
+  assert.match(api, /saveVideo/);
+  assert.match(api, /openAssetInFolder/);
+  assert.match(api, /deleteAsset/);
+  assert.match(editor, /accept="video\/mp4,\.mp4"/);
+  assert.match(editor, /api\.saveVideo\(`\$\{currentPageAssetName\(\)\}\.mp4`/);
+  assert.match(editor, /setVideo\(\{ src: relPath/);
+  assert.match(editor, /rockion:upload-video/);
+  assert.match(editor, /rockion:video-asset-action/);
+  assert.match(videoAsset, /name: "videoAsset"/);
+  assert.match(videoAsset, /\^Assets\\\/Videos\\\/\[\^\?#<>"\]\+\\\.mp4\$/);
+  assert.match(videoAsset, /addStorage\(\)/);
+  assert.match(videoAsset, /serialize\(state: any, node: any\)/);
+  assert.match(videoAsset, /markdownit\.use\(videoMarkdownItPlugin\)/);
+  assert.match(videoAsset, /assetURL\(src\)/);
+  assert.match(videoAsset, /storedVideoSource/);
+  assert.match(videoAsset, /<video src="\$\{escapeAttr\(storedSrc\)\}" controls preload="metadata"/);
+  assert.match(videoAsset, /Open in folder/);
+  assert.match(videoAsset, /Delete asset/);
+  assert.match(emojiPicker, /api\.saveImage\(assetName,\s*Array\.from\(data\)\)/);
+  assert.doesNotMatch(emojiPicker, /toDataURL/);
+  assert.match(slashItems, /title:\s*"Video"/);
+  assert.match(styles, /\.video-asset/);
+  assert.match(styles, /\.video-asset-menu/);
+  assert.match(index, /media-src 'self'/);
+});
+
+test("uploaded image icons are stored as vault image assets", () => {
+  const imageIcons = fs.readFileSync(
+    new URL("../src/editor/imageIcons.mjs", import.meta.url),
+    "utf8"
+  );
+  const editor = fs.readFileSync(
+    new URL("../src/components/Editor.tsx", import.meta.url),
+    "utf8"
+  );
+  const dashboard = fs.readFileSync(
+    new URL("../src/components/Dashboard.tsx", import.meta.url),
+    "utf8"
+  );
+  const sidebar = fs.readFileSync(
+    new URL("../src/components/Sidebar.tsx", import.meta.url),
+    "utf8"
+  );
+  const decorations = fs.readFileSync(
+    new URL("../src/editor/PageLinkDecorations.ts", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(imageIcons, /\^Assets\\\/Images\\\/\[\^\?#<>"\]\+\$/);
+  assert.match(imageIcons, /return `\/\$\{value\}`/);
+  assert.match(editor, /assetName=\{currentPageAssetName\(\)\}/);
+  assert.match(dashboard, /assetName=\{note\.title \|\| "project-icon"\}/);
+  assert.match(sidebar, /assetName=\{node\.name \|\| "project-icon"\}/);
+  for (const source of [editor, dashboard, sidebar, decorations]) {
+    assert.match(source, /isImageIcon/);
+    assert.match(source, /imageIconURL/);
   }
 });
 

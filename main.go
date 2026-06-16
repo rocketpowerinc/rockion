@@ -21,7 +21,8 @@ func main() {
 		MinWidth:  900,
 		MinHeight: 650,
 		AssetServer: &assetserver.Options{
-			Assets: assets,
+			Assets:     assets,
+			Middleware: app.vaultAssetMiddleware(),
 		},
 		BackgroundColour: &options.RGBA{R: 255, G: 255, B: 255, A: 1},
 		OnStartup:        app.startup,

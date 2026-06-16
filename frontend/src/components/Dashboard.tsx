@@ -20,6 +20,7 @@ import {
   reorderedDashboardIDs,
   sortDashboardCards,
 } from "../editor/dashboardModel.mjs";
+import { imageIconURL, isImageIcon } from "../editor/imageIcons.mjs";
 import NewPageModal from "./NewPageModal";
 import CoverPicker from "./CoverPicker";
 import CoverRepositionControls from "./CoverRepositionControls";
@@ -371,8 +372,8 @@ export default function Dashboard({
               title="Change project icon"
               onClick={() => setIconPickerOpen((open) => !open)}
             >
-              {note.icon && note.icon.startsWith("data:") ? (
-                <img className="db-title-icon-img" src={note.icon} alt="" />
+              {isImageIcon(note.icon) ? (
+                <img className="db-title-icon-img" src={imageIconURL(note.icon)} alt="" />
               ) : (
                 <span className="db-title-icon">{note.icon || "📁"}</span>
               )}
@@ -380,6 +381,7 @@ export default function Dashboard({
             {iconPickerOpen && (
               <EmojiPicker
                 onClose={() => setIconPickerOpen(false)}
+                assetName={note.title || "project-icon"}
                 onPick={(icon) => {
                   setIconPickerOpen(false);
                   onSetIcon(note.path, icon);

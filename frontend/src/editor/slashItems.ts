@@ -56,6 +56,15 @@ export const slashItems: SlashItem[] = [
     },
   },
   {
+    title: "Video",
+    hint: "Upload an MP4 video",
+    aliases: ["mp4", "movie", "media"],
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).run();
+      window.dispatchEvent(new CustomEvent("rockion:upload-video"));
+    },
+  },
+  {
     title: "Table",
     hint: "3×3 table",
     command: ({ editor, range }) =>

@@ -218,11 +218,31 @@ func TestSaveImageValidatesAndNormalizesFormat(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if !strings.HasPrefix(rel, "Assets/Images/") {
+		t.Fatalf("image was not stored in image assets folder: %s", rel)
+	}
 	if !strings.HasSuffix(rel, ".png") {
 		t.Fatalf("image format was not normalized: %s", rel)
 	}
 	if _, err := v.SaveImage("bad.png", []byte("not an image")); err == nil {
 		t.Fatal("invalid image was accepted")
+	}
+}
+
+func TestSaveVideoStoresMP4InVideoAssets(t *testing.T) {
+	v := openTestVault(t)
+	rel, err := v.SaveVideo("My Page.mp4", []byte("mp4 bytes"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(rel, "Assets/Videos/") || !strings.HasSuffix(rel, ".mp4") {
+		t.Fatalf("video was not stored in video assets folder: %s", rel)
+	}
+	if _, err := os.Stat(filepath.Join(v.Root, filepath.FromSlash(rel))); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := v.SaveVideo("bad.mov", []byte("bytes")); err == nil {
+		t.Fatal("non-mp4 video was accepted")
 	}
 }
 
@@ -242,6 +262,15 @@ func TestSetIconRequiresNoteAndRejectsInvalidDataURL(t *testing.T) {
 	}
 	if got := v.Icons()["note.md"]; got != "📝" {
 		t.Fatalf("icon was not saved: %q", got)
+	}
+	if err := v.SetIcon("note.md", "Assets/Images/note-icon.png"); err != nil {
+		t.Fatal(err)
+	}
+	if got := v.Icons()["note.md"]; got != "Assets/Images/note-icon.png" {
+		t.Fatalf("asset icon was not saved: %q", got)
+	}
+	if err := v.SetIcon("note.md", "Assets/Videos/bad.mp4"); err == nil {
+		t.Fatal("non-image asset icon was accepted")
 	}
 }
 
@@ -382,7 +411,7 @@ func TestCreateProjectCreatesDashboardAndRejectsCollisions(t *testing.T) {
 	if _, err := v.CreateProject("Client Work"); err == nil {
 		t.Fatal("duplicate project was created")
 	}
-	if _, err := v.CreateProject("assets"); err == nil {
+	if _, err := v.CreateProject("Assets"); err == nil {
 		t.Fatal("reserved project was created")
 	}
 	if _, err := v.CreateProject("CON.txt"); err == nil {
@@ -424,7 +453,7 @@ func TestRootDashboardsAndSidebarTree(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(v.Root, "Projects"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(v.Root, "assets"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(v.Root, "Assets"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.MkdirAll(filepath.Join(v.Root, "NODE_MODULES"), 0o755); err != nil {
@@ -446,8 +475,8 @@ func TestRootDashboardsAndSidebarTree(t *testing.T) {
 	if dashboard.Markdown != "# Projects\n\n" {
 		t.Fatalf("dashboard content = %q", dashboard.Markdown)
 	}
-	if _, err := os.Stat(filepath.Join(v.Root, "assets", "dashboard.md")); !os.IsNotExist(err) {
-		t.Fatal("internal assets folder received a dashboard")
+	if _, err := os.Stat(filepath.Join(v.Root, "Assets", "dashboard.md")); !os.IsNotExist(err) {
+		t.Fatal("internal Assets folder received a dashboard")
 	}
 	if _, err := os.Stat(filepath.Join(v.Root, "NODE_MODULES", "dashboard.md")); !os.IsNotExist(err) {
 		t.Fatal("node_modules folder received a dashboard")

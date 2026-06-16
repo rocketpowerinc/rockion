@@ -36,6 +36,7 @@ import { coverPositionFromDrag } from "../editor/coverPosition.mjs";
 import PageTag from "./PageTag";
 import SelectionToolbar from "./SelectionToolbar";
 import { isExternalHref } from "../editor/externalLinks.mjs";
+import { imageIconURL, isImageIcon } from "../editor/imageIcons.mjs";
 
 interface Props {
   note: Note | null;
@@ -116,6 +117,7 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
   const syncTitleRef = useRef<() => Promise<void>>(async () => {});
   const onNoteRenamedRef = useRef(onNoteRenamed);
   const pageOptionsRef = useRef<HTMLDivElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
   onNoteRenamedRef.current = onNoteRenamed;
   const [linkPickerOpen, setLinkPickerOpen] = useState(false);
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
@@ -163,8 +165,8 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
         lang: writingLanguage,
         spellcheck: "false",
       },
-      handlePaste: (_view, event) => handleImagePaste(event),
-      handleDrop: (_view, event) => handleImageDrop(event),
+      handlePaste: (_view, event) => handleMediaPaste(event),
+      handleDrop: (_view, event) => handleMediaDrop(event),
     },
     onUpdate: () => {
       if (!currentPath.current || conflictRef.current) return;
@@ -381,18 +383,51 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
     [note, pageSettings, pageSettingsSaving]
   );
 
-  // Insert an uploaded image at the cursor and persist to assets/.
+  function currentPageAssetName(): string {
+    const source =
+      firstHeadingTitle(markdownNow()) ||
+      note?.title ||
+      currentPath.current?.split("/").pop()?.replace(/\.[^.]+$/, "") ||
+      "page";
+    const slug = source
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80);
+    return slug || "page";
+  }
+
+  // Insert uploaded media at the cursor and persist to Assets/Images or Assets/Videos.
   async function saveAndInsert(file: File) {
+    if (file.type === "video/mp4" || file.name.toLowerCase().endsWith(".mp4")) {
+      await saveAndInsertVideo(file);
+      return;
+    }
     if (file.size > 10 * 1024 * 1024) {
       setSaveError("Images must be 10 MB or smaller.");
       return;
     }
     try {
       const buf = new Uint8Array(await file.arrayBuffer());
-      const relPath = await api.saveImage(file.name, Array.from(buf));
+      const relPath = await api.saveImage(currentPageAssetName(), Array.from(buf));
       editor?.chain().focus().setImage({ src: relPath, alt: file.name }).run();
     } catch (error) {
       setSaveError(`Image import failed: ${String(error)}`);
+    }
+  }
+
+  async function saveAndInsertVideo(file: File) {
+    if (!file.name.toLowerCase().endsWith(".mp4") && file.type !== "video/mp4") {
+      setSaveError("Only .mp4 video uploads are supported.");
+      return;
+    }
+    try {
+      const buf = new Uint8Array(await file.arrayBuffer());
+      const relPath = await api.saveVideo(`${currentPageAssetName()}.mp4`, Array.from(buf));
+      editor?.chain().focus().setVideo({ src: relPath, title: file.name }).run();
+      setSaveError(null);
+    } catch (error) {
+      setSaveError(`Video import failed: ${String(error)}`);
     }
   }
 
@@ -409,7 +444,7 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
       throw new Error("Cover images must be 10 MB or smaller.");
     }
     const data = new Uint8Array(await file.arrayBuffer());
-    const asset = await api.saveImage(file.name, Array.from(data));
+    const asset = await api.saveImage(currentPageAssetName(), Array.from(data));
     await setPageCover({
       kind: "image",
       value: asset,
@@ -476,9 +511,9 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
     }
   }
 
-  function handleImagePaste(event: ClipboardEvent): boolean {
+  function handleMediaPaste(event: ClipboardEvent): boolean {
     const item = Array.from(event.clipboardData?.items ?? []).find((i) =>
-      i.type.startsWith("image/")
+      i.type.startsWith("image/") || i.type === "video/mp4"
     );
     if (!item) return false;
     const file = item.getAsFile();
@@ -486,9 +521,9 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
     return true;
   }
 
-  function handleImageDrop(event: DragEvent): boolean {
+  function handleMediaDrop(event: DragEvent): boolean {
     const file = Array.from(event.dataTransfer?.files ?? []).find((f) =>
-      f.type.startsWith("image/")
+      f.type.startsWith("image/") || f.type === "video/mp4" || f.name.toLowerCase().endsWith(".mp4")
     );
     if (!file) return false;
     event.preventDefault();
@@ -594,6 +629,7 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
   // Open page creation and linking dialogs from slash commands.
   useEffect(() => {
     const open = () => setLinkPickerOpen(true);
+    const uploadVideo = () => videoInputRef.current?.click();
     const createSubPage = () => setSubPagePromptOpen(true);
     const deleteManagedPage = (event: Event) => {
       const href = (event as CustomEvent).detail as string;
@@ -626,17 +662,62 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
       const resolved = resolvePageHref(currentPath.current || "", href);
       if (resolved) onOpenLink?.(resolved);
     };
+    const videoAssetAction = (event: Event) => {
+      const detail = (event as CustomEvent).detail as { action?: string; src?: string };
+      if (!detail?.src) return;
+      if (detail.action === "open") {
+        void api.openAssetInFolder(detail.src).catch((error) =>
+          setSaveError(`Couldn't open asset folder: ${String(error)}`)
+        );
+        return;
+      }
+      if (detail.action === "delete") {
+        if (!window.confirm("Delete this video asset and remove it from the page?")) return;
+        void (async () => {
+          try {
+            await api.deleteAsset(detail.src || "");
+            removeVideoAsset(detail.src || "");
+            setSaveError(null);
+          } catch (error) {
+            setSaveError(`Couldn't delete video asset: ${String(error)}`);
+          }
+        })();
+      }
+    };
     window.addEventListener("rockion:link-page", open);
+    window.addEventListener("rockion:upload-video", uploadVideo);
     window.addEventListener("rockion:new-sub-page", createSubPage);
     window.addEventListener("rockion:delete-managed-page", deleteManagedPage);
     window.addEventListener("rockion:open-page", openPage);
+    window.addEventListener("rockion:video-asset-action", videoAssetAction);
     return () => {
       window.removeEventListener("rockion:link-page", open);
+      window.removeEventListener("rockion:upload-video", uploadVideo);
       window.removeEventListener("rockion:new-sub-page", createSubPage);
       window.removeEventListener("rockion:delete-managed-page", deleteManagedPage);
       window.removeEventListener("rockion:open-page", openPage);
+      window.removeEventListener("rockion:video-asset-action", videoAssetAction);
     };
   }, [loadNote, onNoteUpdated, onOpenLink, onPageCreated]);
+
+  function removeVideoAsset(src: string) {
+    if (!editor) return;
+    let from = -1;
+    let to = -1;
+    editor.state.doc.descendants((node, pos) => {
+      if (node.type.name === "videoAsset" && node.attrs.src === src) {
+        from = pos;
+        to = pos + node.nodeSize;
+        return false;
+      }
+      return true;
+    });
+    if (from >= 0) {
+      editor.view.dispatch(editor.state.tr.delete(from, to));
+      dirty.current = true;
+      void saveNowRef.current();
+    }
+  }
 
   function insertPageLink(page: PageRef) {
     setLinkPickerOpen(false);
@@ -881,8 +962,8 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
           title="Change page icon"
           onClick={() => setIconPickerOpen((open) => !open)}
         >
-          {note.icon && note.icon.startsWith("data:") ? (
-            <img className="page-icon-img" src={note.icon} alt="" />
+          {isImageIcon(note.icon) ? (
+            <img className="page-icon-img" src={imageIconURL(note.icon)} alt="" />
           ) : (
             note.icon || "📄"
           )}
@@ -890,6 +971,7 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
         {iconPickerOpen && (
           <EmojiPicker
             onClose={() => setIconPickerOpen(false)}
+            assetName={currentPageAssetName()}
             onPick={(emoji) => {
               setIconPickerOpen(false);
               onSetIcon?.(note.path, emoji);
@@ -908,6 +990,17 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
       </div>
       <BlockMenu editor={editor} />
       <SelectionToolbar editor={editor} locked={pageSettings.locked} />
+      <input
+        ref={videoInputRef}
+        type="file"
+        accept="video/mp4,.mp4"
+        hidden
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.currentTarget.value = "";
+          if (file) void saveAndInsertVideo(file);
+        }}
+      />
       <PagePicker
         open={linkPickerOpen}
         pages={pages ?? []}

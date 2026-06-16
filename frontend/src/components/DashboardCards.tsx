@@ -7,6 +7,7 @@ import {
 } from "react";
 import { api, type PageCard } from "../api";
 import { coverBackground } from "../editor/coverStyles.mjs";
+import { imageIconURL, isImageIcon } from "../editor/imageIcons.mjs";
 import PageTag from "./PageTag";
 
 type ViewKind = "gallery" | "list";
@@ -38,8 +39,8 @@ function formatDate(ms: number): string {
 
 function CardIcon({ card }: { card: PageCard }) {
   const icon = card.icon;
-  if (icon && icon.startsWith("data:")) {
-    return <img className="db-card-icon-img" src={icon} alt="" />;
+  if (isImageIcon(icon)) {
+    return <img className="db-card-icon-img" src={imageIconURL(icon)} alt="" />;
   }
   return <span className="db-card-icon">{icon || "📄"}</span>;
 }

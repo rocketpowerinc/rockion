@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { imageIconURL, isImageIcon } from "../editor/imageIcons.mjs";
 
 export interface PageRef {
   path: string;
@@ -81,8 +82,8 @@ export default function PagePicker({ open, pages, onPick, onClose }: Props) {
               onClick={() => choose(i)}
             >
               <div className="switcher-title">
-                {p.icon && p.icon.startsWith("data:") ? (
-                  <img className="pp-icon-img" src={p.icon} alt="" />
+                {isImageIcon(p.icon) ? (
+                  <img className="pp-icon-img" src={imageIconURL(p.icon)} alt="" />
                 ) : p.icon ? (
                   p.icon + " "
                 ) : (

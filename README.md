@@ -86,10 +86,10 @@ rm -rf /Applications/Rockion.app
 
 - TipTap editor that reads/writes GitHub-Flavored Markdown directly to disk, with debounced autosave (no save button).
 - **Title = filename** — edit a note's first `# Heading` and the `.md` file is renamed to match once you pause typing (clashes get a ` 2`, ` 3` suffix; links that point to the page are rewritten).
-- Notion-style `/` slash menu: headings, lists, to-dos, table, quote, **callout**, **link to page**, code block, divider.
+- Notion-style `/` slash menu: headings, lists, to-dos, table, quote, **callout**, **link to page**, **video upload**, code block, divider.
 - **Block handles** — hover any block for a drag grip (reorder via drag) and a `+` button (insert a block below). Nested blocks (incl. callouts inside callouts) can be dragged out.
 - Click the empty area below the content to start a new block.
-- Tables, checklists, and image paste/drop (images saved into the vault's `assets/`).
+- Tables, checklists, image paste/drop, and MP4 video paste/drop (media saved into the vault's `Assets/Images` and `Assets/Videos` folders).
 
 **Callouts** — a single `/Callout` block; click its icon to cycle three cyberpunk gradient styles (green / red / yellow). On disk it's a portable `> [!GREEN]` alert blockquote.
 
@@ -97,7 +97,7 @@ rm -rf /Applications/Rockion.app
 
 **Pages & links**
 
-- Each page has an icon — pick an **emoji** or **upload a custom image** (resized and stored as a data URL in the icons sidecar). Set it from the icon at the top of a note or in the sidebar.
+- Each page has an icon — pick an **emoji** or **upload a custom image** saved into `Assets/Images` and referenced from the icons sidecar. Set it from the icon at the top of a note or in the sidebar.
 - `/Link to page` inserts a plain `[Title](path.md)` markdown link. In the editor it renders Notion-style: the **target page's icon with a small ↗ badge**, no underline. The icon is resolved live from the page's current icon (change a page's icon and its links follow), and nothing extra is written to disk.
 - Backlinks panel shows everything that links to the current note.
 
@@ -129,8 +129,8 @@ download, verify, and apply the matching update directly.
 ## Prerequisites
 
 - **Go** 1.26.4
-- **Node.js** 24.16.0 LTS (also recorded in `.nvmrc`)
-- **npm** 11.17.0
+- **Node.js** 26.3.0 (also recorded in `.nvmrc`)
+- **npm** 11.16.0
 - **Wails CLI v2.12.0**: `go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0`
 - Platform deps for Wails development (WebView2 on Windows, WebKitGTK on Linux). Run `wails doctor` to check.
 
@@ -265,8 +265,8 @@ markdown.
   *decoration* (`PageLinkDecorations`) that looks up the target's icon from a live registry
   (`pageIcons.ts`) — so nothing is baked into the file and link icons update when a page's icon
   changes. Clicking a link (or its icon) opens that note instead of navigating.
-- **Custom image icons** are read in the browser, resized to 64px on a canvas, and stored as a
-  `data:` URL in `icons.json` — no backend image handling, and they render anywhere an icon shows.
+- **Custom image icons** are validated by the backend, stored in `Assets/Images`,
+  and referenced from `icons.json` so they render anywhere an icon shows.
 - **Theme** is a `data-theme` attribute on `<html>` (set before first paint by an inline script in
   `index.html`, persisted to `localStorage`).
 

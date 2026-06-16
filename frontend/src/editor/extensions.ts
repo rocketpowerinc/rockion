@@ -15,6 +15,7 @@ import { CodeBlock } from "./CodeBlock";
 import { AddBlockButton } from "./AddBlockButton";
 import { PageLinkDecorations } from "./PageLinkDecorations";
 import { SafeImage } from "./SafeImage";
+import { VideoAsset } from "./VideoAsset";
 import { Spellcheck } from "./Spellcheck";
 import { AutoLink } from "./AutoLink";
 import { LinkContextMenu } from "./LinkContextMenu";
@@ -41,6 +42,7 @@ export const editorExtensions = [
   TableHeader,
   TableCell,
   SafeImage,
+  VideoAsset,
   AutoLink,
   MarkdownLinkCleanup,
   TextColor,

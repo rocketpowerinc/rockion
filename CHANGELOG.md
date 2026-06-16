@@ -5,6 +5,21 @@ All notable changes to Rockion are documented here. This project adheres to
 
 ## [Unreleased]
 
+### Added
+- Add MP4 video uploads from paste, drag/drop, and the `/Video` slash command.
+  Uploaded videos embed as playable local `<video>` blocks with a three-dot
+  menu for opening the file location or deleting the asset.
+
+### Changed
+- Store uploaded media in typed vault asset folders (`Assets/Images` and
+  `Assets/Videos`) with page-based timestamped filenames.
+
+### Fixed
+- Keep uploaded MP4 blocks playable after saving and reopening a page instead
+  of degrading them into generic empty HTML blocks.
+- Save uploaded page and project icon images into `Assets/Images` instead of
+  embedding them directly in the icon sidecar.
+
 ## [0.1.13] - 2026-06-15
 
 ### Added
@@ -333,7 +348,7 @@ First release. A working local-first markdown editor: Notion-style UI over plain
 - **Vaults** — open any folder of markdown files; the file tree loads in the sidebar.
 - **Editor** — TipTap editor that reads and writes GitHub-Flavored Markdown directly to disk, with debounced autosave (no save button).
 - **Slash menu** — type `/` for headings, lists, to-dos, tables, quotes, code blocks, and dividers.
-- **Blocks** — tables, checklists, and image paste/drop (images saved into `assets/`).
+- **Blocks** — tables, checklists, and image paste/drop.
 - **Search** — full-text search (SQLite FTS5) and a `Cmd/Ctrl+P` quick switcher.
 - **Backlinks** — linked-references panel powered by a link index.
 - **Live re-index** — external edits (Obsidian, git pull) are picked up via a file watcher.

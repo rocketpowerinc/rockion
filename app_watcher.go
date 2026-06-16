@@ -112,7 +112,7 @@ func addWatchDirs(watcher *fsnotify.Watcher, root string) error {
 		}
 		if path != root {
 			name := entry.Name()
-			if strings.HasPrefix(name, ".") || name == "node_modules" || name == "assets" {
+			if strings.HasPrefix(name, ".") || name == "node_modules" || strings.EqualFold(name, "Assets") {
 				return filepath.SkipDir
 			}
 		}
@@ -161,7 +161,7 @@ func shouldSkipWatchPath(path, root string) bool {
 		return false
 	}
 	for _, part := range strings.Split(filepath.Clean(rel), string(filepath.Separator)) {
-		if strings.HasPrefix(part, ".") || part == "node_modules" || part == "assets" {
+		if strings.HasPrefix(part, ".") || part == "node_modules" || strings.EqualFold(part, "Assets") {
 			return true
 		}
 	}

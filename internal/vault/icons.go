@@ -13,9 +13,9 @@ import (
 	"unicode/utf8"
 )
 
-// Page icons (emoji) are stored in a sidecar file <vault>/.rockion/icons.json
-// mapping vault-relative note path -> emoji. This keeps the .md files untouched
-// while the icons still travel with the vault.
+// Page icons are stored in a sidecar file <vault>/.rockion/icons.json mapping
+// vault-relative note path -> emoji or vault-local image asset path. This keeps
+// the .md files untouched while the icons still travel with the vault.
 
 func (v *Vault) iconsPath() string {
 	return filepath.Join(v.Root, ".rockion", "icons.json")
@@ -153,6 +153,20 @@ func mapRenamedPath(path, oldRel, newRel string, isDir bool) (string, bool) {
 func validateIcon(icon string) error {
 	if icon == "" {
 		return nil
+	}
+	if strings.HasPrefix(filepath.ToSlash(icon), "Assets/Images/") {
+		clean := filepath.ToSlash(filepath.Clean(filepath.FromSlash(icon)))
+		if clean != filepath.ToSlash(icon) || strings.Contains(clean, "..") {
+			return errors.New("custom icon asset path is invalid")
+		}
+		ext := strings.ToLower(filepath.Ext(clean))
+		if ext != ".png" && ext != ".jpg" && ext != ".jpeg" && ext != ".gif" {
+			return errors.New("custom icon asset must be an image")
+		}
+		return nil
+	}
+	if strings.HasPrefix(filepath.ToSlash(icon), "Assets/") {
+		return errors.New("custom icon asset must be stored in Assets/Images")
 	}
 	const prefix = "data:image/png;base64,"
 	if strings.HasPrefix(icon, "data:") {

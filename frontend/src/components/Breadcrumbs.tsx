@@ -1,4 +1,5 @@
 import type { PageRef } from "./PagePicker";
+import { imageIconURL, isImageIcon } from "../editor/imageIcons.mjs";
 
 export interface BreadcrumbItem extends PageRef {
   current?: boolean;
@@ -10,8 +11,8 @@ interface Props {
 }
 
 function PageIcon({ icon }: { icon?: string }) {
-  if (icon?.startsWith("data:")) {
-    return <img className="breadcrumb-icon-img" src={icon} alt="" />;
+  if (isImageIcon(icon)) {
+    return <img className="breadcrumb-icon-img" src={imageIconURL(icon)} alt="" />;
   }
   return <span className="breadcrumb-icon">{icon || "📄"}</span>;
 }

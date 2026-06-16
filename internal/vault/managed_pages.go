@@ -300,7 +300,7 @@ func (v *Vault) managedPages(dir string) (map[string]model.Note, error) {
 			return nil
 		}
 		if entry.IsDir() {
-			if hidden(entry.Name()) || strings.EqualFold(entry.Name(), "assets") {
+			if hidden(entry.Name()) || strings.EqualFold(entry.Name(), assetRootDir) {
 				return filepath.SkipDir
 			}
 			return nil

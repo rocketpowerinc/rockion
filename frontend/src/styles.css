@@ -753,7 +753,13 @@ button.primary,
   margin-right: 0;
 }
 .sidebar.is-collapsed .tree-icon-btn {
-  pointer-events: none;
+  /* Collapsed project icons open the project (the name/actions are hidden), so
+     they must stay clickable. */
+  pointer-events: auto;
+  cursor: pointer;
+  width: 36px;
+  height: 28px;
+  justify-content: center;
 }
 .tree-row-label {
   min-width: 0;
@@ -1745,6 +1751,88 @@ button.primary,
   background: var(--hover);
   font-size: 0.85rem;
   overflow-wrap: anywhere;
+}
+
+.video-asset {
+  position: relative;
+  margin: 14px 0;
+}
+.video-asset-caption {
+  width: min(100%, 860px);
+  margin-top: 6px;
+  padding: 2px 4px;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+  outline: none;
+  border-radius: 4px;
+}
+.video-asset-caption:empty::before,
+.video-asset-caption:has(> br:only-child)::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted);
+  opacity: 0.55;
+  pointer-events: none;
+}
+.video-asset video {
+  display: block;
+  width: min(100%, 860px);
+  max-height: 70vh;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #000;
+}
+.video-asset-actions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.video-asset:hover .video-asset-actions,
+.video-asset:focus-within .video-asset-actions {
+  opacity: 1;
+}
+.video-asset-more {
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.66);
+  color: #fff;
+  cursor: pointer;
+}
+.video-asset-menu {
+  position: absolute;
+  top: 0;
+  left: calc(100% + 6px);
+  right: auto;
+  min-width: 150px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  /* Opaque background + sit beside the video (not over it) so the items stay
+     readable regardless of the frame underneath. */
+  background: var(--bg);
+  box-shadow: var(--shadow);
+  z-index: 20;
+}
+.video-asset-menu button {
+  display: block;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.video-asset-menu button:hover {
+  background: var(--hover);
+}
+.editor-wrap.is-locked .video-asset-actions {
+  display: none;
 }
 
 .spellcheck-error {

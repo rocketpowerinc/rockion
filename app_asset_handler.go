@@ -18,7 +18,8 @@ func (a *App) vaultAssetMiddleware() assetserver.Middleware {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			rel := strings.TrimPrefix(path.Clean("/"+r.URL.Path), "/")
 			isAsset := strings.HasPrefix(rel, "Assets/Images/") ||
-				strings.HasPrefix(rel, "Assets/Videos/")
+				strings.HasPrefix(rel, "Assets/Videos/") ||
+				strings.HasPrefix(rel, "Assets/Bookmarks/")
 			if !isAsset {
 				next.ServeHTTP(w, r)
 				return

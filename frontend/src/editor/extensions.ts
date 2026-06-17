@@ -23,6 +23,9 @@ import { MarkdownLinkCleanup } from "./MarkdownLinkCleanup";
 import { TextColor, BgColor } from "./colorMarks";
 import { Underline } from "./Underline";
 import { PageTitlePlainText } from "./PageTitlePlainText";
+import { Bookmark } from "./Bookmark";
+import { Mention } from "./Mention";
+import { LinkPaste } from "./LinkPaste";
 
 // The full set of TipTap extensions that make up the Rockion editor.
 export const editorExtensions = [
@@ -43,6 +46,9 @@ export const editorExtensions = [
   TableCell,
   SafeImage,
   VideoAsset,
+  Bookmark,
+  Mention,
+  LinkPaste,
   AutoLink,
   MarkdownLinkCleanup,
   TextColor,

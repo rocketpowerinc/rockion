@@ -23,6 +23,7 @@ import type { WritingLanguage } from "../writingLanguage";
 import { refreshSpellcheck } from "../editor/Spellcheck";
 import NewPageModal from "./NewPageModal";
 import BlockMenu from "../editor/BlockMenu";
+import LinkPasteMenu from "../editor/LinkPasteMenu";
 import {
   managedPageHref,
   relativePageHref,
@@ -684,12 +685,17 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
         })();
       }
     };
+    const openExternal = (event: Event) => {
+      const href = (event as CustomEvent).detail as string;
+      if (href) api.openExternal(href);
+    };
     window.addEventListener("rockion:link-page", open);
     window.addEventListener("rockion:upload-video", uploadVideo);
     window.addEventListener("rockion:new-sub-page", createSubPage);
     window.addEventListener("rockion:delete-managed-page", deleteManagedPage);
     window.addEventListener("rockion:open-page", openPage);
     window.addEventListener("rockion:video-asset-action", videoAssetAction);
+    window.addEventListener("rockion:open-external", openExternal);
     return () => {
       window.removeEventListener("rockion:link-page", open);
       window.removeEventListener("rockion:upload-video", uploadVideo);
@@ -697,6 +703,7 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
       window.removeEventListener("rockion:delete-managed-page", deleteManagedPage);
       window.removeEventListener("rockion:open-page", openPage);
       window.removeEventListener("rockion:video-asset-action", videoAssetAction);
+      window.removeEventListener("rockion:open-external", openExternal);
     };
   }, [loadNote, onNoteUpdated, onOpenLink, onPageCreated]);
 
@@ -989,6 +996,7 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
         <EditorContent editor={editor} />
       </div>
       <BlockMenu editor={editor} />
+      <LinkPasteMenu editor={editor} />
       <SelectionToolbar editor={editor} locked={pageSettings.locked} />
       <input
         ref={videoInputRef}

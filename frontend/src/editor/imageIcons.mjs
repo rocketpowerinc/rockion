@@ -5,7 +5,7 @@ export function isImageIcon(icon) {
 
 export function assetURL(path) {
   const value = String(path || "").replace(/\\/g, "/");
-  if (/^Assets\/(?:Images|Videos)\//i.test(value)) return `/${value}`;
+  if (/^Assets\/(?:Images|Videos|Bookmarks)\//i.test(value)) return `/${value}`;
   return value;
 }
 

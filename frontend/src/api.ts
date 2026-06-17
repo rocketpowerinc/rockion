@@ -51,6 +51,15 @@ export interface PageSettings {
   fullWidth: boolean;
 }
 
+export interface LinkPreview {
+  url: string;
+  title: string;
+  description: string;
+  image: string;
+  favicon: string;
+  siteName: string;
+}
+
 export interface PageCard {
   pageId: string;
   path: string;
@@ -144,6 +153,9 @@ export const api = {
   // SaveImage takes a Go []byte; Wails marshals a number[] / base64. We pass an array.
   saveImage: (name: string, data: number[]): Promise<string> => App.SaveImage(name, data),
   saveVideo: (name: string, data: number[]): Promise<string> => App.SaveVideo(name, data),
+  fetchLinkPreview: (url: string): Promise<LinkPreview> => App.FetchLinkPreview(url),
+  saveRemoteImage: (url: string): Promise<string> => App.SaveRemoteImage(url),
+  saveFavicon: (url: string): Promise<string> => App.SaveFavicon(url),
   openAssetInFolder: (path: string): Promise<void> => App.OpenAssetInFolder(path),
   deleteAsset: (path: string): Promise<void> => App.DeleteAsset(path),
   setNoteCover: (path: string, cover: PageCover): Promise<Note> =>

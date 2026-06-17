@@ -6,13 +6,23 @@ All notable changes to Rockion are documented here. This project adheres to
 ## [Unreleased]
 
 ### Added
+- Pasting a bare URL now opens a "Paste as" menu (Notion-style): Mention (an inline chip
+  showing the site favicon + page title, not a blue link), Bookmark (a preview card with
+  title, description, thumbnail, and favicon fetched from the page's Open Graph metadata), or
+  URL (the plain link). Mentions are stored portably as `<a data-rockion-mention>`; bookmark
+  cards as `<figure data-rockion-bookmark>`, with thumbnails downloaded to `Assets/Bookmarks`.
+
 - Add MP4 video uploads from paste, drag/drop, and the `/Video` slash command.
   Uploaded videos embed as playable local `<video>` blocks with a three-dot
   menu for opening the file location or deleting the asset.
 
 ### Changed
-- Store uploaded media in typed vault asset folders (`Assets/Images` and
-  `Assets/Videos`) with page-based timestamped filenames.
+- Store uploaded media in typed vault asset folders (`Assets/Images`,
+  `Assets/Videos`, `Assets/Bookmarks`) with page-based timestamped filenames.
+- Make bookmark preview cards more compact (Notion-sized height).
+- Deduplicate downloaded bookmark/mention assets by content hash, so the same
+  site's favicon or a shared preview image is stored once in `Assets/Bookmarks`
+  and reused across links.
 
 ### Fixed
 - Keep uploaded MP4 blocks playable after saving and reopening a page instead

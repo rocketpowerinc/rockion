@@ -21,6 +21,7 @@ interface Props {
   onRenameProject: (dashboardPath: string, title: string) => Promise<Note>;
   onToggleCollapsed: () => void;
   onNewProject: () => void;
+  onSearchVault: () => void;
   onGoHome: () => void;
   onOpenVault: () => void;
   onToggleTheme: () => void;
@@ -45,6 +46,7 @@ export default function Sidebar({
   onRenameProject,
   onToggleCollapsed,
   onNewProject,
+  onSearchVault,
   onGoHome,
   onOpenVault,
   onToggleTheme,
@@ -140,6 +142,30 @@ export default function Sidebar({
           </button>
           <button className="icon-btn" title="New project" onClick={onNewProject}>
             +
+          </button>
+          <button
+            className="icon-btn"
+            title="Search vault"
+            aria-label="Search vault"
+            onClick={onSearchVault}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle
+                cx="10.5"
+                cy="10.5"
+                r="5.8"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              />
+              <path
+                d="m15 15 4.2 4.2"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
           </button>
         </div>
       </div>

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"html"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -21,6 +22,8 @@ var (
 	mdlinkRe   = regexp.MustCompile(`\[[^\]]*\]\(([^)]+)\)`)
 	hashtagRe  = regexp.MustCompile(`(?:^|\s)#([A-Za-z0-9_\-/]+)`)
 	h1Re       = regexp.MustCompile(`(?m)^#\s+(.+)$`)
+	bookmarkRe = regexp.MustCompile(`(?is)<figure\b[^>]*data-rockion-bookmark[^>]*>(.*?)</figure>`)
+	tagRe      = regexp.MustCompile(`(?is)<[^>]+>`)
 )
 
 // Indexer keeps the SQLite index in sync with the vault.
@@ -118,7 +121,7 @@ func (ix *Indexer) indexFile(rel string) error {
 
 	if _, err := tx.Exec(
 		`INSERT INTO notes_fts(rowid, title, body, path) VALUES(?,?,?,?)`,
-		id, note.Title, note.Markdown, rel,
+		id, note.Title, indexedBody(note.Markdown), rel,
 	); err != nil {
 		return err
 	}
@@ -160,6 +163,22 @@ func (ix *Indexer) indexFile(rel string) error {
 	}
 
 	return tx.Commit()
+}
+
+func indexedBody(markdown string) string {
+	bookmarkText := bookmarkRe.ReplaceAllStringFunc(markdown, func(match string) string {
+		body := bookmarkRe.FindStringSubmatch(match)
+		if len(body) < 2 {
+			return ""
+		}
+		text := tagRe.ReplaceAllString(body[1], " ")
+		text = html.UnescapeString(text)
+		return " " + strings.Join(strings.Fields(text), " ") + " "
+	})
+	if bookmarkText == markdown {
+		return markdown
+	}
+	return markdown + "\n\n" + bookmarkText
 }
 
 // RemoveFile drops a note from the index (after deletion on disk).

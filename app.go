@@ -601,6 +601,15 @@ func (a *App) Search(query string, limit int) ([]model.SearchHit, error) {
 	return a.search.Query(query, limit)
 }
 
+func (a *App) SearchVault(query string) (model.VaultSearchResults, error) {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	if err := a.requireVault(); err != nil {
+		return model.VaultSearchResults{}, err
+	}
+	return a.search.VaultQuery(query, 5)
+}
+
 func (a *App) Backlinks(path string) ([]model.SearchHit, error) {
 	a.mu.RLock()
 	defer a.mu.RUnlock()

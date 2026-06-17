@@ -7,6 +7,7 @@ import NewPageModal from "./components/NewPageModal";
 import Dashboard from "./components/Dashboard";
 import VaultTransferModal from "./components/VaultTransferModal";
 import WelcomeDashboard from "./components/WelcomeDashboard";
+import VaultSearch from "./components/VaultSearch";
 import Breadcrumbs, {
   type BreadcrumbItem,
 } from "./components/Breadcrumbs";
@@ -43,6 +44,7 @@ export default function App() {
   const [note, setNote] = useState<Note | null>(null);
   const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [vaultSearchOpen, setVaultSearchOpen] = useState(false);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [newVaultOpen, setNewVaultOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -572,6 +574,7 @@ export default function App() {
         onRenameProject={renameProject}
         onToggleCollapsed={() => setSidebarCollapsed((collapsed) => !collapsed)}
         onNewProject={newProject}
+        onSearchVault={() => setVaultSearchOpen(true)}
         onGoHome={() => void goToVaultHome()}
         onOpenVault={openVault}
         onToggleTheme={toggleTheme}
@@ -632,6 +635,11 @@ export default function App() {
       <QuickSwitcher
         open={switcherOpen}
         onClose={() => setSwitcherOpen(false)}
+        onOpen={openNote}
+      />
+      <VaultSearch
+        open={vaultSearchOpen}
+        onClose={() => setVaultSearchOpen(false)}
         onOpen={openNote}
       />
       {newProjectOpen && (

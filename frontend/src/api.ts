@@ -108,6 +108,11 @@ export interface SearchHit {
   snippet?: string;
 }
 
+export interface VaultSearchResults {
+  titleMatches: SearchHit[];
+  contentMatches: SearchHit[];
+}
+
 export interface UpdateInfo {
   currentVersion: string;
   latestVersion: string;
@@ -179,6 +184,7 @@ export const api = {
     App.RecentHistoryForVaults(paths, limit),
   clearHistoryForVault: (path: string): Promise<void> => App.ClearHistoryForVault(path),
   search: (query: string, limit = 50): Promise<SearchHit[]> => App.Search(query, limit),
+  searchVault: (query: string): Promise<VaultSearchResults> => App.SearchVault(query),
   backlinks: (path: string): Promise<SearchHit[]> => App.Backlinks(path),
   // SaveImage takes a Go []byte; Wails marshals a number[] / base64. We pass an array.
   saveImage: (name: string, data: number[]): Promise<string> => App.SaveImage(name, data),

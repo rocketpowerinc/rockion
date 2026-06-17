@@ -53,6 +53,13 @@ type SearchHit struct {
 	Snippet string `json:"snippet,omitempty"`
 }
 
+// VaultSearchResults separates title matches from body matches so the UI can
+// prioritize page titles and keep content matches bounded.
+type VaultSearchResults struct {
+	TitleMatches   []SearchHit `json:"titleMatches"`
+	ContentMatches []SearchHit `json:"contentMatches"`
+}
+
 // PageCard is a dashboard "gallery card" view of a managed page. It is derived
 // entirely from the page file + sidecar metadata, so nothing card-specific is
 // stored in the dashboard markdown.

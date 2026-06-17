@@ -8,6 +8,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { editorExtensions } from "../editor/extensions";
 import {
@@ -39,6 +40,12 @@ import PageTag from "./PageTag";
 import SelectionToolbar from "./SelectionToolbar";
 import { isExternalHref } from "../editor/externalLinks.mjs";
 import { imageIconURL, isImageIcon } from "../editor/imageIcons.mjs";
+import {
+  clearPageFind,
+  movePageFind,
+  pageFindState,
+  setPageFind,
+} from "../editor/PageFind";
 
 interface Props {
   note: Note | null;
@@ -196,6 +203,71 @@ function VersionHistoryPanel({
   );
 }
 
+function PageFindBar({
+  inputRef,
+  query,
+  index,
+  count,
+  onQuery,
+  onStep,
+  onClose,
+}: {
+  inputRef: React.RefObject<HTMLInputElement>;
+  query: string;
+  index: number;
+  count: number;
+  onQuery: (query: string) => void;
+  onStep: (direction: 1 | -1) => void;
+  onClose: () => void;
+}) {
+  return createPortal(
+    <div className="page-find-bar" role="search" aria-label="Find in page">
+      <input
+        ref={inputRef}
+        type="search"
+        value={query}
+        placeholder="Find in page"
+        aria-label="Find in page"
+        onChange={(event) => onQuery(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            onStep(event.shiftKey ? -1 : 1);
+          } else if (event.key === "Escape") {
+            event.preventDefault();
+            onClose();
+          }
+        }}
+      />
+      <span className="page-find-count">
+        {query.trim() ? `${index} / ${count}` : "0 / 0"}
+      </span>
+      <button
+        type="button"
+        title="Previous match"
+        aria-label="Previous match"
+        disabled={count === 0}
+        onClick={() => onStep(-1)}
+      >
+        ↑
+      </button>
+      <button
+        type="button"
+        title="Next match"
+        aria-label="Next match"
+        disabled={count === 0}
+        onClick={() => onStep(1)}
+      >
+        ↓
+      </button>
+      <button type="button" title="Close find" aria-label="Close find" onClick={onClose}>
+        ×
+      </button>
+    </div>,
+    document.body
+  );
+}
+
 const AUTOSAVE_MS = 600;
 // A title-rename waits a bit longer than autosave so it fires once the title
 // has settled, not on every keystroke.
@@ -253,6 +325,7 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
   const onNoteRenamedRef = useRef(onNoteRenamed);
   const pageOptionsRef = useRef<HTMLDivElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+  const findInputRef = useRef<HTMLInputElement>(null);
   onNoteRenamedRef.current = onNoteRenamed;
   const [linkPickerOpen, setLinkPickerOpen] = useState(false);
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
@@ -266,6 +339,10 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
   const [coverPositionSaving, setCoverPositionSaving] = useState(false);
   const [pageOptionsOpen, setPageOptionsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [findOpen, setFindOpen] = useState(false);
+  const [findQuery, setFindQuery] = useState("");
+  const [findCount, setFindCount] = useState(0);
+  const [findIndex, setFindIndex] = useState(0);
   const [pageSettings, setPageSettingsState] = useState<PageSettings>({
     locked: false,
     fullWidth: false,
@@ -319,6 +396,74 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
       }, TITLE_SYNC_MS);
     },
   });
+
+  const applyFindState = useCallback((state: ReturnType<typeof pageFindState>) => {
+    setFindCount(state.matches.length);
+    setFindIndex(state.matches.length ? state.index + 1 : 0);
+  }, []);
+
+  const updateFindQuery = useCallback(
+    (query: string, index = 0) => {
+      setFindQuery(query);
+      if (!editor) return;
+      applyFindState(setPageFind(editor, query, index));
+    },
+    [applyFindState, editor]
+  );
+
+  const stepFind = useCallback(
+    (direction: 1 | -1) => {
+      if (!editor) return;
+      applyFindState(movePageFind(editor, direction));
+      findInputRef.current?.focus();
+    },
+    [applyFindState, editor]
+  );
+
+  const closeFind = useCallback(() => {
+    setFindOpen(false);
+    setFindQuery("");
+    setFindCount(0);
+    setFindIndex(0);
+    if (editor) clearPageFind(editor);
+  }, [editor]);
+
+  useEffect(() => {
+    if (!editor || !note) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      const mod = event.ctrlKey || event.metaKey;
+      if (!mod || event.key.toLowerCase() !== "f") return;
+      event.preventDefault();
+      event.stopPropagation();
+      setFindOpen(true);
+      setTimeout(() => {
+        findInputRef.current?.focus();
+        findInputRef.current?.select();
+      }, 0);
+      if (findQuery) {
+        applyFindState(setPageFind(editor, findQuery, Math.max(findIndex - 1, 0)));
+      }
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [applyFindState, editor, findIndex, findQuery, note]);
+
+  useEffect(() => {
+    if (!findOpen) return;
+    setTimeout(() => {
+      findInputRef.current?.focus();
+      findInputRef.current?.select();
+    }, 0);
+  }, [findOpen]);
+
+  useEffect(() => {
+    if (!editor) return;
+    clearPageFind(editor);
+    setFindOpen(false);
+    setFindQuery("");
+    setFindCount(0);
+    setFindIndex(0);
+  }, [editor, note?.path]);
 
   useEffect(() => {
     if (!editor) return;
@@ -1139,6 +1284,17 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
         )}
       </div>
       {saveError && <div className="save-error">{saveError}</div>}
+      {findOpen && (
+        <PageFindBar
+          inputRef={findInputRef}
+          query={findQuery}
+          index={findIndex}
+          count={findCount}
+          onQuery={updateFindQuery}
+          onStep={stepFind}
+          onClose={closeFind}
+        />
+      )}
       <div
         className={`editor-wrap ${pageSettings.fullWidth ? "is-full-width" : ""} ${
           pageSettings.locked ? "is-locked" : ""

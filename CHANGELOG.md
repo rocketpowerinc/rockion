@@ -6,6 +6,10 @@ All notable changes to Rockion are documented here. This project adheres to
 ## [Unreleased]
 
 ### Added
+- Add browser-style in-page find for notes with `Ctrl+F`/`Cmd+F`, highlighted
+  matches, match counts, and next/previous navigation.
+- Add a sidebar vault search button that prioritizes unlimited page-title
+  matches and limits page-content matches to five results.
 - Add file-based page version history stored under each vault's `.rockion`
   metadata, with snapshots on edits/deletes, a page-menu restore dialog, and a
   landing-page history overview with a clear-history action.
@@ -20,6 +24,8 @@ All notable changes to Rockion are documented here. This project adheres to
   menu for opening the file location or deleting the asset.
 
 ### Changed
+- Include bookmark card title/description text in the vault search index so
+  pasted bookmarks can be found by their preview descriptions.
 - Throttle autosave-created version-history snapshots to one checkpoint per page
   every five minutes while keeping delete/restore/rename snapshots immediate.
 - Store uploaded media in typed vault asset folders (`Assets/Images`,
@@ -39,6 +45,8 @@ All notable changes to Rockion are documented here. This project adheres to
   chunks, removing Vite's large dictionary chunk warning from release builds.
 
 ### Fixed
+- Keep the in-page find bar as an overlay so opening `Ctrl+F` does not shift
+  page content downward.
 - Reject link-preview and remote-asset downloads that resolve to localhost or
   private-network addresses, and reject oversized remote images instead of
   saving truncated files.

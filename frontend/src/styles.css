@@ -1221,6 +1221,74 @@ button.primary,
   cursor: wait;
   opacity: 0.65;
 }
+.page-find-bar {
+  position: fixed;
+  top: 54px;
+  right: 18px;
+  z-index: 75;
+  display: flex;
+  width: min(420px, calc(100% - 24px));
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 6px;
+  background: var(--bg);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.28);
+}
+.page-find-bar input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  border-radius: 6px;
+  padding: 7px 8px;
+  background: var(--hover);
+  color: var(--text);
+  outline: none;
+}
+.page-find-count {
+  min-width: 54px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+.page-find-bar button {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.page-find-bar button:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--text);
+}
+.page-find-bar button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+.page-find-match {
+  border-radius: 2px;
+  background: color-mix(in srgb, #facc15 55%, transparent);
+  color: inherit;
+}
+.page-find-match.is-active {
+  background: color-mix(in srgb, var(--accent) 65%, #facc15);
+  color: #111;
+}
+.bookmark-card.page-find-match,
+.link-mention.page-find-match {
+  outline: 2px solid color-mix(in srgb, #facc15 75%, transparent);
+  outline-offset: 2px;
+}
+.bookmark-card.page-find-match.is-active,
+.link-mention.page-find-match.is-active {
+  outline-color: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent);
+}
 .history-overlay {
   position: fixed;
   inset: 0;
@@ -2645,6 +2713,25 @@ button.primary,
 .switcher-path {
   color: var(--text-muted);
   font-size: 12px;
+}
+.switcher-empty {
+  padding: 18px 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.vault-search-section-title {
+  padding: 10px 16px 6px;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.switcher-snippet {
+  margin-top: 5px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
 }
 mark {
   background: #fde68a;

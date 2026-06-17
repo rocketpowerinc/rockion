@@ -26,6 +26,7 @@ import { PageTitlePlainText } from "./PageTitlePlainText";
 import { Bookmark } from "./Bookmark";
 import { Mention } from "./Mention";
 import { LinkPaste } from "./LinkPaste";
+import { PageFind } from "./PageFind";
 
 // The full set of TipTap extensions that make up the Rockion editor.
 export const editorExtensions = [
@@ -77,5 +78,6 @@ export const editorExtensions = [
   AddBlockButton,
   PageLinkDecorations,
   LinkContextMenu,
+  PageFind,
   Spellcheck,
 ];

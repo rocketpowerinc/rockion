@@ -144,6 +144,44 @@ test("selected text exposes inline formatting and link controls", () => {
   assert.match(underline, /return \["u",\s*mergeAttributes\(HTMLAttributes\),\s*0\]/);
 });
 
+test("pages support browser-style in-page find without mutating markdown", () => {
+  const editor = fs.readFileSync(
+    new URL("../src/components/Editor.tsx", import.meta.url),
+    "utf8"
+  );
+  const extensions = fs.readFileSync(
+    new URL("../src/editor/extensions.ts", import.meta.url),
+    "utf8"
+  );
+  const pageFind = fs.readFileSync(
+    new URL("../src/editor/PageFind.ts", import.meta.url),
+    "utf8"
+  );
+  const styles = fs.readFileSync(
+    new URL("../src/styles.css", import.meta.url),
+    "utf8"
+  );
+  assert.match(extensions, /PageFind/);
+  assert.match(editor, /event\.key\.toLowerCase\(\) !== "f"/);
+  assert.match(editor, /createPortal/);
+  assert.match(editor, /document\.body/);
+  assert.match(editor, /setFindOpen\(true\)/);
+  assert.match(editor, /role="search"/);
+  assert.match(editor, /onStep\(event\.shiftKey \? -1 : 1\)/);
+  assert.match(pageFind, /Decoration\.inline/);
+  assert.match(pageFind, /searchableAtomText/);
+  assert.match(pageFind, /attrs\.description/);
+  assert.match(pageFind, /attrs\.siteName/);
+  assert.match(pageFind, /Decoration\.node/);
+  assert.match(pageFind, /NodeSelection\.create/);
+  assert.match(pageFind, /class:\s*[\s\S]*page-find-match is-active/);
+  assert.doesNotMatch(pageFind, /setContent|insertContent|deleteRange/);
+  assert.match(styles, /\.page-find-bar/);
+  assert.match(styles, /\.page-find-bar\s*\{[\s\S]*position:\s*fixed/);
+  assert.match(styles, /\.page-find-match\.is-active/);
+  assert.match(styles, /\.bookmark-card\.page-find-match/);
+});
+
 test("external links are normalized, styled blue, and opened outside Rockion", () => {
   assert.equal(normalizeExternalHref("example.com"), "https://example.com");
   assert.equal(normalizeExternalHref("www.example.com/path"), "https://www.example.com/path");
@@ -458,6 +496,27 @@ test("the sidebar plus button creates projects rather than root notes", () => {
   assert.match(sidebar, /onClick=\{onNewProject\}/);
   assert.match(app, /api\.createProject\(trimmed\)/);
   assert.doesNotMatch(app, /setNewPageDir/);
+});
+
+test("the sidebar exposes vault search next to new project", () => {
+  const app = fs.readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
+  const sidebar = fs.readFileSync(
+    new URL("../src/components/Sidebar.tsx", import.meta.url),
+    "utf8"
+  );
+  const api = fs.readFileSync(new URL("../src/api.ts", import.meta.url), "utf8");
+  const search = fs.readFileSync(
+    new URL("../src/components/VaultSearch.tsx", import.meta.url),
+    "utf8"
+  );
+  assert.match(sidebar, /title="New project"[\s\S]*title="Search vault"/);
+  assert.match(sidebar, /onClick=\{onSearchVault\}/);
+  assert.match(app, /<VaultSearch/);
+  assert.match(api, /searchVault:\s*\(query: string\)/);
+  assert.match(search, /titleMatches/);
+  assert.match(search, /contentMatches/);
+  assert.match(search, /Page titles/);
+  assert.match(search, /Page content/);
 });
 
 test("the sidebar can collapse into a compact control rail", () => {

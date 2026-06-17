@@ -24,9 +24,12 @@ func TestCoverLifecycleAndLocalImageLoading(t *testing.T) {
 	if err := png.Encode(&encoded, img); err != nil {
 		t.Fatal(err)
 	}
-	asset, err := v.SaveImage("cover.png", encoded.Bytes())
+	asset, err := v.SaveCoverImage("cover.png", encoded.Bytes())
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !strings.HasPrefix(asset, "Assets/Covers/") {
+		t.Fatalf("cover was not stored in cover assets folder: %s", asset)
 	}
 	cover := model.PageCover{Kind: "image", Value: asset, Position: 65}
 	if err := v.SetCover("note.md", cover); err != nil {

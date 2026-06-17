@@ -80,7 +80,14 @@ export default function LinkPasteMenu({ editor }: { editor: Editor | null }) {
   // Download the site favicon into the vault so it renders under the app's CSP
   // (img-src 'self' — remote images are blocked). Stored host-named (github.com.png)
   // and reused across every link to the same site. Empty string on failure.
-  const downloadFavicon = async (pageURL: string): Promise<string> => {
+  const downloadFavicon = async (pageURL: string, discoveredFavicon = ""): Promise<string> => {
+    if (discoveredFavicon) {
+      try {
+        return await api.saveFavicon(discoveredFavicon);
+      } catch {
+        /* fall back to the page's own favicon */
+      }
+    }
     try {
       return await api.saveFavicon(pageURL);
     } catch {
@@ -91,21 +98,27 @@ export default function LinkPasteMenu({ editor }: { editor: Editor | null }) {
   const chooseMention = async () => {
     acted.current = true;
     setLoading(true);
-    let title = current.url;
+    let preview: LinkPreview = {
+      url: current.url,
+      title: current.url,
+      description: "",
+      image: "",
+      favicon: "",
+      siteName: "",
+    };
     try {
-      const preview = await api.fetchLinkPreview(current.url);
-      title = preview.title || current.url;
+      preview = await api.fetchLinkPreview(current.url);
     } catch {
       /* fall back to the raw URL */
     }
-    const favicon = await downloadFavicon(current.url);
+    const favicon = await downloadFavicon(current.url, preview.favicon);
     // Insert a Notion-style inline mention: the site favicon + page title (not a
     // blue link). Stored portably as <a data-rockion-mention>.
     editor
       .chain()
       .focus()
       .insertContentAt({ from: current.from, to: current.to }, [
-        { type: "linkMention", attrs: { url: current.url, title, favicon } },
+        { type: "linkMention", attrs: { url: current.url, title: preview.title || current.url, favicon } },
         { type: "text", text: " " },
       ])
       .run();
@@ -140,7 +153,7 @@ export default function LinkPasteMenu({ editor }: { editor: Editor | null }) {
       }
     }
     // The footer favicon is also subject to the CSP, so download it locally too.
-    const favicon = await downloadFavicon(current.url);
+    const favicon = await downloadFavicon(current.url, preview.favicon);
     editor
       .chain()
       .focus()

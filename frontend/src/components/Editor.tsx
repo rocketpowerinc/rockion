@@ -15,6 +15,7 @@ import {
   onVaultChanged,
   type Note,
   type PageCover,
+  type PageHistoryVersion,
   type PageSettings,
 } from "../api";
 import PagePicker, { type PageRef } from "./PagePicker";
@@ -60,6 +61,139 @@ export interface EditorHandle {
 interface Conflict {
   remote: Note;
   localMarkdown: string;
+}
+
+function historyTime(timestamp: number): string {
+  if (!timestamp) return "Unknown time";
+  return new Date(timestamp).toLocaleString();
+}
+
+function VersionHistoryPanel({
+  note,
+  onClose,
+  onRestore,
+}: {
+  note: Note;
+  onClose: () => void;
+  onRestore: (note: Note) => void;
+}) {
+  const [versions, setVersions] = useState<PageHistoryVersion[]>([]);
+  const [selected, setSelected] = useState<PageHistoryVersion | null>(null);
+  const [preview, setPreview] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    void api
+      .listPageHistory(note.path)
+      .then((items) => {
+        if (cancelled) return;
+        setVersions(items);
+        setSelected(items[0] ?? null);
+      })
+      .catch((reason) => {
+        if (!cancelled) setError(`Couldn't load version history: ${String(reason)}`);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [note.path]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setPreview("");
+    if (!selected) return () => {};
+    void api
+      .readHistoryVersion(note.path, selected.id)
+      .then((markdown) => {
+        if (!cancelled) setPreview(markdown);
+      })
+      .catch((reason) => {
+        if (!cancelled) setError(`Couldn't read that version: ${String(reason)}`);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [note.path, selected]);
+
+  async function restoreSelected() {
+    if (!selected || busy) return;
+    if (!window.confirm(`Restore "${selected.title}" from ${historyTime(selected.createdAt)}?`)) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const restored = await api.restoreHistoryVersion(note.path, selected.id);
+      onRestore(restored);
+      onClose();
+    } catch (reason) {
+      setError(`Couldn't restore that version: ${String(reason)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="history-overlay" role="dialog" aria-modal="true">
+      <div className="history-panel">
+        <header className="history-panel-header">
+          <div>
+            <span className="welcome-eyebrow">Version history</span>
+            <h2>{note.title}</h2>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close version history">
+            ×
+          </button>
+        </header>
+        {error && <div className="history-error">{error}</div>}
+        <div className="history-panel-body">
+          <aside className="history-version-list">
+            {loading ? (
+              <span className="history-empty">Loading versions...</span>
+            ) : versions.length === 0 ? (
+              <span className="history-empty">No saved versions yet.</span>
+            ) : (
+              versions.map((version) => (
+                <button
+                  key={version.id}
+                  type="button"
+                  className={selected?.id === version.id ? "active" : ""}
+                  onClick={() => setSelected(version)}
+                >
+                  <strong>{historyTime(version.createdAt)}</strong>
+                  <span>{version.reason.replace(/-/g, " ")}</span>
+                </button>
+              ))
+            )}
+          </aside>
+          <section className="history-preview">
+            <pre>{preview || "Select a version to preview it."}</pre>
+          </section>
+        </div>
+        <footer className="history-panel-footer">
+          <button type="button" className="welcome-secondary" onClick={onClose}>
+            Close
+          </button>
+          <button
+            type="button"
+            className="primary"
+            disabled={!selected || busy}
+            onClick={() => void restoreSelected()}
+          >
+            Restore this version
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
 }
 
 const AUTOSAVE_MS = 600;
@@ -131,6 +265,7 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
   const [coverDraftPosition, setCoverDraftPosition] = useState(50);
   const [coverPositionSaving, setCoverPositionSaving] = useState(false);
   const [pageOptionsOpen, setPageOptionsOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [pageSettings, setPageSettingsState] = useState<PageSettings>({
     locked: false,
     fullWidth: false,
@@ -445,7 +580,7 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
       throw new Error("Cover images must be 10 MB or smaller.");
     }
     const data = new Uint8Array(await file.arrayBuffer());
-    const asset = await api.saveImage(currentPageAssetName(), Array.from(data));
+    const asset = await api.saveCoverImage(currentPageAssetName(), Array.from(data));
     await setPageCover({
       kind: "image",
       value: asset,
@@ -572,6 +707,14 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
       }
     },
     [clearRenameTimer, clearSaveTimer, editor]
+  );
+
+  const handleHistoryRestore = useCallback(
+    (restored: Note) => {
+      loadNote(restored);
+      onNoteUpdated?.(restored);
+    },
+    [loadNote, onNoteUpdated]
   );
 
   // Parent navigation flushes first. This fallback still captures pending text
@@ -940,6 +1083,15 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
           {pageOptionsOpen && (
             <div className="page-options-menu" role="menu">
               <button
+                role="menuitem"
+                onClick={() => {
+                  setPageOptionsOpen(false);
+                  setHistoryOpen(true);
+                }}
+              >
+                <span>Version history</span>
+              </button>
+              <button
                 role="menuitemcheckbox"
                 aria-checked={pageSettings.locked}
                 disabled={pageSettingsSaving}
@@ -998,6 +1150,13 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
       <BlockMenu editor={editor} />
       <LinkPasteMenu editor={editor} />
       <SelectionToolbar editor={editor} locked={pageSettings.locked} />
+      {note && historyOpen && (
+        <VersionHistoryPanel
+          note={note}
+          onClose={() => setHistoryOpen(false)}
+          onRestore={handleHistoryRestore}
+        />
+      )}
       <input
         ref={videoInputRef}
         type="file"

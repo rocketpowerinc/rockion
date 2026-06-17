@@ -40,7 +40,7 @@ without lag.
 │  └───────────────┬─────────────────────────┘  │
 └──────────────────┼─────────────────────────────┘
                    ▼
-        Vault folder on disk (.md + assets/ + .rockion metadata)
+        Vault folder on disk (.md + Assets/ + .rockion metadata)
 ```
 
 ---
@@ -57,7 +57,7 @@ without lag.
 | `indexer`  | Walks the vault, parses frontmatter + links, upserts rows into SQLite. Incremental on file change. |
 | `search`   | Full-text search via SQLite FTS5; title/path search; backlink queries. |
 | `app_watcher.go` | Recursive `fsnotify` watcher → per-path debounced reindex → frontend events. |
-| `vault` media | Validates decoded image bytes, caps size/dimensions, and writes into `assets/`. |
+| `vault` media | Validates local image/icon/cover/video/bookmark asset bytes, caps image size/dimensions, and writes into typed `Assets/Images`, `Assets/Icons`, `Assets/Covers`, `Assets/Videos`, and `Assets/Bookmarks` folders. |
 | `vault` covers | Stores page cover metadata in `.rockion/covers.json`; validates generated styles and local uploaded assets. |
 | `vault` dashboard views | Stores layout and sort preferences in `.rockion/dashboard-views.json` without rewriting Markdown frontmatter. |
 | `vault` templates | Seeds and securely renders vault-local `.rockion/templates/*.md` files for managed pages. |
@@ -137,6 +137,14 @@ DeleteManagedPage(dashboard, href, version string) (Note, error)
 Search(query string, limit int) ([]SearchHit, error)
 Backlinks(path string) ([]SearchHit, error)
 SaveImage(path string, data []byte) (string, error)  // returns vault-relative asset path
+SaveIconImage(path string, data []byte) (string, error) // returns Assets/Icons path
+SaveCoverImage(path string, data []byte) (string, error) // returns Assets/Covers path
+SaveVideo(path string, data []byte) (string, error)  // returns Assets/Videos path
+OpenAssetInFolder(path string) error
+DeleteAsset(path string) error
+FetchLinkPreview(url string) (LinkPreview, error)
+SaveRemoteImage(url string) (string, error) // stores remote bookmark image under Assets/Bookmarks
+SaveFavicon(url string) (string, error)     // stores first-party favicon, Google fallback only
 SetNoteCover(path string, cover PageCover) (Note, error)
 CoverImageDataURL(path string) (string, error) // validated local cover for webview
 CoverThumbnailDataURL(path string) (string, error) // bounded dashboard thumbnail
@@ -173,7 +181,18 @@ the authoritative entry point for all category folders.
 
 Page covers do not modify Markdown. Their metadata is stored in the exported
 vault under `.rockion/covers.json`, while uploaded cover images live in
-`assets/`. Solid colors and gradients are generated locally.
+`Assets/Covers`. Legacy `Assets/Images` cover references remain readable. Solid
+colors and gradients are generated locally.
+
+Custom page and project icon images are validated like regular images but saved
+under `Assets/Icons`, then referenced from `.rockion/icons.json`. Legacy
+`Assets/Images` icon references remain readable.
+
+Remote bookmark assets are downloaded into `Assets/Bookmarks` so cards render
+under the app's restrictive CSP and continue working offline. Link preview
+downloads reject localhost/private-network targets and oversized responses.
+Favicons prefer the site's own discovered icon or `/favicon.ico`; Google's
+favicon service is a final fallback only.
 
 Events emitted Go → JS: `vault:changed` (file changed externally), `index:progress`.
 
@@ -186,9 +205,9 @@ Events emitted Go → JS: `vault:changed` (file changed externally), `index:prog
 TipTap (ProseMirror) is the editor core. The on-disk format is Markdown, so we need a
 **Markdown ⟷ ProseMirror** bridge:
 
-- **Load:** parse `.md` → HTML/PM doc. Use `marked` (or `remark`) → TipTap `setContent`.
-- **Save:** serialize the PM doc → Markdown. Use a serializer (`prosemirror-markdown` or
-  `tiptap-markdown`) so what lands on disk stays clean, diff-friendly Markdown.
+- **Load:** parse `.md` through `tiptap-markdown` into the TipTap/ProseMirror document.
+- **Save:** serialize the PM doc through `tiptap-markdown` so what lands on disk stays clean,
+  diff-friendly Markdown plus portable HTML only where Markdown has no native equivalent.
 
 > Decision: use **`tiptap-markdown`** for round-tripping — it plugs into TipTap directly and
 > handles GFM tables, task lists, and frontmatter passthrough, minimizing custom glue.
@@ -198,11 +217,16 @@ TipTap (ProseMirror) is the editor core. The on-disk format is Markdown, so we n
 - StarterKit (paragraph, headings, lists, blockquote, code block, bold/italic…)
 - `@tiptap/extension-task-list` + `task-item` → checklists (`- [ ]`)
 - `@tiptap/extension-table` (+ row/cell/header) → tables
-- `@tiptap/extension-image` → images (drag-drop / paste → `SaveImage` → relative link)
+- Safe image extension → inline content images (drag-drop / paste → `SaveImage` → `Assets/Images` link)
+- Custom video asset extension → MP4 paste/drop/slash upload → `SaveVideo` → portable
+  `<figure data-rockion-video><video ...>` markup.
+- Custom link preview extensions → pasted URLs can become inline mentions or bookmark cards,
+  stored as portable `<a data-rockion-mention>` and `<figure data-rockion-bookmark>` markup.
 - `@tiptap/extension-link`
 - Custom **slash command** extension (`/heading`, `/table`, `/todo`, `/image`, `/divider`…),
   a Notion-style menu rendered via a suggestion popup (tippy.js).
-- Custom **wikilink** node for `[[Page]]` with autocomplete from the note index.
+- Custom page-link decorations for normal Markdown links to vault pages; the saved file stays
+  ordinary Markdown while the editor paints page icons and badges.
 
 ### UI layout
 

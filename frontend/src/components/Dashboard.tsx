@@ -117,7 +117,7 @@ export default function Dashboard({
     async (file: File) => {
       if (file.size > 10 * 1024 * 1024) throw new Error("Cover images must be 10 MB or smaller.");
       const data = new Uint8Array(await file.arrayBuffer());
-      const asset = await api.saveImage(file.name, Array.from(data));
+      const asset = await api.saveCoverImage(file.name, Array.from(data));
       await setCover({ kind: "image", value: asset, position: 50 });
     },
     [setCover]

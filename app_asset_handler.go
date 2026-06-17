@@ -8,8 +8,9 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 )
 
-// vaultAssetMiddleware serves vault media (Assets/Images, Assets/Videos) straight
-// from the open vault. It must run as middleware — not as the asset-server
+// vaultAssetMiddleware serves vault media (Assets/Images, Assets/Icons,
+// Assets/Covers, Assets/Videos, Assets/Bookmarks) straight from the open vault.
+// It must run as middleware — not as the asset-server
 // fallback Handler — so it intercepts the request before Wails' dev proxy hands
 // `/Assets/...` to Vite (whose SPA fallback would otherwise return index.html and
 // break <img>/<video> sources). Every other request is passed through untouched.
@@ -18,6 +19,8 @@ func (a *App) vaultAssetMiddleware() assetserver.Middleware {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			rel := strings.TrimPrefix(path.Clean("/"+r.URL.Path), "/")
 			isAsset := strings.HasPrefix(rel, "Assets/Images/") ||
+				strings.HasPrefix(rel, "Assets/Icons/") ||
+				strings.HasPrefix(rel, "Assets/Covers/") ||
 				strings.HasPrefix(rel, "Assets/Videos/") ||
 				strings.HasPrefix(rel, "Assets/Bookmarks/")
 			if !isAsset {

@@ -1,14 +1,11 @@
 import { Node } from "@tiptap/core";
 import { assetURL } from "./imageIcons.mjs";
-
-function storedVideoSource(source: string): string {
-  return String(source ?? "").trim().replace(/\\/g, "/").replace(/^\/+/, "");
-}
-
-function isSafeVideoSource(source: string): boolean {
-  const value = storedVideoSource(source);
-  return /^Assets\/Videos\/[^?#<>"]+\.mp4$/i.test(value);
-}
+import {
+  isSafeVideoSource,
+  renderVideoAssetHTML,
+  serializeVideoAsset,
+  storedVideoSource,
+} from "./videoMarkup.mjs";
 
 // A video block: the player is rendered by the node view; the <figcaption> is
 // real editable content (content: "inline*"), so the caption is normal text the
@@ -199,15 +196,7 @@ export const VideoAsset = Node.create({
           }
           const title = String(node.attrs.title || "");
           const caption = String(node.textContent || "").trim();
-          state.write(
-            `<figure data-rockion-video>\n<video src="${escapeAttr(src)}" controls preload="metadata"${
-              title ? ` title="${escapeAttr(title)}"` : ""
-            }></video>\n`
-          );
-          if (caption) {
-            state.write(`<figcaption>${escapeText(caption)}</figcaption>\n`);
-          }
-          state.write("</figure>");
+          state.write(serializeVideoAsset({ src, title }, caption));
           state.closeBlock(node);
         },
         parse: {
@@ -225,68 +214,10 @@ function videoMarkdownItPlugin(md: any) {
     md.renderer.rules.html_block ||
     ((tokens: any, idx: number) => tokens[idx].content);
   md.renderer.rules.html_block = (tokens: any, idx: number, options: any, env: any, self: any) => {
-    const parsed = parseVideoBlock(tokens[idx].content);
-    if (!parsed) return defaultRender(tokens, idx, options, env, self);
-    // Always emit a <figcaption> so TipTap's contentElement always resolves,
-    // even when the saved caption is empty.
-    return `<figure data-rockion-video><video src="${escapeAttr(assetURL(parsed.src))}" controls preload="metadata"${
-      parsed.title ? ` title="${escapeAttr(parsed.title)}"` : ""
-    }></video><figcaption>${escapeText(parsed.caption)}</figcaption></figure>\n`;
+    const rendered = renderVideoAssetHTML(tokens[idx].content);
+    if (!rendered) return defaultRender(tokens, idx, options, env, self);
+    return rendered;
   };
-}
-
-// Handles both the current <figure>…<figcaption> form and the legacy bare
-// <video> (with optional data-caption) so older pages keep working.
-function parseVideoBlock(html: string): { src: string; title: string; caption: string } | null {
-  const source = String(html || "").trim();
-  const videoMatch = /<video\b([^>]*)>/i.exec(source);
-  if (!videoMatch) return null;
-  const attrs = videoMatch[1] || "";
-  const src = storedVideoSource(attrValue(attrs, "src"));
-  if (!src || !isSafeVideoSource(src)) return null;
-  const title = attrValue(attrs, "title");
-  let caption = "";
-  const figcap = /<figcaption[^>]*>([\s\S]*?)<\/figcaption>/i.exec(source);
-  if (figcap) {
-    caption = decodeText(figcap[1].replace(/<[^>]*>/g, "").trim());
-  } else {
-    caption = attrValue(attrs, "data-caption");
-  }
-  return { src, title, caption };
-}
-
-function attrValue(attrs: string, name: string): string {
-  const pattern = new RegExp(`${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, "i");
-  const match = pattern.exec(attrs);
-  return decodeAttr(match?.[1] || match?.[2] || match?.[3] || "");
-}
-
-function escapeAttr(value: string): string {
-  return String(value).replace(/[<>"&]/g, (char) =>
-    char === "<" ? "&lt;" : char === ">" ? "&gt;" : char === '"' ? "&quot;" : "&amp;"
-  );
-}
-
-function decodeAttr(value: string): string {
-  return String(value)
-    .replace(/&quot;/g, '"')
-    .replace(/&gt;/g, ">")
-    .replace(/&lt;/g, "<")
-    .replace(/&amp;/g, "&");
-}
-
-function escapeText(value: string): string {
-  return String(value).replace(/[<>&]/g, (char) =>
-    char === "<" ? "&lt;" : char === ">" ? "&gt;" : "&amp;"
-  );
-}
-
-function decodeText(value: string): string {
-  return String(value)
-    .replace(/&nbsp;/g, " ")
-    .replace(/&gt;/g, ">")
-    .replace(/&lt;/g, "<")
-    .replace(/&amp;/g, "&");
 }
 
 declare module "@tiptap/core" {

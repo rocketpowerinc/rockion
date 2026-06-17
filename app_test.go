@@ -37,8 +37,22 @@ func TestVaultAssetHandlerServesOnlyActiveVaultAssets(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(opened.Root, "Assets", "Videos"), 0o755); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.MkdirAll(filepath.Join(opened.Root, "Assets", "Icons"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(opened.Root, "Assets", "Covers"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	videoPath := filepath.Join(opened.Root, "Assets", "Videos", "clip.mp4")
 	if err := os.WriteFile(videoPath, []byte("video"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	iconPath := filepath.Join(opened.Root, "Assets", "Icons", "icon.png")
+	if err := os.WriteFile(iconPath, []byte("icon"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	coverPath := filepath.Join(opened.Root, "Assets", "Covers", "cover.png")
+	if err := os.WriteFile(coverPath, []byte("cover"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -58,6 +72,32 @@ func TestVaultAssetHandlerServesOnlyActiveVaultAssets(t *testing.T) {
 	}
 	if resp.StatusCode != http.StatusOK || string(body) != "video" {
 		t.Fatalf("asset response = %d %q", resp.StatusCode, string(body))
+	}
+
+	resp, err = http.Get(server.URL + "/Assets/Icons/icon.png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, err = io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK || string(body) != "icon" {
+		t.Fatalf("icon asset response = %d %q", resp.StatusCode, string(body))
+	}
+
+	resp, err = http.Get(server.URL + "/Assets/Covers/cover.png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, err = io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK || string(body) != "cover" {
+		t.Fatalf("cover asset response = %d %q", resp.StatusCode, string(body))
 	}
 
 	resp, err = http.Get(server.URL + "/Project/page.md")

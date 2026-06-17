@@ -154,7 +154,8 @@ func validateIcon(icon string) error {
 	if icon == "" {
 		return nil
 	}
-	if strings.HasPrefix(filepath.ToSlash(icon), "Assets/Images/") {
+	if strings.HasPrefix(filepath.ToSlash(icon), "Assets/Icons/") ||
+		strings.HasPrefix(filepath.ToSlash(icon), "Assets/Images/") {
 		clean := filepath.ToSlash(filepath.Clean(filepath.FromSlash(icon)))
 		if clean != filepath.ToSlash(icon) || strings.Contains(clean, "..") {
 			return errors.New("custom icon asset path is invalid")
@@ -166,7 +167,7 @@ func validateIcon(icon string) error {
 		return nil
 	}
 	if strings.HasPrefix(filepath.ToSlash(icon), "Assets/") {
-		return errors.New("custom icon asset must be stored in Assets/Images")
+		return errors.New("custom icon asset must be stored in Assets/Icons")
 	}
 	const prefix = "data:image/png;base64,"
 	if strings.HasPrefix(icon, "data:") {

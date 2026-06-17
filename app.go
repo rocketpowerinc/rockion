@@ -264,6 +264,7 @@ func (a *App) WriteNote(path, markdown, expectedVersion string) (model.Note, err
 	if err := a.requireVault(); err != nil {
 		return model.Note{}, err
 	}
+	a.snapshotExistingNote(path, markdown, "save")
 	if err := a.vault.WriteExpected(path, markdown, expectedVersion); err != nil {
 		if errors.Is(err, vault.ErrConflict) {
 			return model.Note{}, fmt.Errorf("conflict: %w", err)
@@ -358,6 +359,9 @@ func (a *App) renamePathLocked(oldPath, newPath string) error {
 	if err := a.vault.RenamePageSettingsPath(oldPath, newPath, isDir); err != nil {
 		followUpErrs = append(followUpErrs, fmt.Errorf("rename page settings metadata: %w", err))
 	}
+	if err := a.vault.RenameHistoryPath(oldPath, newPath, isDir); err != nil {
+		followUpErrs = append(followUpErrs, fmt.Errorf("rename version history: %w", err))
+	}
 	rewritten, rewriteErr := a.vault.RewriteLinksAfterRename(
 		oldPath,
 		newPath,
@@ -446,6 +450,7 @@ func (a *App) RenameProject(dashboardPath, title string) (model.Note, error) {
 		return model.Note{}, err
 	}
 	updatedMarkdown := replaceFirstHeading(original.Markdown, strings.TrimSpace(title))
+	a.snapshotNote(original, updatedMarkdown, "rename")
 	if err := a.vault.WriteExpected(clean, updatedMarkdown, original.Version); err != nil {
 		return model.Note{}, err
 	}
@@ -512,6 +517,9 @@ func (a *App) DeletePath(path string) error {
 	if err != nil {
 		return err
 	}
+	if err := a.snapshotPathBeforeDelete(path, isDir); err != nil {
+		return fmt.Errorf("snapshot before delete: %w", err)
+	}
 	if err := a.vault.Delete(path); err != nil {
 		return err
 	}
@@ -535,6 +543,53 @@ func (a *App) DeletePath(path string) error {
 		followUpErrs = append(followUpErrs, fmt.Errorf("remove index path: %w", err))
 	}
 	return errors.Join(followUpErrs...)
+}
+
+func (a *App) snapshotExistingNote(path, nextMarkdown, reason string) {
+	note, err := a.vault.Read(path)
+	if err != nil || note.Markdown == nextMarkdown {
+		return
+	}
+	a.snapshotNote(note, nextMarkdown, reason)
+}
+
+func (a *App) snapshotNote(note model.Note, nextMarkdown, reason string) {
+	if note.Markdown == nextMarkdown {
+		return
+	}
+	if _, err := a.vault.RecordHistorySnapshot(note.Path, note.Markdown, reason); err != nil {
+		runtime.LogErrorf(a.ctx, "record version history failed: %v", err)
+	}
+}
+
+func (a *App) snapshotPathBeforeDelete(path string, isDir bool) error {
+	if !isDir {
+		note, err := a.vault.Read(path)
+		if err != nil {
+			return err
+		}
+		_, err = a.vault.RecordHistorySnapshot(note.Path, note.Markdown, "delete")
+		return err
+	}
+	files, err := a.vault.MarkdownFiles()
+	if err != nil {
+		return err
+	}
+	clean := filepath.ToSlash(filepath.Clean(filepath.FromSlash(path)))
+	prefix := strings.TrimSuffix(clean, "/") + "/"
+	for _, rel := range files {
+		if rel != clean && !strings.HasPrefix(rel, prefix) {
+			continue
+		}
+		note, err := a.vault.Read(rel)
+		if err != nil {
+			return err
+		}
+		if _, err := a.vault.RecordHistorySnapshot(note.Path, note.Markdown, "delete"); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (a *App) Search(query string, limit int) ([]model.SearchHit, error) {

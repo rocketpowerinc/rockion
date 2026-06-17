@@ -13,22 +13,34 @@ async function loadDictionary(language: WritingLanguage) {
   const cached = dictionaries.get(language);
   if (cached) return cached;
 
-  const [affixModule, wordsModule] =
+  const [affixURL, wordsURL] =
     language === "fr-FR"
       ? await Promise.all([
-          import("../../node_modules/dictionary-fr/index.aff?raw"),
-          import("../../node_modules/dictionary-fr/index.dic?raw"),
+          import("../../node_modules/dictionary-fr/index.aff?url"),
+          import("../../node_modules/dictionary-fr/index.dic?url"),
         ])
       : await Promise.all([
-          import("../../node_modules/dictionary-en/index.aff?raw"),
-          import("../../node_modules/dictionary-en/index.dic?raw"),
+          import("../../node_modules/dictionary-en/index.aff?url"),
+          import("../../node_modules/dictionary-en/index.dic?url"),
         ]);
+  const [aff, dic] = await Promise.all([
+    fetchTextAsset(affixURL.default),
+    fetchTextAsset(wordsURL.default),
+  ]);
   const dictionary = nspell({
-    aff: affixModule.default,
-    dic: wordsModule.default,
+    aff,
+    dic,
   });
   dictionaries.set(language, dictionary);
   return dictionary;
+}
+
+async function fetchTextAsset(url: string): Promise<string> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Dictionary asset failed to load: ${response.status}`);
+  }
+  return response.text();
 }
 
 function normalizedWord(word: string): string {

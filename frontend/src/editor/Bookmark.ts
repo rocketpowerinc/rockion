@@ -1,5 +1,10 @@
 import { Node } from "@tiptap/core";
-import { assetURL } from "./imageIcons.mjs";
+import {
+  displayPreviewImage,
+  isHttpURL,
+  parseBookmarkElement,
+  serializeBookmark,
+} from "./linkPreviewMarkup.mjs";
 
 export interface BookmarkAttrs {
   url: string;
@@ -8,24 +13,6 @@ export interface BookmarkAttrs {
   image: string;
   favicon: string;
   siteName: string;
-}
-
-function isHttp(url: string): boolean {
-  return /^https?:\/\//i.test(String(url || "").trim());
-}
-
-// Canonical on-disk form: remote URLs as-is, local assets without a leading slash.
-function storeImage(value: string): string {
-  const v = String(value || "").trim();
-  if (!v || isHttp(v)) return v;
-  return v.replace(/^\/+/, "");
-}
-
-// Renderable src: remote URLs as-is, local assets resolved to /Assets/… .
-function displayImage(value: string): string {
-  const v = storeImage(value);
-  if (!v || isHttp(v)) return v;
-  return assetURL(v);
 }
 
 // A Notion-style bookmark card. Stored as portable <figure data-rockion-bookmark>
@@ -54,18 +41,7 @@ export const Bookmark = Node.create({
       {
         tag: "figure[data-rockion-bookmark]",
         getAttrs: (el) => {
-          const figure = el as HTMLElement;
-          const anchor = figure.querySelector("a");
-          const url = anchor?.getAttribute("href") || figure.getAttribute("data-url") || "";
-          if (!isHttp(url)) return false;
-          return {
-            url,
-            title: anchor?.textContent?.trim() || figure.getAttribute("data-title") || url,
-            description: figure.querySelector("p")?.textContent?.trim() || "",
-            image: storeImage(figure.querySelector("img")?.getAttribute("src") || ""),
-            favicon: figure.getAttribute("data-favicon") || "",
-            siteName: figure.getAttribute("data-site") || "",
-          };
+          return parseBookmarkElement(el as HTMLElement);
         },
       },
     ];
@@ -73,7 +49,7 @@ export const Bookmark = Node.create({
 
   renderHTML({ node }) {
     const a = node.attrs as BookmarkAttrs;
-    if (!isHttp(a.url)) {
+    if (!isHttpURL(a.url)) {
       return ["span", {}, a.url || "bookmark"];
     }
     const figureAttrs: Record<string, string> = { "data-rockion-bookmark": "" };
@@ -81,7 +57,7 @@ export const Bookmark = Node.create({
     if (a.siteName) figureAttrs["data-site"] = a.siteName;
     const children: unknown[] = [["a", { href: a.url }, a.title || a.url]];
     if (a.description) children.push(["p", {}, a.description]);
-    if (a.image) children.push(["img", { src: displayImage(a.image), alt: "" }]);
+    if (a.image) children.push(["img", { src: displayPreviewImage(a.image), alt: "" }]);
     return ["figure", figureAttrs, ...children] as never;
   },
 
@@ -104,7 +80,7 @@ export const Bookmark = Node.create({
       dom.title = a.url;
       dom.addEventListener("click", (event) => {
         event.preventDefault();
-        if (isHttp(a.url)) {
+        if (isHttpURL(a.url)) {
           window.dispatchEvent(new CustomEvent("rockion:open-external", { detail: a.url }));
         }
       });
@@ -129,7 +105,7 @@ export const Bookmark = Node.create({
       if (a.favicon) {
         const fav = document.createElement("img");
         fav.className = "bookmark-favicon";
-        fav.src = displayImage(a.favicon);
+        fav.src = displayPreviewImage(a.favicon);
         fav.alt = "";
         fav.addEventListener("error", () => fav.remove());
         footer.appendChild(fav);
@@ -145,7 +121,7 @@ export const Bookmark = Node.create({
       if (a.image) {
         const thumb = document.createElement("img");
         thumb.className = "bookmark-image";
-        thumb.src = displayImage(a.image);
+        thumb.src = displayPreviewImage(a.image);
         thumb.alt = "";
         thumb.addEventListener("error", () => thumb.remove());
         dom.appendChild(thumb);
@@ -160,35 +136,18 @@ export const Bookmark = Node.create({
       markdown: {
         serialize(state: any, node: any) {
           const a = node.attrs as BookmarkAttrs;
-          if (!isHttp(a.url)) {
+          if (!isHttpURL(a.url)) {
             state.write(`[${a.title || a.url}](${a.url})`);
             state.closeBlock(node);
             return;
           }
-          let out = `<figure data-rockion-bookmark${
-            a.favicon ? ` data-favicon="${escAttr(a.favicon)}"` : ""
-          }${a.siteName ? ` data-site="${escAttr(a.siteName)}"` : ""}>\n`;
-          out += `<a href="${escAttr(a.url)}">${escText(a.title || a.url)}</a>\n`;
-          if (a.description) out += `<p>${escText(a.description)}</p>\n`;
-          if (a.image) out += `<img src="${escAttr(storeImage(a.image))}" alt="">\n`;
-          out += `</figure>`;
-          state.write(out);
+          state.write(serializeBookmark(a));
           state.closeBlock(node);
         },
       },
     };
   },
 });
-
-function escAttr(value: string): string {
-  return String(value).replace(/[<>"&]/g, (c) =>
-    c === "<" ? "&lt;" : c === ">" ? "&gt;" : c === '"' ? "&quot;" : "&amp;"
-  );
-}
-
-function escText(value: string): string {
-  return String(value).replace(/[<>&]/g, (c) => (c === "<" ? "&lt;" : c === ">" ? "&gt;" : "&amp;"));
-}
 
 declare module "@tiptap/core" {
   interface Commands<ReturnType> {
@@ -197,4 +156,3 @@ declare module "@tiptap/core" {
     };
   }
 }
-

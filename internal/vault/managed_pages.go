@@ -166,6 +166,9 @@ func (v *Vault) DeleteManagedPage(
 	if !ok {
 		return ManagedDeleteResult{}, errors.New("managed page no longer exists")
 	}
+	if _, err := v.RecordHistorySnapshot(target.Path, target.Markdown, "delete"); err != nil {
+		return ManagedDeleteResult{}, fmt.Errorf("snapshot managed page before delete: %w", err)
+	}
 	targetFull, err := v.resolve(target.Path, false)
 	if err != nil {
 		return ManagedDeleteResult{}, err
@@ -184,6 +187,9 @@ func (v *Vault) DeleteManagedPage(
 	updated := removeManagedLink(dashboard.Markdown, id)
 	if updated == dashboard.Markdown {
 		return ManagedDeleteResult{}, errors.New("managed dashboard link was not found")
+	}
+	if _, err := v.RecordHistorySnapshot(dashboardRel, dashboard.Markdown, "delete managed page"); err != nil {
+		return ManagedDeleteResult{}, fmt.Errorf("snapshot dashboard before managed delete: %w", err)
 	}
 	if err := v.WriteExpected(dashboardRel, updated, dashboard.Version); err != nil {
 		return ManagedDeleteResult{}, err

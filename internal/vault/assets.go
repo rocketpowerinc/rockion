@@ -23,6 +23,24 @@ const maxVideoBytes = 0
 // SaveImage writes validated image bytes into Assets/Images/ and returns the
 // vault-relative path.
 func (v *Vault) SaveImage(name string, data []byte) (string, error) {
+	return v.saveValidatedImage("Images", name, data)
+}
+
+// SaveIconImage writes validated icon image bytes into Assets/Icons/ and
+// returns the vault-relative path. Icons are kept separate from regular embedded
+// page images so vault media stays easier to browse and clean up.
+func (v *Vault) SaveIconImage(name string, data []byte) (string, error) {
+	return v.saveValidatedImage("Icons", name, data)
+}
+
+// SaveCoverImage writes validated cover image bytes into Assets/Covers/ and
+// returns the vault-relative path. Covers are kept separate from embedded page
+// images because they are referenced from .rockion/covers.json, not Markdown.
+func (v *Vault) SaveCoverImage(name string, data []byte) (string, error) {
+	return v.saveValidatedImage("Covers", name, data)
+}
+
+func (v *Vault) saveValidatedImage(kind, name string, data []byte) (string, error) {
 	if len(data) == 0 || len(data) > maxImageBytes {
 		return "", fmt.Errorf("image must be between 1 byte and %d MB", maxImageBytes>>20)
 	}
@@ -39,11 +57,11 @@ func (v *Vault) SaveImage(name string, data []byte) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("unsupported image format: %s", format)
 	}
-	return v.saveAsset("Images", name, data, ext)
+	return v.saveAsset(kind, name, data, ext)
 }
 
 var downloadableImageExt = map[string]bool{
-	".png": true, ".jpg": true, ".jpeg": true, ".gif": true, ".webp": true, ".avif": true,
+	".png": true, ".jpg": true, ".jpeg": true, ".gif": true, ".webp": true, ".avif": true, ".ico": true,
 }
 
 // SaveBookmarkImage stores image bytes fetched from the web (a bookmark
@@ -57,6 +75,9 @@ func (v *Vault) SaveBookmarkImage(name string, data []byte, ext string) (string,
 	ext = strings.ToLower(strings.TrimSpace(ext))
 	if !downloadableImageExt[ext] {
 		return "", errors.New("unsupported image type")
+	}
+	if !downloadableImageBytesMatch(data, ext) {
+		return "", errors.New("invalid image data")
 	}
 	if ext == ".jpeg" {
 		ext = ".jpg"
@@ -75,6 +96,9 @@ func (v *Vault) SaveFaviconImage(host string, data []byte, ext string) (string, 
 	if !downloadableImageExt[ext] {
 		return "", errors.New("unsupported image type")
 	}
+	if !downloadableImageBytesMatch(data, ext) {
+		return "", errors.New("invalid image data")
+	}
 	if ext == ".jpeg" {
 		ext = ".jpg"
 	}
@@ -83,6 +107,29 @@ func (v *Vault) SaveFaviconImage(host string, data []byte, ext string) (string, 
 		base = "favicon"
 	}
 	return v.saveAssetNamed("Bookmarks", base, data, ext)
+}
+
+func downloadableImageBytesMatch(data []byte, ext string) bool {
+	ext = strings.ToLower(strings.TrimSpace(ext))
+	if ext == ".jpeg" {
+		ext = ".jpg"
+	}
+	switch ext {
+	case ".png":
+		return len(data) >= 8 && string(data[:8]) == "\x89PNG\r\n\x1a\n"
+	case ".jpg":
+		return len(data) >= 3 && data[0] == 0xff && data[1] == 0xd8 && data[2] == 0xff
+	case ".gif":
+		return len(data) >= 6 && (string(data[:6]) == "GIF87a" || string(data[:6]) == "GIF89a")
+	case ".webp":
+		return len(data) >= 12 && string(data[:4]) == "RIFF" && string(data[8:12]) == "WEBP"
+	case ".avif":
+		return len(data) >= 12 && string(data[4:8]) == "ftyp" && strings.Contains(string(data[8:min(len(data), 32)]), "avif")
+	case ".ico":
+		return len(data) >= 4 && data[0] == 0x00 && data[1] == 0x00 && data[2] == 0x01 && data[3] == 0x00
+	default:
+		return false
+	}
 }
 
 func (v *Vault) SaveVideo(name string, data []byte) (string, error) {
@@ -249,9 +296,11 @@ func (v *Vault) uniqueAssetPath(rel string) (string, error) {
 func (v *Vault) resolveAssetPath(rel string) (string, string, error) {
 	clean := filepath.ToSlash(filepath.Clean(strings.TrimSpace(rel)))
 	if !strings.HasPrefix(clean, "Assets/Images/") &&
+		!strings.HasPrefix(clean, "Assets/Icons/") &&
+		!strings.HasPrefix(clean, "Assets/Covers/") &&
 		!strings.HasPrefix(clean, "Assets/Videos/") &&
 		!strings.HasPrefix(clean, "Assets/Bookmarks/") {
-		return "", "", errors.New("asset must be inside Assets/Images, Assets/Videos, or Assets/Bookmarks")
+		return "", "", errors.New("asset must be inside Assets/Images, Assets/Icons, Assets/Covers, Assets/Videos, or Assets/Bookmarks")
 	}
 	full, err := v.resolve(clean, true)
 	return clean, full, err

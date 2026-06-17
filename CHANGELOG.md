@@ -6,6 +6,9 @@ All notable changes to Rockion are documented here. This project adheres to
 ## [Unreleased]
 
 ### Added
+- Add file-based page version history stored under each vault's `.rockion`
+  metadata, with snapshots on edits/deletes, a page-menu restore dialog, and a
+  landing-page history overview with a clear-history action.
 - Pasting a bare URL now opens a "Paste as" menu (Notion-style): Mention (an inline chip
   showing the site favicon + page title, not a blue link), Bookmark (a preview card with
   title, description, thumbnail, and favicon fetched from the page's Open Graph metadata), or
@@ -17,18 +20,40 @@ All notable changes to Rockion are documented here. This project adheres to
   menu for opening the file location or deleting the asset.
 
 ### Changed
+- Throttle autosave-created version-history snapshots to one checkpoint per page
+  every five minutes while keeping delete/restore/rename snapshots immediate.
 - Store uploaded media in typed vault asset folders (`Assets/Images`,
-  `Assets/Videos`, `Assets/Bookmarks`) with page-based timestamped filenames.
+  `Assets/Icons`, `Assets/Covers`, `Assets/Videos`, `Assets/Bookmarks`) with
+  page-based timestamped filenames.
+- Pin frontend dependency ranges exactly in `package.json` and document `npm ci`
+  as the reproducible install path.
+- Align pinned frontend dependency versions with the committed lockfile so
+  Wails/npm installs resolve without peer-dependency conflicts.
 - Make bookmark preview cards more compact (Notion-sized height).
 - Deduplicate downloaded bookmark/mention assets by content hash, so the same
   site's favicon or a shared preview image is stored once in `Assets/Bookmarks`
   and reused across links.
+- Prefer first-party favicons from the pasted site before falling back to
+  Google's favicon service.
+- Load spellcheck dictionaries as emitted text assets instead of JavaScript
+  chunks, removing Vite's large dictionary chunk warning from release builds.
 
 ### Fixed
+- Reject link-preview and remote-asset downloads that resolve to localhost or
+  private-network addresses, and reject oversized remote images instead of
+  saving truncated files.
+- Validate downloaded bookmark and favicon bytes before writing them to the
+  vault.
+- Add direct round-trip coverage for video, bookmark, and mention portable
+  markup.
+- Refresh architecture and dependency documentation to match the current asset
+  model and release workflow.
 - Keep uploaded MP4 blocks playable after saving and reopening a page instead
   of degrading them into generic empty HTML blocks.
-- Save uploaded page and project icon images into `Assets/Images` instead of
+- Save uploaded page and project icon images into `Assets/Icons` instead of
   embedding them directly in the icon sidecar.
+- Save uploaded page and project cover images into `Assets/Covers`, leaving
+  `Assets/Images` for inline page-content images.
 
 ## [0.1.13] - 2026-06-15
 

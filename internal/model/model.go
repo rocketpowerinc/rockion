@@ -82,3 +82,25 @@ type PageTemplate struct {
 	ID    string `json:"id"`
 	Label string `json:"label"`
 }
+
+// PageHistoryVersion describes one saved file-based page snapshot.
+type PageHistoryVersion struct {
+	ID        string `json:"id"`
+	Path      string `json:"path"`
+	Title     string `json:"title"`
+	Reason    string `json:"reason"`
+	CreatedAt int64  `json:"createdAt"`
+	Hash      string `json:"hash"`
+	Size      int64  `json:"size"`
+}
+
+// PageHistorySummary is used by the landing page to show recent files with
+// saved version history across known vaults.
+type PageHistorySummary struct {
+	VaultPath string `json:"vaultPath,omitempty"`
+	VaultName string `json:"vaultName,omitempty"`
+	Path      string `json:"path"`
+	Title     string `json:"title"`
+	UpdatedAt int64  `json:"updatedAt"`
+	Count     int    `json:"count"`
+}

@@ -1,5 +1,7 @@
 import type { SavedVault } from "../vaultHistory.mjs";
 import { summarizeVaultHistory } from "../vaultHistory.mjs";
+import { useEffect, useState } from "react";
+import { api, type PageHistorySummary } from "../api";
 
 interface Props {
   nativeRuntime: boolean;
@@ -24,6 +26,11 @@ function relativeTime(timestamp: number): string {
   const days = Math.floor(hours / 24);
   if (days < 30) return `Opened ${days}d ago`;
   return `Opened ${new Date(timestamp).toLocaleDateString()}`;
+}
+
+function historyTime(timestamp: number): string {
+  if (!timestamp) return "No versions yet";
+  return new Date(timestamp).toLocaleString();
 }
 
 function VaultRow({
@@ -78,8 +85,49 @@ export default function WelcomeDashboard({
   onOpenRepository,
 }: Props) {
   const pinned = vaults.filter((vault) => vault.pinned);
-  const recent = vaults.filter((vault) => !vault.pinned).slice(0, 6);
   const stats = summarizeVaultHistory(vaults);
+  const [historyItems, setHistoryItems] = useState<PageHistorySummary[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const paths = vaults.map((vault) => vault.path);
+    if (!nativeRuntime || paths.length === 0) {
+      setHistoryItems([]);
+      return () => {};
+    }
+    setHistoryLoading(true);
+    setHistoryError(null);
+    void api
+      .recentHistoryForVaults(paths, 6)
+      .then((items) => {
+        if (!cancelled) setHistoryItems(items);
+      })
+      .catch((reason) => {
+        if (!cancelled) setHistoryError(`Couldn't load version history: ${String(reason)}`);
+      })
+      .finally(() => {
+        if (!cancelled) setHistoryLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [nativeRuntime, vaults]);
+
+  async function clearSavedVaultHistory() {
+    if (!window.confirm("Clear version history for every saved vault?")) return;
+    setHistoryLoading(true);
+    setHistoryError(null);
+    try {
+      await Promise.all(vaults.map((vault) => api.clearHistoryForVault(vault.path)));
+      setHistoryItems([]);
+    } catch (reason) {
+      setHistoryError(`Couldn't clear version history: ${String(reason)}`);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
 
   return (
     <main className="welcome">
@@ -120,29 +168,48 @@ export default function WelcomeDashboard({
         <section className="welcome-card welcome-vaults-card">
           <div className="welcome-card-heading">
             <div>
-              <span className="welcome-eyebrow">Workspace</span>
-              <h2>Recently opened vaults</h2>
+              <span className="welcome-eyebrow">Version history</span>
+              <h2>Latest snapshots</h2>
             </div>
-            <button className="welcome-text-button" onClick={onOpenVault} disabled={!nativeRuntime}>
-              Browse
+            <button
+              className="welcome-text-button"
+              onClick={() => void clearSavedVaultHistory()}
+              disabled={!nativeRuntime || historyLoading || historyItems.length === 0}
+            >
+              Clear history
             </button>
           </div>
-          {recent.length > 0 ? (
-            <div className="welcome-vault-list">
-              {recent.map((vault) => (
-                <VaultRow
-                  key={vault.path}
-                  vault={vault}
-                  nativeRuntime={nativeRuntime}
-                  onOpen={() => onOpenRecent(vault.path)}
-                  onTogglePinned={() => onTogglePinned(vault.path)}
-                />
+          {historyError && <div className="welcome-history-error">{historyError}</div>}
+          {historyLoading ? (
+            <div className="welcome-empty">
+              <strong>Loading version history</strong>
+              <span>Checking saved vaults for page snapshots.</span>
+            </div>
+          ) : historyItems.length > 0 ? (
+            <div className="welcome-history-list">
+              {historyItems.map((item) => (
+                <button
+                  key={`${item.vaultPath}:${item.path}`}
+                  className="welcome-history-row"
+                  disabled={!nativeRuntime || !item.vaultPath}
+                  onClick={() => item.vaultPath && onOpenRecent(item.vaultPath)}
+                  title={item.path}
+                >
+                  <span>
+                    <strong>{item.title || item.path}</strong>
+                    <small>{item.vaultName ? `${item.vaultName} · ${item.path}` : item.path}</small>
+                  </span>
+                  <span>
+                    <strong>{item.count}</strong>
+                    <small>{historyTime(item.updatedAt)}</small>
+                  </span>
+                </button>
               ))}
             </div>
           ) : (
             <div className="welcome-empty">
-              <strong>No recent vaults yet</strong>
-              <span>Open or create a vault and it will appear here.</span>
+              <strong>No page versions yet</strong>
+              <span>Rockion starts keeping snapshots after you edit a page.</span>
             </div>
           )}
         </section>

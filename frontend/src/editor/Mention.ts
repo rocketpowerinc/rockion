@@ -1,21 +1,10 @@
 import { Node } from "@tiptap/core";
-import { assetURL } from "./imageIcons.mjs";
-
-function isHttp(url: string): boolean {
-  return /^https?:\/\//i.test(String(url || "").trim());
-}
-
-// Resolve a stored favicon to something the WebView can actually load. The app's
-// CSP is img-src 'self' data: blob:, so remote favicons are blocked — they must
-// be downloaded into the vault first (see LinkPasteMenu). Local vault paths are
-// served by the asset middleware; data: URIs pass through.
-function displayFavicon(fav: string): string {
-  const v = String(fav || "").replace(/\\/g, "/");
-  if (/^Assets\//i.test(v)) return assetURL(v);
-  if (v.startsWith("data:")) return v;
-  if (isHttp(v)) return v; // remote (likely blocked by CSP, kept as a last resort)
-  return "";
-}
+import {
+  displayFavicon,
+  isHttpURL,
+  parseMentionElement,
+  serializeMention,
+} from "./linkPreviewMarkup.mjs";
 
 export interface MentionAttrs {
   url: string;
@@ -48,13 +37,7 @@ export const Mention = Node.create({
         priority: 100,
         getAttrs: (el) => {
           const anchor = el as HTMLElement;
-          const url = anchor.getAttribute("href") || "";
-          if (!isHttp(url)) return false;
-          return {
-            url,
-            title: anchor.textContent?.trim() || url,
-            favicon: anchor.getAttribute("data-favicon") || "",
-          };
+          return parseMentionElement(anchor);
         },
       },
     ];
@@ -93,7 +76,7 @@ export const Mention = Node.create({
 
       dom.addEventListener("click", (event) => {
         event.preventDefault();
-        if (isHttp(a.url)) {
+        if (isHttpURL(a.url)) {
           window.dispatchEvent(new CustomEvent("rockion:open-external", { detail: a.url }));
         }
       });
@@ -107,27 +90,13 @@ export const Mention = Node.create({
       markdown: {
         serialize(state: any, node: any) {
           const a = node.attrs as MentionAttrs;
-          if (!isHttp(a.url)) {
+          if (!isHttpURL(a.url)) {
             state.write(a.title || a.url);
             return;
           }
-          state.write(
-            `<a href="${escAttr(a.url)}" data-rockion-mention${
-              a.favicon ? ` data-favicon="${escAttr(a.favicon)}"` : ""
-            }>${escText(a.title || a.url)}</a>`
-          );
+          state.write(serializeMention(a));
         },
       },
     };
   },
 });
-
-function escAttr(value: string): string {
-  return String(value).replace(/[<>"&]/g, (c) =>
-    c === "<" ? "&lt;" : c === ">" ? "&gt;" : c === '"' ? "&quot;" : "&amp;"
-  );
-}
-
-function escText(value: string): string {
-  return String(value).replace(/[<>&]/g, (c) => (c === "<" ? "&lt;" : c === ">" ? "&gt;" : "&amp;"));
-}

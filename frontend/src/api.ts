@@ -83,6 +83,25 @@ export interface PageTemplate {
   label: string;
 }
 
+export interface PageHistoryVersion {
+  id: string;
+  path: string;
+  title: string;
+  reason: string;
+  createdAt: number;
+  hash: string;
+  size: number;
+}
+
+export interface PageHistorySummary {
+  vaultPath?: string;
+  vaultName?: string;
+  path: string;
+  title: string;
+  updatedAt: number;
+  count: number;
+}
+
 export interface SearchHit {
   path: string;
   title: string;
@@ -148,10 +167,23 @@ export const api = {
     href: string,
     expectedVersion: string
   ): Promise<Note> => App.DeleteManagedPage(dashboardPath, href, expectedVersion),
+  listPageHistory: (path: string): Promise<PageHistoryVersion[]> =>
+    App.ListPageHistory(path),
+  readHistoryVersion: (path: string, versionId: string): Promise<string> =>
+    App.ReadHistoryVersion(path, versionId),
+  restoreHistoryVersion: (path: string, versionId: string): Promise<Note> =>
+    App.RestoreHistoryVersion(path, versionId),
+  recentHistory: (limit = 6): Promise<PageHistorySummary[]> => App.RecentHistory(limit),
+  clearHistory: (): Promise<void> => App.ClearHistory(),
+  recentHistoryForVaults: (paths: string[], limit = 6): Promise<PageHistorySummary[]> =>
+    App.RecentHistoryForVaults(paths, limit),
+  clearHistoryForVault: (path: string): Promise<void> => App.ClearHistoryForVault(path),
   search: (query: string, limit = 50): Promise<SearchHit[]> => App.Search(query, limit),
   backlinks: (path: string): Promise<SearchHit[]> => App.Backlinks(path),
   // SaveImage takes a Go []byte; Wails marshals a number[] / base64. We pass an array.
   saveImage: (name: string, data: number[]): Promise<string> => App.SaveImage(name, data),
+  saveIconImage: (name: string, data: number[]): Promise<string> => App.SaveIconImage(name, data),
+  saveCoverImage: (name: string, data: number[]): Promise<string> => App.SaveCoverImage(name, data),
   saveVideo: (name: string, data: number[]): Promise<string> => App.SaveVideo(name, data),
   fetchLinkPreview: (url: string): Promise<LinkPreview> => App.FetchLinkPreview(url),
   saveRemoteImage: (url: string): Promise<string> => App.SaveRemoteImage(url),

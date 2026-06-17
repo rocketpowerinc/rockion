@@ -90,6 +90,7 @@ rm -rf /Applications/Rockion.app
 - **Block handles** — hover any block for a drag grip (reorder via drag) and a `+` button (insert a block below). Nested blocks (incl. callouts inside callouts) can be dragged out.
 - Click the empty area below the content to start a new block.
 - Tables, checklists, image paste/drop, and MP4 video paste/drop (media saved into the vault's `Assets/Images` and `Assets/Videos` folders).
+- Uploaded page/project cover images are saved separately in `Assets/Covers`, while custom icon images are saved in `Assets/Icons`.
 
 **Callouts** — a single `/Callout` block; click its icon to cycle three cyberpunk gradient styles (green / red / yellow). On disk it's a portable `> [!GREEN]` alert blockquote.
 
@@ -97,7 +98,7 @@ rm -rf /Applications/Rockion.app
 
 **Pages & links**
 
-- Each page has an icon — pick an **emoji** or **upload a custom image** saved into `Assets/Images` and referenced from the icons sidecar. Set it from the icon at the top of a note or in the sidebar.
+- Each page has an icon — pick an **emoji** or **upload a custom image** saved into `Assets/Icons` and referenced from the icons sidecar. Set it from the icon at the top of a note or in the sidebar.
 - `/Link to page` inserts a plain `[Title](path.md)` markdown link. In the editor it renders Notion-style: the **target page's icon with a small ↗ badge**, no underline. The icon is resolved live from the page's current icon (change a page's icon and its links follow), and nothing extra is written to disk.
 - Backlinks panel shows everything that links to the current note.
 
@@ -133,6 +134,11 @@ download, verify, and apply the matching update directly.
 - **npm** 11.16.0
 - **Wails CLI v2.12.0**: `go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0`
 - Platform deps for Wails development (WebView2 on Windows, WebKitGTK on Linux). Run `wails doctor` to check.
+
+Frontend dependencies are intentionally pinned exactly in `frontend/package.json`
+and `frontend/package-lock.json`. Use `npm ci` for reproducible installs in
+release and CI paths; use `npm install` only when deliberately updating
+dependencies and committing the resulting lockfile change.
 
 ## Develop
 
@@ -260,12 +266,12 @@ markdown.
   pages use the gray `Other` tag. Newly bundled defaults are copied into existing vaults once;
   `.rockion/default-templates.json` remembers them so user-deleted defaults stay deleted.
 - **Dashboard covers** load bounded thumbnails on demand; the full validated image is only loaded
-  for the active page cover.
+  for the active page cover. Uploaded cover images are stored in `Assets/Covers`.
 - **Page links** are plain markdown links. The icon + ↗ badge are added by a ProseMirror
   *decoration* (`PageLinkDecorations`) that looks up the target's icon from a live registry
   (`pageIcons.ts`) — so nothing is baked into the file and link icons update when a page's icon
   changes. Clicking a link (or its icon) opens that note instead of navigating.
-- **Custom image icons** are validated by the backend, stored in `Assets/Images`,
+- **Custom image icons** are validated by the backend, stored in `Assets/Icons`,
   and referenced from `icons.json` so they render anywhere an icon shows.
 - **Theme** is a `data-theme` attribute on `<html>` (set before first paint by an inline script in
   `index.html`, persisted to `localStorage`).

@@ -49,7 +49,7 @@ export default function EmojiPicker({ onPick, onClose, assetName = "icon" }: Pro
     if (!file) return;
     try {
       const data = new Uint8Array(await file.arrayBuffer());
-      onPick(await api.saveImage(assetName, Array.from(data)));
+      onPick(await api.saveIconImage(assetName, Array.from(data)));
     } catch (err) {
       console.error("icon upload failed:", err);
     }

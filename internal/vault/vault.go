@@ -25,6 +25,7 @@ type Vault struct {
 	Root             string
 	iconsMu          sync.Mutex
 	coversMu         sync.Mutex
+	historyMu        sync.Mutex
 	sidebarMu        sync.Mutex
 	dashboardViewsMu sync.Mutex
 	pageSettingsMu   sync.Mutex

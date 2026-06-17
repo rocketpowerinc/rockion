@@ -227,6 +227,20 @@ func TestSaveImageValidatesAndNormalizesFormat(t *testing.T) {
 	if _, err := v.SaveImage("bad.png", []byte("not an image")); err == nil {
 		t.Fatal("invalid image was accepted")
 	}
+	iconRel, err := v.SaveIconImage("icon.png", encoded.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(iconRel, "Assets/Icons/") || !strings.HasSuffix(iconRel, ".png") {
+		t.Fatalf("icon image was not stored in icon assets folder: %s", iconRel)
+	}
+	coverRel, err := v.SaveCoverImage("cover.png", encoded.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(coverRel, "Assets/Covers/") || !strings.HasSuffix(coverRel, ".png") {
+		t.Fatalf("cover image was not stored in cover assets folder: %s", coverRel)
+	}
 }
 
 func TestSaveVideoStoresMP4InVideoAssets(t *testing.T) {
@@ -243,6 +257,22 @@ func TestSaveVideoStoresMP4InVideoAssets(t *testing.T) {
 	}
 	if _, err := v.SaveVideo("bad.mov", []byte("bytes")); err == nil {
 		t.Fatal("non-mp4 video was accepted")
+	}
+}
+
+func TestBookmarkImagesValidateBytes(t *testing.T) {
+	v := openTestVault(t)
+	pngBytes := []byte("\x89PNG\r\n\x1a\nrest")
+	if rel, err := v.SaveBookmarkImage("preview.png", pngBytes, ".png"); err != nil {
+		t.Fatal(err)
+	} else if !strings.HasPrefix(rel, "Assets/Bookmarks/") || !strings.HasSuffix(rel, ".png") {
+		t.Fatalf("bookmark image path = %q", rel)
+	}
+	if _, err := v.SaveBookmarkImage("bad.png", []byte("not an image"), ".png"); err == nil {
+		t.Fatal("invalid bookmark image bytes were accepted")
+	}
+	if _, err := v.SaveFaviconImage("example.com", []byte("not an icon"), ".ico"); err == nil {
+		t.Fatal("invalid favicon bytes were accepted")
 	}
 }
 
@@ -263,11 +293,14 @@ func TestSetIconRequiresNoteAndRejectsInvalidDataURL(t *testing.T) {
 	if got := v.Icons()["note.md"]; got != "📝" {
 		t.Fatalf("icon was not saved: %q", got)
 	}
-	if err := v.SetIcon("note.md", "Assets/Images/note-icon.png"); err != nil {
+	if err := v.SetIcon("note.md", "Assets/Icons/note-icon.png"); err != nil {
 		t.Fatal(err)
 	}
-	if got := v.Icons()["note.md"]; got != "Assets/Images/note-icon.png" {
+	if got := v.Icons()["note.md"]; got != "Assets/Icons/note-icon.png" {
 		t.Fatalf("asset icon was not saved: %q", got)
+	}
+	if err := v.SetIcon("note.md", "Assets/Images/legacy-note-icon.png"); err != nil {
+		t.Fatal("legacy image icon path should remain readable:", err)
 	}
 	if err := v.SetIcon("note.md", "Assets/Videos/bad.mp4"); err == nil {
 		t.Fatal("non-image asset icon was accepted")

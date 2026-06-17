@@ -36,6 +36,21 @@ import {
   emojiCatalog,
   searchEmojis,
 } from "../src/editor/emojiCatalog.mjs";
+import {
+  imageIconURL,
+  isImageIcon,
+} from "../src/editor/imageIcons.mjs";
+import {
+  parseVideoBlock,
+  renderVideoAssetHTML,
+  serializeVideoAsset,
+} from "../src/editor/videoMarkup.mjs";
+import {
+  parseBookmarkElement,
+  parseMentionElement,
+  serializeBookmark,
+  serializeMention,
+} from "../src/editor/linkPreviewMarkup.mjs";
 
 test("plain markdown filenames are not fuzzy-linked", () => {
   const source = fs.readFileSync(new URL("../src/editor/extensions.ts", import.meta.url), "utf8");
@@ -187,6 +202,10 @@ test("MP4 uploads render as local video assets with asset actions", () => {
     new URL("../src/editor/VideoAsset.ts", import.meta.url),
     "utf8"
   );
+  const videoMarkup = fs.readFileSync(
+    new URL("../src/editor/videoMarkup.mjs", import.meta.url),
+    "utf8"
+  );
   const emojiPicker = fs.readFileSync(
     new URL("../src/components/EmojiPicker.tsx", import.meta.url),
     "utf8"
@@ -210,16 +229,17 @@ test("MP4 uploads render as local video assets with asset actions", () => {
   assert.match(editor, /rockion:upload-video/);
   assert.match(editor, /rockion:video-asset-action/);
   assert.match(videoAsset, /name: "videoAsset"/);
-  assert.match(videoAsset, /\^Assets\\\/Videos\\\/\[\^\?#<>"\]\+\\\.mp4\$/);
+  assert.match(videoMarkup, /\^Assets\\\/Videos\\\/\[\^\?#<>"\]\+\\\.mp4\$/);
   assert.match(videoAsset, /addStorage\(\)/);
   assert.match(videoAsset, /serialize\(state: any, node: any\)/);
   assert.match(videoAsset, /markdownit\.use\(videoMarkdownItPlugin\)/);
   assert.match(videoAsset, /assetURL\(src\)/);
   assert.match(videoAsset, /storedVideoSource/);
-  assert.match(videoAsset, /<video src="\$\{escapeAttr\(storedSrc\)\}" controls preload="metadata"/);
+  assert.match(videoAsset, /serializeVideoAsset\(\{ src, title \}, caption\)/);
+  assert.match(videoAsset, /renderVideoAssetHTML\(tokens\[idx\]\.content\)/);
   assert.match(videoAsset, /Open in folder/);
   assert.match(videoAsset, /Delete asset/);
-  assert.match(emojiPicker, /api\.saveImage\(assetName,\s*Array\.from\(data\)\)/);
+  assert.match(emojiPicker, /api\.saveIconImage\(assetName,\s*Array\.from\(data\)\)/);
   assert.doesNotMatch(emojiPicker, /toDataURL/);
   assert.match(slashItems, /title:\s*"Video"/);
   assert.match(styles, /\.video-asset/);
@@ -227,7 +247,86 @@ test("MP4 uploads render as local video assets with asset actions", () => {
   assert.match(index, /media-src 'self'/);
 });
 
-test("uploaded image icons are stored as vault image assets", () => {
+test("video, bookmark, and mention markup round-trip through portable HTML", () => {
+  const video = serializeVideoAsset(
+    { src: "/Assets/Videos/my-page-2026-06-15-205140.mp4", title: 'Demo "Clip"' },
+    "caption <safe>"
+  );
+  assert.match(video, /^<figure data-rockion-video>/);
+  assert.match(video, /<video src="Assets\/Videos\/my-page-2026-06-15-205140\.mp4" controls preload="metadata" title="Demo &quot;Clip&quot;"><\/video>/);
+  const parsedVideo = parseVideoBlock(video);
+  assert.deepEqual(parsedVideo, {
+    src: "Assets/Videos/my-page-2026-06-15-205140.mp4",
+    title: 'Demo "Clip"',
+    caption: "caption <safe>",
+  });
+  assert.equal(
+    renderVideoAssetHTML(video),
+    '<figure data-rockion-video><video src="/Assets/Videos/my-page-2026-06-15-205140.mp4" controls preload="metadata" title="Demo &quot;Clip&quot;"></video><figcaption>caption &lt;safe&gt;</figcaption></figure>\n'
+  );
+  assert.equal(parseVideoBlock('<video src="https://example.com/tracker.mp4"></video>'), null);
+
+  const bookmark = serializeBookmark({
+    url: "https://example.com/path",
+    title: "Example <Site>",
+    description: "Description & more",
+    image: "/Assets/Bookmarks/hash.webp",
+    favicon: "Assets/Bookmarks/example.com.ico",
+    siteName: "Example",
+  });
+  const renderedBookmark = new MarkdownIt({ html: true, linkify: false }).render(bookmark);
+  assert.match(renderedBookmark, /<figure data-rockion-bookmark/);
+  const fakeFigure = {
+    getAttribute: (name) =>
+      name === "data-favicon"
+        ? "Assets/Bookmarks/example.com.ico"
+        : name === "data-site"
+          ? "Example"
+          : "",
+    querySelector: (selector) => {
+      const nodes = {
+        a: { getAttribute: () => "https://example.com/path", textContent: "Example <Site>" },
+        p: { textContent: "Description & more" },
+        img: { getAttribute: () => "/Assets/Bookmarks/hash.webp" },
+      };
+      return nodes[selector] || null;
+    },
+  };
+  assert.deepEqual(parseBookmarkElement(fakeFigure), {
+    url: "https://example.com/path",
+    title: "Example <Site>",
+    description: "Description & more",
+    image: "Assets/Bookmarks/hash.webp",
+    favicon: "Assets/Bookmarks/example.com.ico",
+    siteName: "Example",
+  });
+
+  const mention = serializeMention({
+    url: "https://example.com",
+    title: "Example",
+    favicon: "Assets/Bookmarks/example.com.ico",
+  });
+  assert.equal(
+    mention,
+    '<a href="https://example.com" data-rockion-mention data-favicon="Assets/Bookmarks/example.com.ico">Example</a>'
+  );
+  const fakeAnchor = {
+    getAttribute: (name) =>
+      name === "href"
+        ? "https://example.com"
+        : name === "data-favicon"
+          ? "Assets/Bookmarks/example.com.ico"
+          : "",
+    textContent: "Example",
+  };
+  assert.deepEqual(parseMentionElement(fakeAnchor), {
+    url: "https://example.com",
+    title: "Example",
+    favicon: "Assets/Bookmarks/example.com.ico",
+  });
+});
+
+test("uploaded image icons are stored as vault icon assets", () => {
   const imageIcons = fs.readFileSync(
     new URL("../src/editor/imageIcons.mjs", import.meta.url),
     "utf8"
@@ -249,8 +348,14 @@ test("uploaded image icons are stored as vault image assets", () => {
     "utf8"
   );
 
-  assert.match(imageIcons, /\^Assets\\\/Images\\\/\[\^\?#<>"\]\+\$/);
+  assert.equal(isImageIcon("Assets/Icons/note-icon.png"), true);
+  assert.equal(imageIconURL("Assets/Icons/note-icon.png"), "/Assets/Icons/note-icon.png");
+  assert.equal(isImageIcon("Assets/Images/legacy-note-icon.png"), true);
+  assert.equal(isImageIcon("Assets/Videos/bad.mp4"), false);
   assert.match(imageIcons, /return `\/\$\{value\}`/);
+  assert.match(editor, /api\.saveImage\(currentPageAssetName\(\),\s*Array\.from\(buf\)\)/);
+  assert.match(editor, /api\.saveCoverImage\(currentPageAssetName\(\),\s*Array\.from\(data\)\)/);
+  assert.match(imageIcons, /Images\|Icons\|Covers\|Videos\|Bookmarks/);
   assert.match(editor, /assetName=\{currentPageAssetName\(\)\}/);
   assert.match(dashboard, /assetName=\{note\.title \|\| "project-icon"\}/);
   assert.match(sidebar, /assetName=\{node\.name \|\| "project-icon"\}/);
@@ -403,6 +508,11 @@ test("page covers allow generated and validated image backgrounds", () => {
     new URL("../src/components/CoverPicker.tsx", import.meta.url),
     "utf8"
   );
+  const dashboard = fs.readFileSync(
+    new URL("../src/components/Dashboard.tsx", import.meta.url),
+    "utf8"
+  );
+  assert.match(dashboard, /api\.saveCoverImage\(file\.name,\s*Array\.from\(data\)\)/);
   assert.match(picker, /Choose an image/);
   assert.doesNotMatch(picker, /Browse Unsplash/);
   assert.match(picker, /Remove cover/);

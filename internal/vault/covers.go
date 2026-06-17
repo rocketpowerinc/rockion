@@ -215,8 +215,9 @@ func supportedCoverKind(kind string) bool {
 
 func (v *Vault) validateCoverAsset(rel string) (string, string, error) {
 	clean := filepath.ToSlash(filepath.Clean(filepath.FromSlash(rel)))
-	if !strings.HasPrefix(clean, "Assets/Images/") {
-		return "", "", errors.New("cover image must be stored in the vault image assets folder")
+	if !strings.HasPrefix(clean, "Assets/Covers/") &&
+		!strings.HasPrefix(clean, "Assets/Images/") {
+		return "", "", errors.New("cover image must be stored in the vault cover assets folder")
 	}
 	full, err := v.resolve(clean, false)
 	if err != nil {

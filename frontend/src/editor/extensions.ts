@@ -27,6 +27,8 @@ import { Bookmark } from "./Bookmark";
 import { Mention } from "./Mention";
 import { LinkPaste } from "./LinkPaste";
 import { PageFind } from "./PageFind";
+import { DragIndent } from "./DragIndent";
+import { IndentBlock } from "./IndentBlock";
 
 // The full set of TipTap extensions that make up the Rockion editor.
 export const editorExtensions = [
@@ -39,6 +41,7 @@ export const editorExtensions = [
   }),
   TaskList,
   TaskItem.configure({ nested: true }),
+  IndentBlock,
   Callout,
   CodeBlock,
   Table.configure({ resizable: true }),
@@ -73,11 +76,12 @@ export const editorExtensions = [
     dragHandleWidth: 22,
     scrollTreshold: 100,
     // Treat callouts as draggable blocks so a nested callout can be dragged out.
-    customNodes: ["callout"],
+    customNodes: ["callout", "indentBlock"],
   }),
   AddBlockButton,
   PageLinkDecorations,
   LinkContextMenu,
+  DragIndent,
   PageFind,
   Spellcheck,
 ];

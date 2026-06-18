@@ -177,6 +177,7 @@ function calloutMarkdownItPlugin(md: any) {
       if (!m) continue;
 
       const type = m[1].toLowerCase();
+      if (type === "indent") continue;
 
       // Find the matching blockquote_close (respecting nesting).
       let depth = 0;

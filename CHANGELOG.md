@@ -6,6 +6,8 @@ All notable changes to Rockion are documented here. This project adheres to
 ## [Unreleased]
 
 ### Added
+- Add horizontal drag-drop indent/outdent behavior for editor blocks, including
+  a clearer short/long drop guide and portable indentation for non-list blocks.
 - Add browser-style in-page find for notes with `Ctrl+F`/`Cmd+F`, highlighted
   matches, match counts, and next/previous navigation.
 - Add a sidebar vault search button that prioritizes unlimited page-title

@@ -2429,6 +2429,25 @@ button.primary,
 .editor-wrap.is-locked .add-block-button {
   display: none !important;
 }
+.rockion-indent {
+  margin-left: 1.75rem;
+}
+.drag-indent-guide {
+  position: fixed;
+  z-index: 9999;
+  height: 3px;
+  border-radius: 999px;
+  pointer-events: none;
+  transform: translateY(-50%);
+  background: color-mix(in srgb, var(--accent) 82%, white);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent),
+    0 0 16px color-mix(in srgb, var(--accent) 42%, transparent);
+}
+.drag-indent-guide.is-outdent {
+  background: color-mix(in srgb, #e5a100 86%, white);
+  box-shadow: 0 0 0 1px color-mix(in srgb, #e5a100 28%, transparent),
+    0 0 16px color-mix(in srgb, #e5a100 44%, transparent);
+}
 
 /* Notion-style "+" add-block button (left gutter). */
 .add-block-button {

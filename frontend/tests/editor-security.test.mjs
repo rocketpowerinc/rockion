@@ -182,6 +182,41 @@ test("pages support browser-style in-page find without mutating markdown", () =>
   assert.match(styles, /\.bookmark-card\.page-find-match/);
 });
 
+test("dragged blocks can indent or outdent by horizontal drop position", () => {
+  const extensions = fs.readFileSync(
+    new URL("../src/editor/extensions.ts", import.meta.url),
+    "utf8"
+  );
+  const dragIndent = fs.readFileSync(
+    new URL("../src/editor/DragIndent.ts", import.meta.url),
+    "utf8"
+  );
+  const indentBlock = fs.readFileSync(
+    new URL("../src/editor/IndentBlock.ts", import.meta.url),
+    "utf8"
+  );
+  const styles = fs.readFileSync(
+    new URL("../src/styles.css", import.meta.url),
+    "utf8"
+  );
+  assert.match(extensions, /DragIndent/);
+  assert.match(extensions, /IndentBlock/);
+  assert.match(extensions, /"indentBlock"/);
+  assert.match(dragIndent, /sinkListItem/);
+  assert.match(dragIndent, /liftListItem/);
+  assert.match(dragIndent, /wrapIn\("indentBlock"\)/);
+  assert.match(dragIndent, /lift\("indentBlock"\)/);
+  assert.match(dragIndent, /CONTAINER_BLOCK_SELECTOR/);
+  assert.match(dragIndent, /event\.clientY < rect\.top \+ rect\.height \/ 2/);
+  assert.match(dragIndent, /dataset\.dragIndent/);
+  assert.match(dragIndent, /drag-indent-guide/);
+  assert.match(indentBlock, /\[!INDENT\]/);
+  assert.match(indentBlock, /data-rockion-indent/);
+  assert.match(styles, /\.drag-indent-guide/);
+  assert.match(styles, /\.drag-indent-guide\.is-outdent/);
+  assert.match(styles, /translateY\(-50%\)/);
+});
+
 test("external links are normalized, styled blue, and opened outside Rockion", () => {
   assert.equal(normalizeExternalHref("example.com"), "https://example.com");
   assert.equal(normalizeExternalHref("www.example.com/path"), "https://www.example.com/path");

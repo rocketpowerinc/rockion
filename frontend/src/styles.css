@@ -1957,6 +1957,16 @@ button.primary,
   padding: 1px 5px;
   font-size: 0.9em;
 }
+.rk-prose :not(pre) > code {
+  color: #ff4d5e;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
+}
+.rk-prose :not(pre) > code.is-copied {
+  background: color-mix(in srgb, #24d17e 20%, var(--hover));
+  box-shadow: 0 0 0 1px color-mix(in srgb, #24d17e 60%, transparent);
+  color: #24d17e;
+}
 .rk-prose img {
   max-width: 100%;
   border-radius: 6px;

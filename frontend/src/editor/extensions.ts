@@ -29,6 +29,7 @@ import { LinkPaste } from "./LinkPaste";
 import { PageFind } from "./PageFind";
 import { DragIndent } from "./DragIndent";
 import { IndentBlock } from "./IndentBlock";
+import { InlineCodeCopy } from "./InlineCodeCopy";
 
 // The full set of TipTap extensions that make up the Rockion editor.
 export const editorExtensions = [
@@ -55,6 +56,7 @@ export const editorExtensions = [
   LinkPaste,
   AutoLink,
   MarkdownLinkCleanup,
+  InlineCodeCopy,
   TextColor,
   BgColor,
   Underline,

@@ -144,6 +144,35 @@ test("selected text exposes inline formatting and link controls", () => {
   assert.match(underline, /return \["u",\s*mergeAttributes\(HTMLAttributes\),\s*0\]/);
 });
 
+test("inline code is styled as clickable copyable text", () => {
+  const extensions = fs.readFileSync(
+    new URL("../src/editor/extensions.ts", import.meta.url),
+    "utf8"
+  );
+  const inlineCodeCopy = fs.readFileSync(
+    new URL("../src/editor/InlineCodeCopy.ts", import.meta.url),
+    "utf8"
+  );
+  const styles = fs.readFileSync(
+    new URL("../src/styles.css", import.meta.url),
+    "utf8"
+  );
+  assert.match(extensions, /InlineCodeCopy/);
+  assert.match(inlineCodeCopy, /closest\("code"\)/);
+  assert.match(inlineCodeCopy, /target instanceof Text/);
+  assert.match(inlineCodeCopy, /closest\("pre"\)/);
+  assert.match(inlineCodeCopy, /navigator\.clipboard\?\.writeText/);
+  assert.match(inlineCodeCopy, /execCommand\("copy"\)/);
+  assert.match(inlineCodeCopy, /classList\.add\("is-copied"\)/);
+  assert.match(inlineCodeCopy, /classList\.remove\("is-copied"\)/);
+  assert.match(inlineCodeCopy, /return true/);
+  assert.match(styles, /\.rk-prose :not\(pre\) > code/);
+  assert.match(styles, /\.rk-prose :not\(pre\) > code\.is-copied/);
+  assert.match(styles, /color:\s*#ff4d5e/);
+  assert.match(styles, /#24d17e/);
+  assert.match(styles, /cursor:\s*pointer/);
+});
+
 test("pages support browser-style in-page find without mutating markdown", () => {
   const editor = fs.readFileSync(
     new URL("../src/components/Editor.tsx", import.meta.url),

@@ -29,6 +29,8 @@ type Vault struct {
 	sidebarMu        sync.Mutex
 	dashboardViewsMu sync.Mutex
 	pageSettingsMu   sync.Mutex
+	coverThumbMu     sync.Mutex
+	coverThumbs      map[string]string
 }
 
 // Open returns a Vault rooted at an existing directory.

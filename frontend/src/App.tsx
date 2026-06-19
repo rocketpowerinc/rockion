@@ -4,10 +4,12 @@ import Editor, { type EditorHandle } from "./components/Editor";
 import Backlinks from "./components/Backlinks";
 import QuickSwitcher from "./components/QuickSwitcher";
 import NewPageModal from "./components/NewPageModal";
+import PagePicker, { type PageRef } from "./components/PagePicker";
 import Dashboard from "./components/Dashboard";
 import VaultTransferModal from "./components/VaultTransferModal";
 import WelcomeDashboard from "./components/WelcomeDashboard";
 import VaultSearch from "./components/VaultSearch";
+import PageTabs, { type OpenPageTab } from "./components/PageTabs";
 import Breadcrumbs, {
   type BreadcrumbItem,
 } from "./components/Breadcrumbs";
@@ -34,6 +36,13 @@ import {
   type SavedVault,
 } from "./vaultHistory.mjs";
 
+function normalizeTabGroups(tabs: OpenPageTab[]): OpenPageTab[] {
+  return [
+    ...tabs.filter((tab) => tab.pinned),
+    ...tabs.filter((tab) => !tab.pinned),
+  ];
+}
+
 export default function App() {
   const nativeRuntime = api.isNativeRuntime();
   const [vault, setVault] = useState<VaultInfo | null>(null);
@@ -42,8 +51,10 @@ export default function App() {
   const [favorites, setFavorites] = useState<TreeNode[]>([]);
   const [vaultRevision, setVaultRevision] = useState(0);
   const [note, setNote] = useState<Note | null>(null);
+  const [openTabs, setOpenTabs] = useState<OpenPageTab[]>([]);
   const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [tabPickerOpen, setTabPickerOpen] = useState(false);
   const [vaultSearchOpen, setVaultSearchOpen] = useState(false);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [newVaultOpen, setNewVaultOpen] = useState(false);
@@ -78,6 +89,8 @@ export default function App() {
     }
   });
 
+  const vaultTabsKey = vault ? `rockion-open-tabs:${vault.path}` : "";
+
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
     api.setWindowTheme(theme);
@@ -105,10 +118,104 @@ export default function App() {
     }
   }, [sidebarCollapsed]);
 
+  useEffect(() => {
+    if (!vaultTabsKey) {
+      setOpenTabs([]);
+      return;
+    }
+    try {
+      const parsed = JSON.parse(localStorage.getItem(vaultTabsKey) || "[]");
+      if (!Array.isArray(parsed)) {
+        setOpenTabs([]);
+        return;
+      }
+      setOpenTabs(
+        normalizeTabGroups(
+          parsed
+            .filter((tab) => tab && typeof tab.path === "string" && typeof tab.title === "string")
+            .map((tab) => ({
+              path: tab.path,
+              title: tab.title,
+              icon: typeof tab.icon === "string" ? tab.icon : undefined,
+              pinned: !!tab.pinned,
+            }))
+        )
+      );
+    } catch {
+      setOpenTabs([]);
+    }
+  }, [vaultTabsKey]);
+
+  useEffect(() => {
+    if (!vaultTabsKey) return;
+    try {
+      localStorage.setItem(vaultTabsKey, JSON.stringify(openTabs));
+    } catch {
+      /* localStorage unavailable */
+    }
+  }, [openTabs, vaultTabsKey]);
+
   const toggleTheme = useCallback(
     () => setTheme((current) => (current === "dark" ? "light" : "dark")),
     []
   );
+
+  const rememberOpenTab = useCallback((opened: Note, asPinned = false) => {
+    setOpenTabs((current) => {
+      const existing = current.find((tab) => tab.path === opened.path);
+      if (existing) {
+        return normalizeTabGroups(
+          current.map((tab) =>
+            tab.path === opened.path
+              ? {
+                  ...tab,
+                  title: opened.title,
+                  icon: opened.icon,
+                  pinned: tab.pinned || asPinned,
+                }
+              : tab
+          )
+        );
+      }
+      return normalizeTabGroups([
+        ...current,
+        {
+          path: opened.path,
+          title: opened.title,
+          icon: opened.icon,
+          pinned: asPinned,
+        },
+      ]);
+    });
+  }, []);
+
+  const replaceCurrentUnpinnedTab = useCallback((opened: Note) => {
+    setOpenTabs((current) => {
+      if (current.some((tab) => tab.path === opened.path)) return current;
+      const activeIndex = note?.path
+        ? current.findIndex((tab) => tab.path === note.path && !tab.pinned)
+        : -1;
+      if (activeIndex < 0) return current;
+      const next = [...current];
+      next[activeIndex] = {
+        path: opened.path,
+        title: opened.title,
+        icon: opened.icon,
+        pinned: false,
+      };
+      return normalizeTabGroups(next);
+    });
+  }, [note?.path]);
+
+  const updateOpenTab = useCallback((updated: Note) => {
+    setOpenTabs((current) =>
+      current.map((tab) =>
+        tab.path === updated.path
+          ? { ...tab, title: updated.title, icon: updated.icon }
+          : tab
+      )
+    );
+  }, []);
 
   const flushEditor = useCallback(async () => {
     return (await editorRef.current?.flushSave()) ?? true;
@@ -131,6 +238,7 @@ export default function App() {
       setVault(info);
       changeSavedVaults((current) => rememberVault(current, info));
       setNote(null);
+      setOpenTabs([]);
       setNavigationHistory([]);
       setError(null);
     },
@@ -160,6 +268,15 @@ export default function App() {
       };
     });
   }, [navigationHistory, note, pageRefs]);
+
+  const currentTab = useMemo<OpenPageTab | null>(() => {
+    if (!note) return null;
+    return {
+      path: note.path,
+      title: note.title,
+      icon: note.icon,
+    };
+  }, [note]);
 
   // Keep the page-link icon registry in sync so link icons resolve live.
   useEffect(() => {
@@ -235,6 +352,11 @@ export default function App() {
       await api.setNoteIcon(path, icon);
       await refreshTree();
       setNote((n) => (n && n.path === path ? { ...n, icon: icon || undefined } : n));
+      setOpenTabs((current) =>
+        current.map((tab) =>
+          tab.path === path ? { ...tab, icon: icon || undefined } : tab
+        )
+      );
     },
     [refreshTree]
   );
@@ -299,6 +421,7 @@ export default function App() {
       setPages([]);
       setFavorites([]);
       setNote(null);
+      setOpenTabs([]);
       setNavigationHistory([]);
       setVaultRevision(0);
       setError(null);
@@ -378,11 +501,19 @@ export default function App() {
     [activateVault, refreshTree, vaultTransfer]
   );
 
-  const openNote = useCallback(async (path: string, historyIndex?: number) => {
-    if (note?.path === path) return;
+  const openNote = useCallback(async (path: string, historyIndex?: number, asNewTab = false) => {
+    if (note?.path === path) {
+      if (asNewTab) rememberOpenTab(note);
+      return;
+    }
     if (!(await flushEditor())) return;
     try {
       const opened = await api.readNote(path);
+      if (asNewTab) {
+        rememberOpenTab(opened);
+      } else {
+        replaceCurrentUnpinnedTab(opened);
+      }
       setNote(opened);
       setNavigationHistory((current) => {
         if (typeof historyIndex === "number") {
@@ -412,7 +543,50 @@ export default function App() {
     } catch (e) {
       setError(`Couldn't open note: ${String(e)}`);
     }
-  }, [flushEditor, note?.path]);
+  }, [flushEditor, note, rememberOpenTab, replaceCurrentUnpinnedTab]);
+
+  const toggleTabPin = useCallback((path: string) => {
+    setOpenTabs((current) => {
+      const tab = current.find((item) => item.path === path);
+      if (!tab) return current;
+      const rest = current.filter((item) => item.path !== path);
+      const updated = { ...tab, pinned: !tab.pinned };
+      const firstUnpinned = rest.findIndex((item) => !item.pinned);
+      const insertAt = updated.pinned
+        ? firstUnpinned < 0
+          ? rest.length
+          : firstUnpinned
+        : rest.findIndex((item) => !item.pinned);
+      const next = [...rest];
+      next.splice(insertAt < 0 ? next.length : insertAt, 0, updated);
+      return normalizeTabGroups(next);
+    });
+  }, []);
+
+  const reorderTabs = useCallback((fromPath: string, toPath: string) => {
+    setOpenTabs((current) => {
+      const from = current.findIndex((tab) => tab.path === fromPath);
+      const to = current.findIndex((tab) => tab.path === toPath);
+      if (from < 0 || to < 0 || from === to) return current;
+      if (!!current[from].pinned !== !!current[to].pinned) return current;
+      const next = [...current];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return normalizeTabGroups(next);
+    });
+  }, []);
+
+  const closeAllUnpinnedTabs = useCallback(() => {
+    setOpenTabs((current) => current.filter((tab) => tab.pinned));
+  }, []);
+
+  const openTabPickerPage = useCallback(
+    (page: PageRef) => {
+      setTabPickerOpen(false);
+      void openNote(page.path, undefined, true);
+    },
+    [openNote]
+  );
 
   const newProject = useCallback(async () => {
     if (!(await flushEditor())) return;
@@ -427,6 +601,7 @@ export default function App() {
         const dashboard = await api.createProject(trimmed);
         setNewProjectOpen(false);
         await refreshTree();
+        rememberOpenTab(dashboard);
         setNote(dashboard);
         setNavigationHistory([dashboard.path]);
         setError(null);
@@ -435,7 +610,7 @@ export default function App() {
         throw e;
       }
     },
-    [refreshTree]
+    [refreshTree, rememberOpenTab]
   );
 
   const renameProject = useCallback(
@@ -461,6 +636,20 @@ export default function App() {
               ? `${renamedProject}${path.slice(previousProject.length)}`
               : path
           )
+        );
+        setOpenTabs((current) =>
+          current.map((tab) => {
+            if (tab.path !== previousProject && !tab.path.startsWith(`${previousProject}/`)) {
+              return tab;
+            }
+            const nextPath = `${renamedProject}${tab.path.slice(previousProject.length)}`;
+            return {
+              ...tab,
+              path: nextPath,
+              title: nextPath === renamed.path ? renamed.title : tab.title,
+              icon: nextPath === renamed.path ? renamed.icon : tab.icon,
+            };
+          })
         );
         await refreshTree();
         setError(null);
@@ -587,6 +776,17 @@ export default function App() {
         onReorderFavorites={reorderFavorites}
       />
       <main className="main">
+        <PageTabs
+          tabs={openTabs}
+          current={currentTab}
+          activePath={note?.path ?? null}
+          pages={pages}
+          onOpen={(path) => void openNote(path)}
+          onNewTab={() => setTabPickerOpen(true)}
+          onTogglePin={toggleTabPin}
+          onReorder={reorderTabs}
+          onCloseAllUnpinned={closeAllUnpinnedTabs}
+        />
         <Breadcrumbs
           items={breadcrumbs}
           onOpen={(index, path) => void openNote(path, index)}
@@ -598,7 +798,10 @@ export default function App() {
             onError={setError}
             onRefreshTree={() => void refreshTree()}
             onNoteUpdated={(updated) =>
-              setNote((current) => (current?.path === updated.path ? updated : current))
+              {
+                updateOpenTab(updated);
+                setNote((current) => (current?.path === updated.path ? updated : current));
+              }
             }
             onRenameProject={renameProject}
             onSetIcon={setIcon}
@@ -616,12 +819,27 @@ export default function App() {
             onSetIcon={setIcon}
             onToggleFavorite={toggleFavorite}
             onNoteUpdated={(updated) =>
-              setNote((current) => (current?.path === updated.path ? updated : current))
+              {
+                updateOpenTab(updated);
+                setNote((current) => (current?.path === updated.path ? updated : current));
+              }
             }
             onNoteRenamed={(renamed) => {
               const previousPath = note?.path;
               setNote(renamed);
               if (previousPath && previousPath !== renamed.path) {
+                setOpenTabs((current) =>
+                  current.map((tab) =>
+                    tab.path === previousPath
+                      ? {
+                          ...tab,
+                          path: renamed.path,
+                          title: renamed.title,
+                          icon: renamed.icon,
+                        }
+                      : tab
+                  )
+                );
                 setNavigationHistory((current) =>
                   current.map((path) => (path === previousPath ? renamed.path : path))
                 );
@@ -636,6 +854,13 @@ export default function App() {
         open={switcherOpen}
         onClose={() => setSwitcherOpen(false)}
         onOpen={openNote}
+      />
+      <PagePicker
+        open={tabPickerOpen}
+        pages={pageRefs}
+        placeholder="Open page in tab…"
+        onPick={openTabPickerPage}
+        onClose={() => setTabPickerOpen(false)}
       />
       <VaultSearch
         open={vaultSearchOpen}

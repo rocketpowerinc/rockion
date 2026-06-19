@@ -7,6 +7,7 @@ import (
 	"image/color"
 	_ "image/jpeg"
 	"image/png"
+	"os"
 	"strings"
 	"testing"
 
@@ -110,5 +111,57 @@ func TestCoverValidation(t *testing.T) {
 	}
 	if v.Cover("note.md") != nil {
 		t.Fatal("empty cover did not clear metadata")
+	}
+}
+
+func TestCoverThumbnailCacheInvalidatesWhenAssetChanges(t *testing.T) {
+	v := openTestVault(t)
+	if err := v.Write("note.md", "# Note\n"); err != nil {
+		t.Fatal(err)
+	}
+	first := image.NewRGBA(image.Rect(0, 0, 4, 2))
+	first.Set(0, 0, color.RGBA{R: 255, A: 255})
+	var firstBytes bytes.Buffer
+	if err := png.Encode(&firstBytes, first); err != nil {
+		t.Fatal(err)
+	}
+	asset, err := v.SaveCoverImage("cover.png", firstBytes.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := v.SetCover("note.md", model.PageCover{Kind: "image", Value: asset, Position: 50}); err != nil {
+		t.Fatal(err)
+	}
+	thumb1, err := v.CoverThumbnailDataURL("note.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	thumb2, err := v.CoverThumbnailDataURL("note.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if thumb1 != thumb2 {
+		t.Fatal("unchanged cover thumbnail was not stable")
+	}
+
+	second := image.NewRGBA(image.Rect(0, 0, 8, 4))
+	second.Set(0, 0, color.RGBA{G: 255, A: 255})
+	var secondBytes bytes.Buffer
+	if err := png.Encode(&secondBytes, second); err != nil {
+		t.Fatal(err)
+	}
+	full, err := v.AssetFullPath(asset)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(full, secondBytes.Bytes(), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	thumb3, err := v.CoverThumbnailDataURL("note.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if thumb3 == thumb1 {
+		t.Fatal("cover thumbnail cache did not invalidate after asset replacement")
 	}
 }

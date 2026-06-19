@@ -211,6 +211,68 @@ test("pages support browser-style in-page find without mutating markdown", () =>
   assert.match(styles, /\.bookmark-card\.page-find-match/);
 });
 
+test("page tabs use plus search and right-click tab actions", () => {
+  const app = fs.readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
+  const pageTabs = fs.readFileSync(
+    new URL("../src/components/PageTabs.tsx", import.meta.url),
+    "utf8"
+  );
+  const styles = fs.readFileSync(
+    new URL("../src/styles.css", import.meta.url),
+    "utf8"
+  );
+  assert.match(app, /const \[openTabs,\s*setOpenTabs\]/);
+  assert.match(app, /const \[tabPickerOpen,\s*setTabPickerOpen\]/);
+  assert.match(app, /rockion-open-tabs:\$\{vault\.path\}/);
+  assert.match(app, /asNewTab = false/);
+  assert.match(app, /rememberOpenTab\(opened\)/);
+  assert.match(app, /replaceCurrentUnpinnedTab\(opened\)/);
+  assert.match(app, /toggleTabPin/);
+  assert.match(app, /reorderTabs/);
+  assert.match(app, /function normalizeTabGroups/);
+  assert.match(app, /tabs\.filter\(\(tab\) => tab\.pinned\)/);
+  assert.match(app, /tabs\.filter\(\(tab\) => !tab\.pinned\)/);
+  assert.match(app, /!!current\[from\]\.pinned !== !!current\[to\]\.pinned/);
+  assert.match(app, /next\.splice\(from,\s*1\)/);
+  assert.match(app, /next\.splice\(to,\s*0,\s*moved\)/);
+  assert.match(app, /closeAllUnpinnedTabs/);
+  assert.match(app, /<PagePicker/);
+  assert.match(app, /<PageTabs/);
+  assert.match(pageTabs, /role="tablist"/);
+  assert.match(pageTabs, /tabs\.map/);
+  assert.doesNotMatch(pageTabs, /orderedTabs/);
+  assert.match(pageTabs, /draggable/);
+  assert.match(pageTabs, /canDropOn/);
+  assert.match(pageTabs, /!!dragged\.pinned === !!target\.pinned/);
+  assert.match(pageTabs, /onDragStart/);
+  assert.match(pageTabs, /onDrop/);
+  assert.match(pageTabs, /onReorder\(from,\s*tab\.path\)/);
+  assert.match(pageTabs, /onContextMenu/);
+  assert.match(pageTabs, /getBoundingClientRect/);
+  assert.match(pageTabs, /createPortal/);
+  assert.match(pageTabs, /TAB_MENU_WIDTH = 184/);
+  assert.match(pageTabs, /rect\.bottom \+ TAB_MENU_GAP/);
+  assert.match(pageTabs, /document\.body/);
+  assert.match(pageTabs, /className="page-tab-menu block-menu"/);
+  assert.match(pageTabs, /className="block-menu-item"/);
+  assert.match(pageTabs, /aria-label=\{`Tab options for \$\{menu\.title\}`\}/);
+  assert.match(pageTabs, /Pin tab/);
+  assert.match(pageTabs, /Unpin tab/);
+  assert.match(pageTabs, /Close all tabs/);
+  assert.match(pageTabs, /Open page in new tab/);
+  assert.match(pageTabs, /is-pinned/);
+  assert.match(pageTabs, /is-current/);
+  assert.match(styles, /\.page-tabs/);
+  assert.match(styles, /\.page-tab\.is-active/);
+  assert.match(styles, /\.page-tab\.is-dragging/);
+  assert.match(styles, /\.page-tab\.is-pinned/);
+  assert.match(styles, /\.page-tab\.is-current/);
+  assert.match(styles, /\.page-tab-new/);
+  assert.match(styles, /\.page-tab-menu/);
+  assert.match(styles, /width:\s*184px/);
+  assert.match(styles, /\.page-tab-menu-sep/);
+});
+
 test("dragged blocks can indent or outdent by horizontal drop position", () => {
   const extensions = fs.readFileSync(
     new URL("../src/editor/extensions.ts", import.meta.url),

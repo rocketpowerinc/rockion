@@ -11,12 +11,13 @@ export interface PageRef {
 interface Props {
   open: boolean;
   pages: PageRef[];
+  placeholder?: string;
   onPick: (page: PageRef) => void;
   onClose: () => void;
 }
 
 // Notion-style "link to page" picker: search vault notes and pick one.
-export default function PagePicker({ open, pages, onPick, onClose }: Props) {
+export default function PagePicker({ open, pages, placeholder = "Link to page…", onPick, onClose }: Props) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -51,7 +52,7 @@ export default function PagePicker({ open, pages, onPick, onClose }: Props) {
         <input
           ref={inputRef}
           className="switcher-input"
-          placeholder="Link to page…"
+          placeholder={placeholder}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);

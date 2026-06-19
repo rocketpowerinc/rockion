@@ -22,6 +22,7 @@ const (
 	maxCoverImagePixels  = 40_000_000
 	coverThumbnailWidth  = 640
 	coverThumbnailHeight = 360
+	maxCoverThumbCache   = 128
 )
 
 var coverColorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
@@ -114,6 +115,14 @@ func (v *Vault) CoverThumbnailDataURL(rel string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	info, err := os.Stat(full)
+	if err != nil {
+		return "", err
+	}
+	cacheKey := coverThumbnailCacheKey(full, info)
+	if cached := v.cachedCoverThumbnail(cacheKey); cached != "" {
+		return cached, nil
+	}
 	file, err := os.Open(full)
 	if err != nil {
 		return "", err
@@ -143,7 +152,34 @@ func (v *Vault) CoverThumbnailDataURL(rel string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(encoded.Bytes()), nil
+	dataURL := "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(encoded.Bytes())
+	v.storeCoverThumbnail(cacheKey, dataURL)
+	return dataURL, nil
+}
+
+func coverThumbnailCacheKey(full string, info os.FileInfo) string {
+	return fmt.Sprintf("%s:%d:%d", full, info.Size(), info.ModTime().UnixNano())
+}
+
+func (v *Vault) cachedCoverThumbnail(key string) string {
+	v.coverThumbMu.Lock()
+	defer v.coverThumbMu.Unlock()
+	return v.coverThumbs[key]
+}
+
+func (v *Vault) storeCoverThumbnail(key, dataURL string) {
+	v.coverThumbMu.Lock()
+	defer v.coverThumbMu.Unlock()
+	if v.coverThumbs == nil {
+		v.coverThumbs = map[string]string{}
+	}
+	if len(v.coverThumbs) >= maxCoverThumbCache {
+		for existing := range v.coverThumbs {
+			delete(v.coverThumbs, existing)
+			break
+		}
+	}
+	v.coverThumbs[key] = dataURL
 }
 
 func (v *Vault) RenameCoverPath(oldRel, newRel string, isDir bool) error {

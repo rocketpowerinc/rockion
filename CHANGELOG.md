@@ -10,6 +10,13 @@ All notable changes to Rockion are documented here. This project adheres to
   a clearer short/long drop guide and portable indentation for non-list blocks.
 - Add red inline code styling, click-to-copy behavior, and a copied visual cue
   for inline code spans.
+- Cache generated cover thumbnails by asset metadata to keep dashboards
+  responsive in vaults with many local cover images.
+- Add a stable top page tab bar where `+` searches for a page to open as a new
+  tab, pinned tabs stay icon-only, and right-click exposes pin/unpin plus
+  close-all-unpinned actions.
+- Allow manual drag-reordering of tabs within pinned and unpinned groups while
+  keeping pinned tabs permanently to the left of unpinned tabs.
 - Add browser-style in-page find for notes with `Ctrl+F`/`Cmd+F`, highlighted
   matches, match counts, and next/previous navigation.
 - Add a sidebar vault search button that prioritizes unlimited page-title

@@ -83,9 +83,9 @@ export const slashItems: SlashItem[] = [
   },
   {
     title: "Callout",
-    hint: "Click its icon to cycle green → red → yellow 🟢",
+    hint: "Click its icon to cycle callout type",
     command: ({ editor, range }) =>
-      editor.chain().focus().deleteRange(range).wrapIn("callout", { type: "green" }).run(),
+      editor.chain().focus().deleteRange(range).wrapIn("callout", { type: "pin" }).run(),
   },
   {
     title: "Code block",

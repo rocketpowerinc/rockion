@@ -21,8 +21,9 @@ const KNOWN_TYPES = [
   "danger",
 ];
 
-// Click order for the icon: cycle through the cyberpunk palette.
-const CYBER_CYCLE = ["green", "red", "yellow"];
+// Click order for the icon: cycle through the neon callout palette
+// (📌 ♻️ 🛑 ⚠️ ℹ️ ❓ ✅).
+const CYBER_CYCLE = ["pin", "recycle", "stop", "warning", "info", "question", "success"];
 
 declare module "@tiptap/core" {
   interface Commands<ReturnType> {

@@ -2837,52 +2837,100 @@ button.primary,
   content: "🛑";
 }
 
-/* ---- Cyberpunk gradient callouts ---- */
-/* Three neon panels with a gradient border AND a gradient sheen across the
-   fill, readable on both the light and dark app themes. */
-.rk-prose .callout[data-callout="green"],
-.rk-prose .callout[data-callout="red"],
-.rk-prose .callout[data-callout="yellow"] {
+/* ---- Neon gradient callouts ---- */
+/* Seven neon panels, each a distinct hue, with a gradient border AND a
+   gradient sheen across the fill. Readable on both light and dark themes. */
+.rk-prose .callout[data-callout="pin"],
+.rk-prose .callout[data-callout="recycle"],
+.rk-prose .callout[data-callout="stop"],
+.rk-prose .callout[data-callout="warning"],
+.rk-prose .callout[data-callout="info"],
+.rk-prose .callout[data-callout="question"],
+.rk-prose .callout[data-callout="success"] {
   border: 1.5px solid transparent;
   border-radius: 8px;
   color: #eef4ff;
 }
-.rk-prose .callout[data-callout="green"] a,
-.rk-prose .callout[data-callout="red"] a,
-.rk-prose .callout[data-callout="yellow"] a {
+.rk-prose .callout[data-callout="pin"] a,
+.rk-prose .callout[data-callout="recycle"] a,
+.rk-prose .callout[data-callout="stop"] a,
+.rk-prose .callout[data-callout="warning"] a,
+.rk-prose .callout[data-callout="info"] a,
+.rk-prose .callout[data-callout="question"] a,
+.rk-prose .callout[data-callout="success"] a {
   color: #7fdcff;
 }
-.rk-prose .callout[data-callout="green"]::before,
-.rk-prose .callout[data-callout="red"]::before,
-.rk-prose .callout[data-callout="yellow"]::before {
+.rk-prose .callout[data-callout="pin"]::before,
+.rk-prose .callout[data-callout="recycle"]::before,
+.rk-prose .callout[data-callout="stop"]::before,
+.rk-prose .callout[data-callout="warning"]::before,
+.rk-prose .callout[data-callout="info"]::before,
+.rk-prose .callout[data-callout="question"]::before,
+.rk-prose .callout[data-callout="success"]::before {
   filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.45));
 }
 
-.rk-prose .callout[data-callout="green"] {
+.rk-prose .callout[data-callout="pin"] {
+  background: linear-gradient(135deg, rgba(255, 43, 214, 0.30), rgba(177, 74, 237, 0.12) 55%, rgba(16, 7, 16, 0.96)) padding-box,
+    linear-gradient(135deg, #ff2bd6, #b14aed) border-box;
+  box-shadow: 0 0 18px rgba(255, 43, 214, 0.30), inset 0 0 26px rgba(177, 74, 237, 0.08);
+}
+.rk-prose .callout[data-callout="pin"]::before {
+  content: "📌";
+}
+
+.rk-prose .callout[data-callout="recycle"] {
   background: linear-gradient(135deg, rgba(57, 255, 20, 0.30), rgba(0, 229, 160, 0.12) 55%, rgba(7, 16, 12, 0.96)) padding-box,
     linear-gradient(135deg, #39ff14, #00e5a0) border-box;
   box-shadow: 0 0 18px rgba(57, 255, 20, 0.30), inset 0 0 26px rgba(0, 229, 160, 0.08);
 }
-.rk-prose .callout[data-callout="green"]::before {
-  content: "🟢";
+.rk-prose .callout[data-callout="recycle"]::before {
+  content: "♻️";
 }
 
-.rk-prose .callout[data-callout="red"] {
-  background: linear-gradient(135deg, rgba(255, 45, 85, 0.32), rgba(255, 107, 61, 0.12) 55%, rgba(18, 7, 9, 0.96)) padding-box,
+.rk-prose .callout[data-callout="stop"] {
+  background: linear-gradient(135deg, rgba(255, 45, 85, 0.30), rgba(255, 107, 61, 0.12) 55%, rgba(18, 7, 9, 0.96)) padding-box,
     linear-gradient(135deg, #ff2d55, #ff6b3d) border-box;
-  box-shadow: 0 0 18px rgba(255, 45, 85, 0.32), inset 0 0 26px rgba(255, 107, 61, 0.08);
+  box-shadow: 0 0 18px rgba(255, 45, 85, 0.30), inset 0 0 26px rgba(255, 107, 61, 0.08);
 }
-.rk-prose .callout[data-callout="red"]::before {
-  content: "🔴";
+.rk-prose .callout[data-callout="stop"]::before {
+  content: "🛑";
 }
 
-.rk-prose .callout[data-callout="yellow"] {
-  background: linear-gradient(135deg, rgba(255, 230, 0, 0.30), rgba(255, 174, 0, 0.12) 55%, rgba(18, 14, 4, 0.96)) padding-box,
+.rk-prose .callout[data-callout="warning"] {
+  background: linear-gradient(135deg, rgba(255, 200, 0, 0.30), rgba(255, 174, 0, 0.12) 55%, rgba(18, 14, 4, 0.96)) padding-box,
     linear-gradient(135deg, #ffe600, #ffae00) border-box;
   box-shadow: 0 0 18px rgba(255, 200, 0, 0.30), inset 0 0 26px rgba(255, 174, 0, 0.08);
 }
-.rk-prose .callout[data-callout="yellow"]::before {
-  content: "🟡";
+.rk-prose .callout[data-callout="warning"]::before {
+  content: "⚠️";
+}
+
+.rk-prose .callout[data-callout="info"] {
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.30), rgba(59, 130, 246, 0.12) 55%, rgba(4, 12, 18, 0.96)) padding-box,
+    linear-gradient(135deg, #00e5ff, #3b82f6) border-box;
+  box-shadow: 0 0 18px rgba(0, 229, 255, 0.30), inset 0 0 26px rgba(59, 130, 246, 0.08);
+}
+.rk-prose .callout[data-callout="info"]::before {
+  content: "ℹ️";
+}
+
+.rk-prose .callout[data-callout="question"] {
+  background: linear-gradient(135deg, rgba(177, 74, 237, 0.30), rgba(99, 102, 241, 0.12) 55%, rgba(12, 7, 18, 0.96)) padding-box,
+    linear-gradient(135deg, #b14aed, #6366f1) border-box;
+  box-shadow: 0 0 18px rgba(177, 74, 237, 0.30), inset 0 0 26px rgba(99, 102, 241, 0.08);
+}
+.rk-prose .callout[data-callout="question"]::before {
+  content: "❓";
+}
+
+.rk-prose .callout[data-callout="success"] {
+  background: linear-gradient(135deg, rgba(20, 241, 217, 0.30), rgba(183, 255, 0, 0.12) 55%, rgba(4, 18, 16, 0.96)) padding-box,
+    linear-gradient(135deg, #14f1d9, #b7ff00) border-box;
+  box-shadow: 0 0 18px rgba(20, 241, 217, 0.30), inset 0 0 26px rgba(183, 255, 0, 0.08);
+}
+.rk-prose .callout[data-callout="success"]::before {
+  content: "✅";
 }
 
 /* ---- Slash menu ---- */

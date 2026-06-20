@@ -47,6 +47,15 @@ func (a *App) SaveVideo(name string, data []byte) (string, error) {
 	return a.vault.SaveVideo(name, data)
 }
 
+func (a *App) SaveAudio(name string, data []byte) (string, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if err := a.requireVault(); err != nil {
+		return "", err
+	}
+	return a.vault.SaveAudio(name, data)
+}
+
 func (a *App) DeleteAsset(path string) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()

@@ -19,11 +19,26 @@ import (
 const assetRootDir = "Assets"
 const maxImageBytes = 10 << 20
 const maxVideoBytes = 0
+const maxAudioBytes = 0
 
 // SaveImage writes validated image bytes into Assets/Images/ and returns the
-// vault-relative path.
+// vault-relative path. PNG/JPEG/GIF are strictly decoded; WebP and AVIF — which
+// the Go stdlib can't decode but the WebView renders — are accepted by
+// magic-byte validation instead.
 func (v *Vault) SaveImage(name string, data []byte) (string, error) {
-	return v.saveValidatedImage("Images", name, data)
+	rel, err := v.saveValidatedImage("Images", name, data)
+	if err == nil {
+		return rel, nil
+	}
+	if len(data) == 0 || len(data) > maxImageBytes {
+		return "", fmt.Errorf("image must be between 1 byte and %d MB", maxImageBytes>>20)
+	}
+	for _, ext := range []string{".webp", ".avif"} {
+		if downloadableImageBytesMatch(data, ext) {
+			return v.saveAsset("Images", name, data, ext)
+		}
+	}
+	return "", err
 }
 
 // SaveIconImage writes validated icon image bytes into Assets/Icons/ and
@@ -140,6 +155,28 @@ func (v *Vault) SaveVideo(name string, data []byte) (string, error) {
 		return "", errors.New("only .mp4 video uploads are supported")
 	}
 	return v.saveAsset("Videos", name, data, ".mp4")
+}
+
+var allowedAudioExt = map[string]bool{
+	".mp3": true, ".wav": true, ".ogg": true, ".oga": true, ".m4a": true,
+	".aac": true, ".flac": true, ".opus": true, ".weba": true,
+}
+
+// SaveAudio writes an uploaded audio file into Assets/Audio/ and returns the
+// vault-relative path. Like SaveVideo it trusts the extension (the bytes are
+// played by the browser), accepting the common web-playable audio containers.
+func (v *Vault) SaveAudio(name string, data []byte) (string, error) {
+	if len(data) == 0 {
+		return "", errors.New("audio must not be empty")
+	}
+	if maxAudioBytes > 0 && len(data) > maxAudioBytes {
+		return "", errors.New("audio is larger than the configured limit")
+	}
+	ext := strings.ToLower(filepath.Ext(name))
+	if !allowedAudioExt[ext] {
+		return "", errors.New("unsupported audio format")
+	}
+	return v.saveAsset("Audio", name, data, ext)
 }
 
 func (v *Vault) DeleteAsset(rel string) error {
@@ -364,8 +401,9 @@ func (v *Vault) resolveAssetPath(rel string) (string, string, error) {
 		!strings.HasPrefix(clean, "Assets/Icons/") &&
 		!strings.HasPrefix(clean, "Assets/Covers/") &&
 		!strings.HasPrefix(clean, "Assets/Videos/") &&
+		!strings.HasPrefix(clean, "Assets/Audio/") &&
 		!strings.HasPrefix(clean, "Assets/Bookmarks/") {
-		return "", "", errors.New("asset must be inside Assets/Images, Assets/Icons, Assets/Covers, Assets/Videos, or Assets/Bookmarks")
+		return "", "", errors.New("asset must be inside Assets/Images, Assets/Icons, Assets/Covers, Assets/Videos, Assets/Audio, or Assets/Bookmarks")
 	}
 	full, err := v.resolve(clean, true)
 	return clean, full, err

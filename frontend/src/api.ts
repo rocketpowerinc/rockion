@@ -191,6 +191,7 @@ export const api = {
   saveIconImage: (name: string, data: number[]): Promise<string> => App.SaveIconImage(name, data),
   saveCoverImage: (name: string, data: number[]): Promise<string> => App.SaveCoverImage(name, data),
   saveVideo: (name: string, data: number[]): Promise<string> => App.SaveVideo(name, data),
+  saveAudio: (name: string, data: number[]): Promise<string> => App.SaveAudio(name, data),
   fetchLinkPreview: (url: string): Promise<LinkPreview> => App.FetchLinkPreview(url),
   saveRemoteImage: (url: string): Promise<string> => App.SaveRemoteImage(url),
   saveFavicon: (url: string): Promise<string> => App.SaveFavicon(url),

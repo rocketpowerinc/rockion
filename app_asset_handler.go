@@ -22,6 +22,7 @@ func (a *App) vaultAssetMiddleware() assetserver.Middleware {
 				strings.HasPrefix(rel, "Assets/Icons/") ||
 				strings.HasPrefix(rel, "Assets/Covers/") ||
 				strings.HasPrefix(rel, "Assets/Videos/") ||
+				strings.HasPrefix(rel, "Assets/Audio/") ||
 				strings.HasPrefix(rel, "Assets/Bookmarks/")
 			if !isAsset {
 				next.ServeHTTP(w, r)

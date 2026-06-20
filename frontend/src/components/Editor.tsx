@@ -295,6 +295,37 @@ function firstHeadingTitle(markdown: string): string {
   return "";
 }
 
+const AUDIO_EXTS = ["mp3", "wav", "ogg", "oga", "m4a", "aac", "flac", "opus", "weba"];
+const AUDIO_TYPE_EXT: Record<string, string> = {
+  "audio/mpeg": "mp3",
+  "audio/mp3": "mp3",
+  "audio/wav": "wav",
+  "audio/x-wav": "wav",
+  "audio/wave": "wav",
+  "audio/ogg": "ogg",
+  "audio/oga": "oga",
+  "audio/mp4": "m4a",
+  "audio/x-m4a": "m4a",
+  "audio/aac": "aac",
+  "audio/flac": "flac",
+  "audio/x-flac": "flac",
+  "audio/opus": "opus",
+  "audio/webm": "weba",
+};
+
+// The on-disk extension for an uploaded audio file: prefer the filename's own
+// extension, else map from the MIME type. Empty string = not a supported audio.
+function audioExtForFile(file: File): string {
+  const dot = file.name.lastIndexOf(".");
+  const nameExt = dot >= 0 ? file.name.slice(dot + 1).toLowerCase() : "";
+  if (AUDIO_EXTS.includes(nameExt)) return nameExt;
+  return AUDIO_TYPE_EXT[(file.type || "").toLowerCase()] || "";
+}
+
+function isAudioFile(file: File): boolean {
+  return (file.type || "").startsWith("audio/") || audioExtForFile(file) !== "";
+}
+
 const Editor = forwardRef<EditorHandle, Props>(function Editor(
   {
     note,
@@ -325,6 +356,8 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
   const onNoteRenamedRef = useRef(onNoteRenamed);
   const pageOptionsRef = useRef<HTMLDivElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
   const findInputRef = useRef<HTMLInputElement>(null);
   onNoteRenamedRef.current = onNoteRenamed;
   const [linkPickerOpen, setLinkPickerOpen] = useState(false);
@@ -684,6 +717,10 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
       await saveAndInsertVideo(file);
       return;
     }
+    if (isAudioFile(file)) {
+      await saveAndInsertAudio(file);
+      return;
+    }
     if (file.size > 10 * 1024 * 1024) {
       setSaveError("Images must be 10 MB or smaller.");
       return;
@@ -709,6 +746,22 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
       setSaveError(null);
     } catch (error) {
       setSaveError(`Video import failed: ${String(error)}`);
+    }
+  }
+
+  async function saveAndInsertAudio(file: File) {
+    const ext = audioExtForFile(file);
+    if (!ext) {
+      setSaveError("Unsupported audio format.");
+      return;
+    }
+    try {
+      const buf = new Uint8Array(await file.arrayBuffer());
+      const relPath = await api.saveAudio(`${currentPageAssetName()}.${ext}`, Array.from(buf));
+      editor?.chain().focus().setAudio({ src: relPath, title: file.name }).run();
+      setSaveError(null);
+    } catch (error) {
+      setSaveError(`Audio import failed: ${String(error)}`);
     }
   }
 
@@ -794,7 +847,7 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
 
   function handleMediaPaste(event: ClipboardEvent): boolean {
     const item = Array.from(event.clipboardData?.items ?? []).find((i) =>
-      i.type.startsWith("image/") || i.type === "video/mp4"
+      i.type.startsWith("image/") || i.type === "video/mp4" || i.type.startsWith("audio/")
     );
     if (!item) return false;
     const file = item.getAsFile();
@@ -804,7 +857,7 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
 
   function handleMediaDrop(event: DragEvent): boolean {
     const file = Array.from(event.dataTransfer?.files ?? []).find((f) =>
-      f.type.startsWith("image/") || f.type === "video/mp4" || f.name.toLowerCase().endsWith(".mp4")
+      f.type.startsWith("image/") || f.type === "video/mp4" || f.name.toLowerCase().endsWith(".mp4") || isAudioFile(f)
     );
     if (!file) return false;
     event.preventDefault();
@@ -919,6 +972,8 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
   useEffect(() => {
     const open = () => setLinkPickerOpen(true);
     const uploadVideo = () => videoInputRef.current?.click();
+    const uploadImage = () => imageInputRef.current?.click();
+    const uploadAudio = () => audioInputRef.current?.click();
     const createSubPage = () => setSubPagePromptOpen(true);
     const deleteManagedPage = (event: Event) => {
       const href = (event as CustomEvent).detail as string;
@@ -969,6 +1024,28 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
             setSaveError(null);
           } catch (error) {
             setSaveError(`Couldn't delete video asset: ${String(error)}`);
+          }
+        })();
+      }
+    };
+    const audioAssetAction = (event: Event) => {
+      const detail = (event as CustomEvent).detail as { action?: string; src?: string };
+      if (!detail?.src) return;
+      if (detail.action === "open") {
+        void api.openAssetInFolder(detail.src).catch((error) =>
+          setSaveError(`Couldn't open asset folder: ${String(error)}`)
+        );
+        return;
+      }
+      if (detail.action === "delete") {
+        if (!window.confirm("Delete this audio asset and remove it from the page?")) return;
+        void (async () => {
+          try {
+            await api.deleteAsset(detail.src || "");
+            removeAudioAsset(detail.src || "");
+            setSaveError(null);
+          } catch (error) {
+            setSaveError(`Couldn't delete audio asset: ${String(error)}`);
           }
         })();
       }
@@ -1027,20 +1104,26 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
     };
     window.addEventListener("rockion:link-page", open);
     window.addEventListener("rockion:upload-video", uploadVideo);
+    window.addEventListener("rockion:upload-image", uploadImage);
+    window.addEventListener("rockion:upload-audio", uploadAudio);
     window.addEventListener("rockion:new-sub-page", createSubPage);
     window.addEventListener("rockion:delete-managed-page", deleteManagedPage);
     window.addEventListener("rockion:open-page", openPage);
     window.addEventListener("rockion:video-asset-action", videoAssetAction);
+    window.addEventListener("rockion:audio-asset-action", audioAssetAction);
     window.addEventListener("rockion:bookmark-action", bookmarkAction);
     window.addEventListener("rockion:mention-action", mentionAction);
     window.addEventListener("rockion:open-external", openExternal);
     return () => {
       window.removeEventListener("rockion:link-page", open);
       window.removeEventListener("rockion:upload-video", uploadVideo);
+      window.removeEventListener("rockion:upload-image", uploadImage);
+      window.removeEventListener("rockion:upload-audio", uploadAudio);
       window.removeEventListener("rockion:new-sub-page", createSubPage);
       window.removeEventListener("rockion:delete-managed-page", deleteManagedPage);
       window.removeEventListener("rockion:open-page", openPage);
       window.removeEventListener("rockion:video-asset-action", videoAssetAction);
+      window.removeEventListener("rockion:audio-asset-action", audioAssetAction);
       window.removeEventListener("rockion:bookmark-action", bookmarkAction);
       window.removeEventListener("rockion:mention-action", mentionAction);
       window.removeEventListener("rockion:open-external", openExternal);
@@ -1053,6 +1136,25 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
     let to = -1;
     editor.state.doc.descendants((node, pos) => {
       if (node.type.name === "videoAsset" && node.attrs.src === src) {
+        from = pos;
+        to = pos + node.nodeSize;
+        return false;
+      }
+      return true;
+    });
+    if (from >= 0) {
+      editor.view.dispatch(editor.state.tr.delete(from, to));
+      dirty.current = true;
+      void saveNowRef.current();
+    }
+  }
+
+  function removeAudioAsset(src: string) {
+    if (!editor) return;
+    let from = -1;
+    let to = -1;
+    editor.state.doc.descendants((node, pos) => {
+      if (node.type.name === "audioAsset" && node.attrs.src === src) {
         from = pos;
         to = pos + node.nodeSize;
         return false;
@@ -1383,6 +1485,28 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
           const file = event.target.files?.[0];
           event.currentTarget.value = "";
           if (file) void saveAndInsertVideo(file);
+        }}
+      />
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.currentTarget.value = "";
+          if (file) void saveAndInsert(file);
+        }}
+      />
+      <input
+        ref={audioInputRef}
+        type="file"
+        accept="audio/*,.mp3,.wav,.ogg,.oga,.m4a,.aac,.flac,.opus,.weba"
+        hidden
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.currentTarget.value = "";
+          if (file) void saveAndInsertAudio(file);
         }}
       />
       <PagePicker

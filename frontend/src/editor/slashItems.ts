@@ -56,12 +56,30 @@ export const slashItems: SlashItem[] = [
     },
   },
   {
+    title: "Image",
+    hint: "Upload an image",
+    aliases: ["img", "photo", "picture", "png", "jpg", "jpeg", "gif"],
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).run();
+      window.dispatchEvent(new CustomEvent("rockion:upload-image"));
+    },
+  },
+  {
     title: "Video",
     hint: "Upload an MP4 video",
     aliases: ["mp4", "movie", "media"],
     command: ({ editor, range }) => {
       editor.chain().focus().deleteRange(range).run();
       window.dispatchEvent(new CustomEvent("rockion:upload-video"));
+    },
+  },
+  {
+    title: "Audio",
+    hint: "Upload an audio clip",
+    aliases: ["sound", "music", "mp3", "wav", "voice", "media"],
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).run();
+      window.dispatchEvent(new CustomEvent("rockion:upload-audio"));
     },
   },
   {

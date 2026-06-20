@@ -2255,6 +2255,88 @@ button.primary,
   display: none;
 }
 
+/* ---- Audio asset ---- */
+.audio-asset {
+  position: relative;
+  margin: 14px 0;
+}
+.audio-asset audio {
+  display: block;
+  width: min(100%, 520px);
+  border-radius: 10px;
+}
+.audio-asset-caption {
+  width: min(100%, 520px);
+  margin-top: 6px;
+  padding: 2px 4px;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+  outline: none;
+  border-radius: 4px;
+}
+.audio-asset-caption:empty::before,
+.audio-asset-caption:has(> br:only-child)::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted);
+  opacity: 0.55;
+  pointer-events: none;
+}
+.audio-asset-actions {
+  position: absolute;
+  top: -2px;
+  left: calc(min(100%, 520px) + 8px);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.audio-asset:hover .audio-asset-actions,
+.audio-asset:focus-within .audio-asset-actions {
+  opacity: 1;
+}
+.audio-asset-more {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.audio-asset-more:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.audio-asset-menu {
+  position: absolute;
+  top: 0;
+  left: calc(100% + 6px);
+  right: auto;
+  min-width: 150px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: var(--shadow);
+  z-index: 20;
+}
+.audio-asset-menu button {
+  display: block;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.audio-asset-menu button:hover {
+  background: var(--hover);
+}
+.editor-wrap.is-locked .audio-asset-actions {
+  display: none;
+}
+
 /* ---- Paste-as menu (pasted URLs) ---- */
 .link-paste-menu {
   z-index: 80;

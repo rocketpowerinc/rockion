@@ -6,6 +6,11 @@ All notable changes to Rockion are documented here. This project adheres to
 ## [Unreleased]
 
 ### Added
+- Image and audio uploads alongside video: new `/Image` and `/Audio` slash
+  commands plus paste and drag-and-drop. Images are stored in `Assets/Images`
+  and audio in `Assets/Audio`; audio embeds as a portable
+  `<figure data-rockion-audio><audio …>` block with a caption and ⋯ menu,
+  mirroring video.
 - Add horizontal drag-drop indent/outdent behavior for editor blocks, including
   a clearer short/long drop guide and portable indentation for non-list blocks.
 - Add red inline code styling, click-to-copy behavior, and a copied visual cue

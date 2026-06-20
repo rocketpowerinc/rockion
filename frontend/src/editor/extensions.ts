@@ -16,6 +16,7 @@ import { AddBlockButton } from "./AddBlockButton";
 import { PageLinkDecorations } from "./PageLinkDecorations";
 import { SafeImage } from "./SafeImage";
 import { VideoAsset } from "./VideoAsset";
+import { AudioAsset } from "./AudioAsset";
 import { Spellcheck } from "./Spellcheck";
 import { AutoLink } from "./AutoLink";
 import { LinkContextMenu } from "./LinkContextMenu";
@@ -51,6 +52,7 @@ export const editorExtensions = [
   TableCell,
   SafeImage,
   VideoAsset,
+  AudioAsset,
   Bookmark,
   Mention,
   LinkPaste,

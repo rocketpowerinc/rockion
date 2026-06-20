@@ -43,6 +43,12 @@ function normalizeTabGroups(tabs: OpenPageTab[]): OpenPageTab[] {
   ];
 }
 
+function isEditableShortcutTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName.toLowerCase();
+  return tag === "input" || tag === "textarea" || tag === "select" || target.isContentEditable;
+}
+
 export default function App() {
   const nativeRuntime = api.isNativeRuntime();
   const [vault, setVault] = useState<VaultInfo | null>(null);
@@ -52,6 +58,7 @@ export default function App() {
   const [vaultRevision, setVaultRevision] = useState(0);
   const [note, setNote] = useState<Note | null>(null);
   const [openTabs, setOpenTabs] = useState<OpenPageTab[]>([]);
+  const [closedTabs, setClosedTabs] = useState<OpenPageTab[]>([]);
   const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [tabPickerOpen, setTabPickerOpen] = useState(false);
@@ -121,8 +128,10 @@ export default function App() {
   useEffect(() => {
     if (!vaultTabsKey) {
       setOpenTabs([]);
+      setClosedTabs([]);
       return;
     }
+    setClosedTabs([]);
     try {
       const parsed = JSON.parse(localStorage.getItem(vaultTabsKey) || "[]");
       if (!Array.isArray(parsed)) {
@@ -239,6 +248,7 @@ export default function App() {
       changeSavedVaults((current) => rememberVault(current, info));
       setNote(null);
       setOpenTabs([]);
+      setClosedTabs([]);
       setNavigationHistory([]);
       setError(null);
     },
@@ -576,9 +586,71 @@ export default function App() {
     });
   }, []);
 
-  const closeAllUnpinnedTabs = useCallback(() => {
-    setOpenTabs((current) => current.filter((tab) => tab.pinned));
+  const closeCurrentPage = useCallback(() => {
+    setNote(null);
+    setNavigationHistory([]);
   }, []);
+
+  const closeTab = useCallback(
+    async (path: string) => {
+      if (!(await flushEditor())) return;
+      const tab = openTabs.find((item) => item.path === path);
+      const closing = tab ?? (currentTab?.path === path ? currentTab : null);
+      if (!closing) return;
+      const nextTabs = normalizeTabGroups(openTabs.filter((item) => item.path !== path));
+      setClosedTabs((stack) => [...stack, closing]);
+      setOpenTabs(nextTabs);
+      if (note?.path === path) {
+        const fallback = nextTabs[0];
+        if (fallback) {
+          void openNote(fallback.path, undefined, true);
+        } else {
+          closeCurrentPage();
+        }
+      }
+    },
+    [closeCurrentPage, currentTab, flushEditor, note?.path, openNote, openTabs]
+  );
+
+  const closeAllUnpinnedTabs = useCallback(async () => {
+    if (!(await flushEditor())) return;
+    const closing = openTabs.filter((tab) => !tab.pinned);
+    if (currentTab && !openTabs.some((tab) => tab.path === currentTab.path)) {
+      closing.push(currentTab);
+    }
+    const nextTabs = openTabs.filter((tab) => tab.pinned);
+    if (closing.length > 0) {
+      setClosedTabs((stack) => [...stack, ...closing]);
+    }
+    setOpenTabs(nextTabs);
+    if (note && closing.some((tab) => tab.path === note.path)) {
+      const fallback = nextTabs[0];
+      if (fallback) {
+        void openNote(fallback.path, undefined, true);
+      } else {
+        closeCurrentPage();
+      }
+    }
+  }, [closeCurrentPage, currentTab, flushEditor, note, openNote, openTabs]);
+
+  const reopenClosedTab = useCallback(() => {
+    const tab = closedTabs[closedTabs.length - 1];
+    if (!tab) return false;
+    setClosedTabs((current) => current.slice(0, -1));
+    void openNote(tab.path, undefined, true);
+    return true;
+  }, [closedTabs, openNote]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== "t" || (!event.ctrlKey && !event.metaKey)) return;
+      if (event.altKey || !event.shiftKey || isEditableShortcutTarget(event.target)) return;
+      if (!reopenClosedTab()) return;
+      event.preventDefault();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [reopenClosedTab]);
 
   const openTabPickerPage = useCallback(
     (page: PageRef) => {
@@ -676,6 +748,10 @@ export default function App() {
         } else if (nativeRuntime) {
           setNewVaultOpen(true);
         }
+      } else if (mod && !e.shiftKey && (e.key === "t" || e.key === "T")) {
+        if (!vaultRef.current || isEditableShortcutTarget(e.target)) return;
+        e.preventDefault();
+        setTabPickerOpen(true);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -784,8 +860,9 @@ export default function App() {
           onOpen={(path) => void openNote(path)}
           onNewTab={() => setTabPickerOpen(true)}
           onTogglePin={toggleTabPin}
+          onCloseTab={(path) => void closeTab(path)}
           onReorder={reorderTabs}
-          onCloseAllUnpinned={closeAllUnpinnedTabs}
+          onCloseAllUnpinned={() => void closeAllUnpinnedTabs()}
         />
         <Breadcrumbs
           items={breadcrumbs}

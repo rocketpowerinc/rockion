@@ -22,6 +22,7 @@ interface Props {
   onOpen: (path: string) => void;
   onNewTab: () => void;
   onTogglePin: (path: string) => void;
+  onCloseTab: (path: string) => void;
   onReorder: (fromPath: string, toPath: string) => void;
   onCloseAllUnpinned: () => void;
 }
@@ -49,6 +50,7 @@ export default function PageTabs({
   onOpen,
   onNewTab,
   onTogglePin,
+  onCloseTab,
   onReorder,
   onCloseAllUnpinned,
 }: Props) {
@@ -147,6 +149,20 @@ export default function PageTabs({
               <PageIcon icon={icon} />
               {!tab.pinned && <span className="page-tab-title">{title}</span>}
             </button>
+            {!tab.pinned && (
+              <button
+                type="button"
+                className="page-tab-close"
+                title={`Close ${title}`}
+                aria-label={`Close ${title}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onCloseTab(tab.path);
+                }}
+              >
+                ×
+              </button>
+            )}
           </div>
         );
       })}
@@ -155,6 +171,15 @@ export default function PageTabs({
           <button type="button" className="page-tab-main" title={current.title}>
             <PageIcon icon={tabIcon(current, pages)} />
             <span className="page-tab-title">{tabTitle(current, pages)}</span>
+          </button>
+          <button
+            type="button"
+            className="page-tab-close"
+            title={`Close ${tabTitle(current, pages)}`}
+            aria-label={`Close ${tabTitle(current, pages)}`}
+            onClick={() => onCloseTab(current.path)}
+          >
+            ×
           </button>
         </div>
       )}

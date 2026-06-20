@@ -217,11 +217,16 @@ test("page tabs use plus search and right-click tab actions", () => {
     new URL("../src/components/PageTabs.tsx", import.meta.url),
     "utf8"
   );
+  const sidebar = fs.readFileSync(
+    new URL("../src/components/Sidebar.tsx", import.meta.url),
+    "utf8"
+  );
   const styles = fs.readFileSync(
     new URL("../src/styles.css", import.meta.url),
     "utf8"
   );
   assert.match(app, /const \[openTabs,\s*setOpenTabs\]/);
+  assert.match(app, /const \[closedTabs,\s*setClosedTabs\]/);
   assert.match(app, /const \[tabPickerOpen,\s*setTabPickerOpen\]/);
   assert.match(app, /rockion-open-tabs:\$\{vault\.path\}/);
   assert.match(app, /asNewTab = false/);
@@ -229,6 +234,7 @@ test("page tabs use plus search and right-click tab actions", () => {
   assert.match(app, /replaceCurrentUnpinnedTab\(opened\)/);
   assert.match(app, /toggleTabPin/);
   assert.match(app, /reorderTabs/);
+  assert.match(app, /closeTab/);
   assert.match(app, /function normalizeTabGroups/);
   assert.match(app, /tabs\.filter\(\(tab\) => tab\.pinned\)/);
   assert.match(app, /tabs\.filter\(\(tab\) => !tab\.pinned\)/);
@@ -236,6 +242,16 @@ test("page tabs use plus search and right-click tab actions", () => {
   assert.match(app, /next\.splice\(from,\s*1\)/);
   assert.match(app, /next\.splice\(to,\s*0,\s*moved\)/);
   assert.match(app, /closeAllUnpinnedTabs/);
+  assert.match(app, /currentTab && !openTabs\.some\(\(tab\) => tab\.path === currentTab\.path\)/);
+  assert.match(app, /setNote\(null\)/);
+  assert.match(app, /setClosedTabs\(\(stack\) => \[\.\.\.stack,\s*\.\.\.closing\]\)/);
+  assert.match(app, /reopenClosedTab/);
+  assert.match(app, /event\.key\.toLowerCase\(\) !== "t"/);
+  assert.match(app, /event\.ctrlKey/);
+  assert.match(app, /!event\.shiftKey/);
+  assert.match(app, /!e\.shiftKey && \(e\.key === "t"/);
+  assert.match(app, /event\.preventDefault\(\)/);
+  assert.match(app, /isEditableShortcutTarget/);
   assert.match(app, /<PagePicker/);
   assert.match(app, /<PageTabs/);
   assert.match(pageTabs, /role="tablist"/);
@@ -248,6 +264,9 @@ test("page tabs use plus search and right-click tab actions", () => {
   assert.match(pageTabs, /onDrop/);
   assert.match(pageTabs, /onReorder\(from,\s*tab\.path\)/);
   assert.match(pageTabs, /onContextMenu/);
+  assert.match(pageTabs, /onCloseTab/);
+  assert.match(pageTabs, /className="page-tab-close"/);
+  assert.match(pageTabs, /event\.stopPropagation\(\)/);
   assert.match(pageTabs, /getBoundingClientRect/);
   assert.match(pageTabs, /createPortal/);
   assert.match(pageTabs, /TAB_MENU_WIDTH = 184/);
@@ -267,10 +286,20 @@ test("page tabs use plus search and right-click tab actions", () => {
   assert.match(styles, /\.page-tab\.is-dragging/);
   assert.match(styles, /\.page-tab\.is-pinned/);
   assert.match(styles, /\.page-tab\.is-current/);
+  assert.match(styles, /\.page-tab-close/);
   assert.match(styles, /\.page-tab-new/);
   assert.match(styles, /\.page-tab-menu/);
   assert.match(styles, /width:\s*184px/);
   assert.match(styles, /\.page-tab-menu-sep/);
+  assert.match(sidebar, /Hotkeys/);
+  assert.match(sidebar, /Ctrl\+T/);
+  assert.match(sidebar, /Ctrl\+Shift\+T/);
+  assert.match(sidebar, /Ctrl\+P/);
+  assert.match(sidebar, /Ctrl\+N/);
+  assert.match(sidebar, /Ctrl\+F/);
+  assert.match(sidebar, /Ctrl\+E/);
+  assert.match(styles, /\.settings-hotkeys/);
+  assert.match(styles, /\.settings-hotkey-row/);
 });
 
 test("dragged blocks can indent or outdent by horizontal drop position", () => {

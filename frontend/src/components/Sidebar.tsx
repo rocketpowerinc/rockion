@@ -32,6 +32,15 @@ interface Props {
   onReorderFavorites: (paths: string[]) => Promise<void>;
 }
 
+function HotkeyRow({ keys, label }: { keys: string; label: string }) {
+  return (
+    <div className="settings-hotkey-row">
+      <kbd>{keys}</kbd>
+      <span>{label}</span>
+    </div>
+  );
+}
+
 export default function Sidebar({
   vaultName,
   tree,
@@ -60,6 +69,7 @@ export default function Sidebar({
   const folders = items.filter((item) => item.isDir);
   const rootNotes = items.filter((item) => !item.isDir);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [hotkeysOpen, setHotkeysOpen] = useState(false);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [unsortedOpen, setUnsortedOpen] = useState(true);
   const [draggedFavorite, setDraggedFavorite] = useState<string | null>(null);
@@ -89,6 +99,7 @@ export default function Sidebar({
     try {
       await onCheckForUpdate();
       setSettingsOpen(false);
+      setHotkeysOpen(false);
     } finally {
       setCheckingUpdate(false);
     }
@@ -252,6 +263,7 @@ export default function Sidebar({
               role="menuitem"
               onClick={() => {
                 setSettingsOpen(false);
+                setHotkeysOpen(false);
                 onOpenVault();
               }}
             >
@@ -261,6 +273,7 @@ export default function Sidebar({
               role="menuitem"
               onClick={() => {
                 setSettingsOpen(false);
+                setHotkeysOpen(false);
                 void onExportVault();
               }}
             >
@@ -270,6 +283,7 @@ export default function Sidebar({
               role="menuitem"
               onClick={() => {
                 setSettingsOpen(false);
+                setHotkeysOpen(false);
                 void onImportVault();
               }}
             >
@@ -280,6 +294,7 @@ export default function Sidebar({
               onClick={() => {
                 onToggleTheme();
                 setSettingsOpen(false);
+                setHotkeysOpen(false);
               }}
             >
               <span>Theme</span>
@@ -292,6 +307,7 @@ export default function Sidebar({
               onClick={() => {
                 onToggleWritingLanguage();
                 setSettingsOpen(false);
+                setHotkeysOpen(false);
               }}
             >
               <span>Writing Language</span>
@@ -299,6 +315,24 @@ export default function Sidebar({
                 {writingLanguageLabel(writingLanguage)}
               </span>
             </button>
+            <button
+              role="menuitem"
+              aria-expanded={hotkeysOpen}
+              onClick={() => setHotkeysOpen((open) => !open)}
+            >
+              <span>Hotkeys</span>
+              <span className="settings-menu-hint">{hotkeysOpen ? "Hide" : "Show"}</span>
+            </button>
+            {hotkeysOpen && (
+              <div className="settings-hotkeys" role="group" aria-label="Hotkey bindings">
+                <HotkeyRow keys="Ctrl+T" label="Open page in new tab" />
+                <HotkeyRow keys="Ctrl+Shift+T" label="Reopen closed tab" />
+                <HotkeyRow keys="Ctrl+P" label="Open quick switcher" />
+                <HotkeyRow keys="Ctrl+N" label="Create new project or vault" />
+                <HotkeyRow keys="Ctrl+F" label="Find in current page" />
+                <HotkeyRow keys="Ctrl+E" label="Toggle inline code" />
+              </div>
+            )}
           </div>
         )}
         <button

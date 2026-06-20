@@ -15,6 +15,13 @@ All notable changes to Rockion are documented here. This project adheres to
 - Add a stable top page tab bar where `+` searches for a page to open as a new
   tab, pinned tabs stay icon-only, and right-click exposes pin/unpin plus
   close-all-unpinned actions.
+- Add `Ctrl+T`/`Cmd+T` to open the new-tab page picker and
+  `Ctrl+Shift+T`/`Cmd+Shift+T` to reopen the most recently closed unpinned page
+  tab.
+- Add a Hotkeys section to the settings menu that lists the current keyboard
+  shortcuts.
+- Add close buttons to unpinned page tabs and make close-all also close the
+  active current-page tab when it is not pinned.
 - Allow manual drag-reordering of tabs within pinned and unpinned groups while
   keeping pinned tabs permanently to the left of unpinned tabs.
 - Add browser-style in-page find for notes with `Ctrl+F`/`Cmd+F`, highlighted

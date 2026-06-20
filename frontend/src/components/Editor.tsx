@@ -212,7 +212,7 @@ function PageFindBar({
   onStep,
   onClose,
 }: {
-  inputRef: React.RefObject<HTMLInputElement>;
+  inputRef: React.RefObject<HTMLInputElement | null>;
   query: string;
   index: number;
   count: number;
@@ -538,10 +538,10 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
     };
   }, [note?.cover?.kind, note?.cover?.value, note?.path]);
 
-  const markdownNow = useCallback(
-    () => editor?.storage?.markdown?.getMarkdown?.() ?? editor?.getText() ?? "",
-    [editor]
-  );
+  const markdownNow = useCallback(() => {
+    const storage = editor?.storage as { markdown?: { getMarkdown?: () => string } } | undefined;
+    return storage?.markdown?.getMarkdown?.() ?? editor?.getText() ?? "";
+  }, [editor]);
 
   const saveNow = useCallback(async (): Promise<boolean> => {
     clearSaveTimer();
@@ -834,7 +834,7 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
       setConflict(null);
       setSaveError(null);
       try {
-        editor.commands.setContent(next?.markdown ?? "", false);
+        editor.commands.setContent(next?.markdown ?? "", { emitUpdate: false });
       } catch (error) {
         console.error("setContent failed, falling back to plain text:", error);
         editor.commands.setContent(
@@ -847,7 +847,7 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
               },
             ],
           },
-          false
+          { emitUpdate: false }
         );
       }
     },
@@ -1108,7 +1108,7 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
         conflict.localMarkdown,
         conflict.remote.version
       );
-      editor?.commands.setContent(conflict.localMarkdown, false);
+      editor?.commands.setContent(conflict.localMarkdown, { emitUpdate: false });
       version.current = saved.version;
       dirty.current = false;
       conflictRef.current = null;

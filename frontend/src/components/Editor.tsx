@@ -973,6 +973,54 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
         })();
       }
     };
+    const deleteAtomWithBookmarkAssets = async (
+      pos: number,
+      nodeType: "bookmark" | "linkMention",
+      assets: string[] | undefined
+    ) => {
+      if (!removeAtomAt(pos, nodeType)) return;
+      const saved = await saveNowRef.current();
+      if (!saved) return;
+      const bookmarkAssets = (assets || []).filter((path) =>
+        /^Assets\/Bookmarks\//i.test(path)
+      );
+      if (bookmarkAssets.length > 0) {
+        await api.deleteUnusedBookmarkAssets(bookmarkAssets);
+      }
+      setSaveError(null);
+    };
+    const bookmarkAction = (event: Event) => {
+      const detail = (event as CustomEvent).detail as {
+        action?: string;
+        pos?: number;
+        assets?: string[];
+      };
+      if (detail?.action !== "delete" || typeof detail.pos !== "number") return;
+      const pos = detail.pos;
+      void (async () => {
+        try {
+          await deleteAtomWithBookmarkAssets(pos, "bookmark", detail.assets);
+        } catch (error) {
+          setSaveError(`Couldn't delete bookmark: ${String(error)}`);
+        }
+      })();
+    };
+    const mentionAction = (event: Event) => {
+      const detail = (event as CustomEvent).detail as {
+        action?: string;
+        pos?: number;
+        assets?: string[];
+      };
+      if (detail?.action !== "delete" || typeof detail.pos !== "number") return;
+      const pos = detail.pos;
+      void (async () => {
+        try {
+          await deleteAtomWithBookmarkAssets(pos, "linkMention", detail.assets);
+        } catch (error) {
+          setSaveError(`Couldn't delete mention: ${String(error)}`);
+        }
+      })();
+    };
     const openExternal = (event: Event) => {
       const href = (event as CustomEvent).detail as string;
       if (href) api.openExternal(href);
@@ -983,6 +1031,8 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
     window.addEventListener("rockion:delete-managed-page", deleteManagedPage);
     window.addEventListener("rockion:open-page", openPage);
     window.addEventListener("rockion:video-asset-action", videoAssetAction);
+    window.addEventListener("rockion:bookmark-action", bookmarkAction);
+    window.addEventListener("rockion:mention-action", mentionAction);
     window.addEventListener("rockion:open-external", openExternal);
     return () => {
       window.removeEventListener("rockion:link-page", open);
@@ -991,6 +1041,8 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
       window.removeEventListener("rockion:delete-managed-page", deleteManagedPage);
       window.removeEventListener("rockion:open-page", openPage);
       window.removeEventListener("rockion:video-asset-action", videoAssetAction);
+      window.removeEventListener("rockion:bookmark-action", bookmarkAction);
+      window.removeEventListener("rockion:mention-action", mentionAction);
       window.removeEventListener("rockion:open-external", openExternal);
     };
   }, [loadNote, onNoteUpdated, onOpenLink, onPageCreated]);
@@ -1012,6 +1064,15 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
       dirty.current = true;
       void saveNowRef.current();
     }
+  }
+
+  function removeAtomAt(pos: number, nodeType: "bookmark" | "linkMention") {
+    if (!editor) return false;
+    const node = editor.state.doc.nodeAt(pos);
+    if (!node || node.type.name !== nodeType) return false;
+    editor.view.dispatch(editor.state.tr.delete(pos, pos + node.nodeSize));
+    dirty.current = true;
+    return true;
   }
 
   function insertPageLink(page: PageRef) {

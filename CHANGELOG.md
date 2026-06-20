@@ -22,6 +22,8 @@ All notable changes to Rockion are documented here. This project adheres to
   shortcuts.
 - Add close buttons to unpinned page tabs and make close-all also close the
   active current-page tab when it is not pinned.
+- Add delete controls for bookmark cards and mention chips, removing the content
+  block/chip and deleting only unreferenced local bookmark assets.
 - Allow manual drag-reordering of tabs within pinned and unpinned groups while
   keeping pinned tabs permanently to the left of unpinned tabs.
 - Add browser-style in-page find for notes with `Ctrl+F`/`Cmd+F`, highlighted
@@ -66,6 +68,12 @@ All notable changes to Rockion are documented here. This project adheres to
   chunks, removing Vite's large dictionary chunk warning from release builds.
 
 ### Fixed
+- Insert pasted bookmark cards and mention chips immediately, then enrich link
+  previews and local assets in the background so slow networks do not block the
+  editor.
+- Store pasted link favicons as content-addressed bookmark assets and cache
+  resolved favicon paths locally so repeated mentions/bookmarks show icons
+  without waiting on preview fetches.
 - Keep the in-page find bar as an overlay so opening `Ctrl+F` does not shift
   page content downward.
 - Reject link-preview and remote-asset downloads that resolve to localhost or

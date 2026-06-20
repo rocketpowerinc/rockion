@@ -10,6 +10,32 @@ interface PasteState {
   y: number;
 }
 
+// v2: bust stale entries cached before favicons rejected non-image responses
+// (e.g. a site whose /favicon.ico returned an HTML challenge saved as a bad icon).
+const FAVICON_CACHE_PREFIX = "rockion-favicon:v2:";
+
+function faviconCacheKey(value: string): string {
+  return `${FAVICON_CACHE_PREFIX}${value.trim().toLowerCase()}`;
+}
+
+function cachedFavicon(value: string): string {
+  try {
+    const cached = localStorage.getItem(faviconCacheKey(value));
+    return cached && /^Assets\/Bookmarks\//i.test(cached) ? cached : "";
+  } catch {
+    return "";
+  }
+}
+
+function rememberFavicon(value: string, path: string) {
+  if (!/^Assets\/Bookmarks\//i.test(path)) return;
+  try {
+    localStorage.setItem(faviconCacheKey(value), path);
+  } catch {
+    /* localStorage unavailable */
+  }
+}
+
 // "Paste as" menu (Notion-style) shown when a bare URL is pasted: Mention (an
 // inline favicon + title chip), Bookmark (a preview card), or URL (the plain link).
 export default function LinkPasteMenu({ editor }: { editor: Editor | null }) {
@@ -71,6 +97,25 @@ export default function LinkPasteMenu({ editor }: { editor: Editor | null }) {
 
   const current = state;
 
+  const updateMatchingNodes = (
+    typeName: "linkMention" | "bookmark",
+    url: string,
+    attrs: Record<string, string>
+  ) => {
+    if (!editor || Object.keys(attrs).length === 0) return;
+    let changed = false;
+    const tr = editor.state.tr;
+    editor.state.doc.descendants((node, pos) => {
+      if (node.type.name !== typeName || node.attrs.url !== url) return true;
+      tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...attrs });
+      changed = true;
+      return true;
+    });
+    if (changed) {
+      editor.view.dispatch(tr);
+    }
+  };
+
   const chooseURL = () => {
     acted.current = true;
     insertLink(current.url, current.url);
@@ -78,18 +123,25 @@ export default function LinkPasteMenu({ editor }: { editor: Editor | null }) {
   };
 
   // Download the site favicon into the vault so it renders under the app's CSP
-  // (img-src 'self' — remote images are blocked). Stored host-named (github.com.png)
-  // and reused across every link to the same site. Empty string on failure.
+  // (img-src 'self' — remote images are blocked). Stored content-addressed and
+  // cached per URL locally so repeated pastes can render immediately.
   const downloadFavicon = async (pageURL: string, discoveredFavicon = ""): Promise<string> => {
+    const cached = cachedFavicon(discoveredFavicon || pageURL) || cachedFavicon(pageURL);
+    if (cached) return cached;
     if (discoveredFavicon) {
       try {
-        return await api.saveFavicon(discoveredFavicon);
+        const saved = await api.saveFavicon(discoveredFavicon);
+        rememberFavicon(discoveredFavicon, saved);
+        rememberFavicon(pageURL, saved);
+        return saved;
       } catch {
         /* fall back to the page's own favicon */
       }
     }
     try {
-      return await api.saveFavicon(pageURL);
+      const saved = await api.saveFavicon(pageURL);
+      rememberFavicon(pageURL, saved);
+      return saved;
     } catch {
       return "";
     }
@@ -97,83 +149,99 @@ export default function LinkPasteMenu({ editor }: { editor: Editor | null }) {
 
   const chooseMention = async () => {
     acted.current = true;
-    setLoading(true);
-    let preview: LinkPreview = {
-      url: current.url,
-      title: current.url,
-      description: "",
-      image: "",
-      favicon: "",
-      siteName: "",
-    };
-    try {
-      preview = await api.fetchLinkPreview(current.url);
-    } catch {
-      /* fall back to the raw URL */
-    }
-    const favicon = await downloadFavicon(current.url, preview.favicon);
-    // Insert a Notion-style inline mention: the site favicon + page title (not a
-    // blue link). Stored portably as <a data-rockion-mention>.
+    const pasted = current;
     editor
       .chain()
       .focus()
-      .insertContentAt({ from: current.from, to: current.to }, [
-        { type: "linkMention", attrs: { url: current.url, title: preview.title || current.url, favicon } },
+      .insertContentAt({ from: pasted.from, to: pasted.to }, [
+        { type: "linkMention", attrs: { url: pasted.url, title: pasted.url, favicon: "" } },
         { type: "text", text: " " },
       ])
       .run();
     setState(null);
     setLoading(false);
-  };
-
-  const chooseBookmark = async () => {
-    acted.current = true;
-    setLoading(true);
+    const initialFavicon = cachedFavicon(pasted.url);
+    if (initialFavicon) {
+      updateMatchingNodes("linkMention", pasted.url, { favicon: initialFavicon });
+    }
     let preview: LinkPreview = {
-      url: current.url,
-      title: current.url,
+      url: pasted.url,
+      title: pasted.url,
       description: "",
       image: "",
       favicon: "",
       siteName: "",
     };
-    try {
-      preview = await api.fetchLinkPreview(current.url);
-    } catch {
-      /* fall back to minimal card */
+    const previewPromise = api.fetchLinkPreview(pasted.url).catch(() => preview);
+    const faviconPromise = downloadFavicon(pasted.url);
+    const favicon = await faviconPromise;
+    if (favicon) {
+      updateMatchingNodes("linkMention", pasted.url, { favicon });
     }
-    // Download the preview image into the vault so it renders reliably (no
-    // hotlink/CORS failures) and works offline. Fall back to the remote URL.
-    let image = preview.image || "";
-    if (image) {
-      try {
-        image = await api.saveRemoteImage(image);
-      } catch {
-        /* keep the remote URL */
-      }
-    }
-    // The footer favicon is also subject to the CSP, so download it locally too.
-    const favicon = await downloadFavicon(current.url, preview.favicon);
+    preview = await previewPromise;
+    const discoveredFavicon =
+      preview.favicon && !favicon ? await downloadFavicon(pasted.url, preview.favicon) : favicon;
+    updateMatchingNodes("linkMention", pasted.url, {
+      title: preview.title || pasted.url,
+      favicon: discoveredFavicon,
+    });
+  };
+
+  const chooseBookmark = async () => {
+    acted.current = true;
+    const pasted = current;
     editor
       .chain()
       .focus()
       .insertContentAt(
-        { from: current.from, to: current.to },
+        { from: pasted.from, to: pasted.to },
         {
           type: "bookmark",
           attrs: {
-            url: preview.url || current.url,
-            title: preview.title || current.url,
-            description: preview.description || "",
-            image,
-            favicon: favicon || preview.favicon || "",
-            siteName: preview.siteName || "",
+            url: pasted.url,
+            title: pasted.url,
+            description: "",
+            image: "",
+            favicon: "",
+            siteName: "",
           },
         }
       )
       .run();
     setState(null);
     setLoading(false);
+    const initialFavicon = cachedFavicon(pasted.url);
+    if (initialFavicon) {
+      updateMatchingNodes("bookmark", pasted.url, { favicon: initialFavicon });
+    }
+    let preview: LinkPreview = {
+      url: pasted.url,
+      title: pasted.url,
+      description: "",
+      image: "",
+      favicon: "",
+      siteName: "",
+    };
+    const previewPromise = api.fetchLinkPreview(pasted.url).catch(() => preview);
+    const faviconPromise = downloadFavicon(pasted.url);
+    const favicon = await faviconPromise;
+    if (favicon) {
+      updateMatchingNodes("bookmark", pasted.url, { favicon });
+    }
+    preview = await previewPromise;
+    // Share one asset across mention + bookmark: use the downloaded site favicon
+    // as the card's icon (no separate og:image). The same file is reused
+    // everywhere, and the card renders at a consistent, fixed size.
+    const discoveredFavicon =
+      preview.favicon && !favicon ? await downloadFavicon(pasted.url, preview.favicon) : favicon;
+    updateMatchingNodes("bookmark", pasted.url, {
+      url: preview.url || pasted.url,
+      title: preview.title || pasted.url,
+      description: preview.description || "",
+      image: discoveredFavicon || "",
+      favicon: discoveredFavicon || "",
+      siteName: preview.siteName || "",
+    });
   };
 
   return (

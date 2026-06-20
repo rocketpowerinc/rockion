@@ -51,7 +51,7 @@ export const Mention = Node.create({
   },
 
   addNodeView() {
-    return ({ node }) => {
+    return ({ node, getPos }) => {
       const a = node.attrs as MentionAttrs;
       const dom = document.createElement("span");
       dom.className = "link-mention";
@@ -73,6 +73,29 @@ export const Mention = Node.create({
       label.className = "link-mention-label";
       label.textContent = a.title || a.url;
       dom.appendChild(label);
+
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.className = "link-mention-delete";
+      deleteButton.title = "Delete mention";
+      deleteButton.setAttribute("aria-label", "Delete mention");
+      deleteButton.textContent = "×";
+      deleteButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const pos = typeof getPos === "function" ? getPos() : undefined;
+        if (typeof pos !== "number") return;
+        window.dispatchEvent(
+          new CustomEvent("rockion:mention-action", {
+            detail: {
+              action: "delete",
+              pos,
+              assets: /^Assets\/Bookmarks\//i.test(a.favicon || "") ? [a.favicon] : [],
+            },
+          })
+        );
+      });
+      dom.appendChild(deleteButton);
 
       dom.addEventListener("click", (event) => {
         event.preventDefault();

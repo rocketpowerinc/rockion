@@ -120,8 +120,8 @@ func (a *App) SaveRemoteImage(rawURL string) (string, error) {
 	return a.vault.SaveBookmarkImage(name, data, ext)
 }
 
-// SaveFavicon downloads a site favicon and stores it under a readable,
-// host-based name (e.g. github.com.png), reused across every link to that site.
+// SaveFavicon downloads a site favicon and stores it under a content-addressed
+// name in Assets/Bookmarks, reused across every link with identical favicon bytes.
 // If rawURL already points at a favicon discovered from the page, that exact URL
 // is tried first; otherwise the site's own /favicon.ico is tried before falling
 // back to Google's favicon service.
@@ -269,7 +269,7 @@ func faviconCandidates(pageOrIcon *url.URL) []string {
 	candidates = append(candidates, firstParty.String())
 	host := strings.TrimPrefix(strings.ToLower(pageOrIcon.Hostname()), "www.")
 	if host != "" {
-		candidates = append(candidates, "https://www.google.com/s2/favicons?sz=64&domain="+url.QueryEscape(host))
+		candidates = append(candidates, "https://www.google.com/s2/favicons?sz=128&domain="+url.QueryEscape(host))
 	}
 	return dedupeStrings(candidates)
 }
@@ -300,7 +300,11 @@ func downloadImage(client *http.Client, src string, limit int64) ([]byte, string
 	if err != nil {
 		return nil, "", err
 	}
-	ext := firstNonEmpty(imageExtFromBytes(data), imageExtFromContentType(resp.Header.Get("Content-Type")), strings.ToLower(path.Ext(u.Path)))
+	// Identify the format from the actual bytes / Content-Type only. The URL
+	// path is deliberately NOT a fallback: a site whose /favicon.ico returns an
+	// HTML redirect or soft-404 (e.g. xbox.com) would otherwise be saved as a
+	// bogus ".ico" and block the Google favicon fallback.
+	ext := firstNonEmpty(imageExtFromBytes(data), imageExtFromContentType(resp.Header.Get("Content-Type")))
 	if ext == "" {
 		return nil, "", errors.New("unsupported image type")
 	}

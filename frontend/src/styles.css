@@ -2300,26 +2300,55 @@ button.primary,
 .bookmark-card {
   display: flex;
   align-items: stretch;
-  gap: 12px;
+  gap: 0;
+  position: relative;
   margin: 12px 0;
   border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
   background: var(--bg);
   cursor: pointer;
-  min-height: 0;
+  height: 104px;
   max-width: 100%;
 }
 .bookmark-card:hover {
   background: var(--hover);
 }
+.bookmark-delete {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  opacity: 0;
+}
+.bookmark-card:hover .bookmark-delete,
+.bookmark-delete:focus {
+  opacity: 1;
+}
+.bookmark-delete:hover {
+  background: var(--hover);
+  color: var(--text);
+}
 .bookmark-text {
   flex: 1 1 auto;
   min-width: 0;
-  padding: 8px 12px;
+  padding: 10px 14px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   justify-content: center;
 }
 .bookmark-title {
@@ -2332,9 +2361,11 @@ button.primary,
 }
 .bookmark-desc {
   font-size: 12px;
+  line-height: 1.45;
   color: var(--text-muted);
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -2358,12 +2389,21 @@ button.primary,
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.bookmark-image {
+.bookmark-thumb {
   flex: 0 0 auto;
-  width: 180px;
-  max-width: 36%;
-  object-fit: cover;
+  width: 104px;
   align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--hover);
+  border-left: 1px solid var(--border);
+}
+.bookmark-thumb-img {
+  width: 54px;
+  height: 54px;
+  object-fit: contain;
+  border-radius: 10px;
 }
 
 /* ---- Inline web mention (favicon + title, not a blue link) ---- */
@@ -2392,6 +2432,31 @@ button.primary,
 }
 .link-mention-label {
   border-bottom: 0.6px solid var(--border);
+}
+.link-mention-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  margin-left: 1px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  opacity: 0;
+}
+.link-mention:hover .link-mention-delete,
+.link-mention:focus-within .link-mention-delete {
+  opacity: 1;
+}
+.link-mention-delete:hover {
+  background: var(--hover);
+  color: #ef4444;
 }
 
 .spellcheck-error {

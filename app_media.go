@@ -56,6 +56,15 @@ func (a *App) DeleteAsset(path string) error {
 	return a.vault.DeleteAsset(path)
 }
 
+func (a *App) DeleteUnusedBookmarkAssets(paths []string) ([]string, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if err := a.requireVault(); err != nil {
+		return nil, err
+	}
+	return a.vault.DeleteUnusedBookmarkAssets(paths)
+}
+
 func (a *App) OpenAssetInFolder(path string) error {
 	a.mu.RLock()
 	defer a.mu.RUnlock()

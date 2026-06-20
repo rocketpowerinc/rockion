@@ -441,6 +441,19 @@ test("MP4 uploads render as local video assets with asset actions", () => {
 });
 
 test("video, bookmark, and mention markup round-trip through portable HTML", () => {
+  const editor = fs.readFileSync(new URL("../src/components/Editor.tsx", import.meta.url), "utf8");
+  const bookmarkNode = fs.readFileSync(
+    new URL("../src/editor/Bookmark.ts", import.meta.url),
+    "utf8"
+  );
+  const mentionNode = fs.readFileSync(
+    new URL("../src/editor/Mention.ts", import.meta.url),
+    "utf8"
+  );
+  const linkPasteMenu = fs.readFileSync(
+    new URL("../src/editor/LinkPasteMenu.tsx", import.meta.url),
+    "utf8"
+  );
   const video = serializeVideoAsset(
     { src: "/Assets/Videos/my-page-2026-06-15-205140.mp4", title: 'Demo "Clip"' },
     "caption <safe>"
@@ -493,6 +506,17 @@ test("video, bookmark, and mention markup round-trip through portable HTML", () 
     favicon: "Assets/Bookmarks/example.com.ico",
     siteName: "Example",
   });
+  assert.match(bookmarkNode, /bookmark-menu-button/);
+  assert.match(bookmarkNode, /Delete bookmark/);
+  assert.match(bookmarkNode, /rockion:bookmark-action/);
+  assert.match(bookmarkNode, /\[a\.image,\s*a\.favicon\]/);
+  assert.match(bookmarkNode, /\^Assets\\\/Bookmarks\\\//);
+  assert.match(editor, /rockion:bookmark-action/);
+  assert.match(editor, /removeAtomAt/);
+  assert.match(editor, /rockion:mention-action/);
+  assert.match(editor, /"linkMention"/);
+  assert.match(editor, /api\.deleteUnusedBookmarkAssets\(bookmarkAssets\)/);
+  assert.match(editor, /\^Assets\\\/Bookmarks\\\//);
 
   const mention = serializeMention({
     url: "https://example.com",
@@ -517,6 +541,16 @@ test("video, bookmark, and mention markup round-trip through portable HTML", () 
     title: "Example",
     favicon: "Assets/Bookmarks/example.com.ico",
   });
+  assert.match(mentionNode, /link-mention-delete/);
+  assert.match(mentionNode, /Delete mention/);
+  assert.match(mentionNode, /rockion:mention-action/);
+  assert.match(mentionNode, /\^Assets\\\/Bookmarks\\\//);
+  assert.match(linkPasteMenu, /FAVICON_CACHE_PREFIX/);
+  assert.match(linkPasteMenu, /cachedFavicon\(pasted\.url\)/);
+  assert.match(linkPasteMenu, /rememberFavicon\(pageURL,\s*saved\)/);
+  assert.match(linkPasteMenu, /const previewPromise = api\.fetchLinkPreview/);
+  assert.match(linkPasteMenu, /const faviconPromise = downloadFavicon\(pasted\.url\)/);
+  assert.match(linkPasteMenu, /updateMatchingNodes\("linkMention",\s*pasted\.url,\s*\{\s*favicon/);
 });
 
 test("uploaded image icons are stored as vault icon assets", () => {

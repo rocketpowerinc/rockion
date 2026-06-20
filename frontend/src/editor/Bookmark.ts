@@ -71,7 +71,7 @@ export const Bookmark = Node.create({
   },
 
   addNodeView() {
-    return ({ node }) => {
+    return ({ node, getPos }) => {
       const a = node.attrs as BookmarkAttrs;
       const dom = document.createElement("div");
       dom.className = "bookmark-card";
@@ -84,6 +84,31 @@ export const Bookmark = Node.create({
           window.dispatchEvent(new CustomEvent("rockion:open-external", { detail: a.url }));
         }
       });
+
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.className = "bookmark-delete";
+      deleteButton.title = "Delete bookmark";
+      deleteButton.setAttribute("aria-label", "Delete bookmark");
+      deleteButton.textContent = "\u00d7";
+      deleteButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const pos = typeof getPos === "function" ? getPos() : undefined;
+        if (typeof pos !== "number") return;
+        window.dispatchEvent(
+          new CustomEvent("rockion:bookmark-action", {
+            detail: {
+              action: "delete",
+              pos,
+              assets: [a.image, a.favicon].filter((path) =>
+                /^Assets\/Bookmarks\//i.test(path || "")
+              ),
+            },
+          })
+        );
+      });
+      dom.appendChild(deleteButton);
 
       const text = document.createElement("div");
       text.className = "bookmark-text";
@@ -102,14 +127,6 @@ export const Bookmark = Node.create({
 
       const footer = document.createElement("div");
       footer.className = "bookmark-footer";
-      if (a.favicon) {
-        const fav = document.createElement("img");
-        fav.className = "bookmark-favicon";
-        fav.src = displayPreviewImage(a.favicon);
-        fav.alt = "";
-        fav.addEventListener("error", () => fav.remove());
-        footer.appendChild(fav);
-      }
       const host = document.createElement("span");
       host.className = "bookmark-url";
       host.textContent = a.url;
@@ -118,12 +135,19 @@ export const Bookmark = Node.create({
 
       dom.appendChild(text);
 
-      if (a.image) {
-        const thumb = document.createElement("img");
-        thumb.className = "bookmark-image";
-        thumb.src = displayPreviewImage(a.image);
-        thumb.alt = "";
-        thumb.addEventListener("error", () => thumb.remove());
+      // The icon tile is the shared site favicon, shown at a fixed size (CSS uses
+      // object-fit: contain) so the card height never depends on the icon's
+      // intrinsic dimensions.
+      const iconSrc = a.image || a.favicon;
+      if (iconSrc) {
+        const thumb = document.createElement("div");
+        thumb.className = "bookmark-thumb";
+        const img = document.createElement("img");
+        img.className = "bookmark-thumb-img";
+        img.src = displayPreviewImage(iconSrc);
+        img.alt = "";
+        img.addEventListener("error", () => thumb.remove());
+        thumb.appendChild(img);
         dom.appendChild(thumb);
       }
 

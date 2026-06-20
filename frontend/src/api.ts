@@ -196,6 +196,8 @@ export const api = {
   saveFavicon: (url: string): Promise<string> => App.SaveFavicon(url),
   openAssetInFolder: (path: string): Promise<void> => App.OpenAssetInFolder(path),
   deleteAsset: (path: string): Promise<void> => App.DeleteAsset(path),
+  deleteUnusedBookmarkAssets: (paths: string[]): Promise<string[]> =>
+    App.DeleteUnusedBookmarkAssets(paths),
   setNoteCover: (path: string, cover: PageCover): Promise<Note> =>
     App.SetNoteCover(path, cover),
   getPageSettings: (path: string): Promise<PageSettings> => App.GetPageSettings(path),

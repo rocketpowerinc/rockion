@@ -274,6 +274,52 @@ func TestBookmarkImagesValidateBytes(t *testing.T) {
 	if _, err := v.SaveFaviconImage("example.com", []byte("not an icon"), ".ico"); err == nil {
 		t.Fatal("invalid favicon bytes were accepted")
 	}
+	if rel, err := v.SaveFaviconImage("costco.com", pngBytes, ".png"); err != nil {
+		t.Fatal(err)
+	} else if strings.Contains(rel, "costco.com") || !strings.HasPrefix(rel, "Assets/Bookmarks/") || !strings.HasSuffix(rel, ".png") {
+		t.Fatalf("favicon was not stored as a hashed bookmark asset: %q", rel)
+	} else if base := strings.TrimSuffix(filepath.Base(rel), ".png"); len(base) != 32 {
+		t.Fatalf("favicon asset basename length = %d, want content hash length for %q", len(base), rel)
+	}
+}
+
+func TestDeleteUnusedBookmarkAssetsKeepsReferencedAssets(t *testing.T) {
+	v := openTestVault(t)
+	if err := os.MkdirAll(filepath.Join(v.Root, "Assets", "Bookmarks"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	unused := "Assets/Bookmarks/unused.png"
+	shared := "Assets/Bookmarks/shared.png"
+	if err := os.WriteFile(filepath.Join(v.Root, filepath.FromSlash(unused)), []byte("unused"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(v.Root, filepath.FromSlash(shared)), []byte("shared"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(v.Root, "note.md"),
+		[]byte(`<figure data-rockion-bookmark><img src="`+shared+`"></figure>`),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	deleted, err := v.DeleteUnusedBookmarkAssets([]string{unused, shared})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deleted) != 1 || deleted[0] != unused {
+		t.Fatalf("deleted = %#v, want only %q", deleted, unused)
+	}
+	if _, err := os.Stat(filepath.Join(v.Root, filepath.FromSlash(unused))); !os.IsNotExist(err) {
+		t.Fatalf("unused asset still exists or stat failed unexpectedly: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(v.Root, filepath.FromSlash(shared))); err != nil {
+		t.Fatalf("referenced asset was removed: %v", err)
+	}
+	if _, err := v.DeleteUnusedBookmarkAssets([]string{"Assets/Images/not-bookmark.png"}); err == nil {
+		t.Fatal("non-bookmark asset cleanup unexpectedly succeeded")
+	}
 }
 
 func TestSetIconRequiresNoteAndRejectsInvalidDataURL(t *testing.T) {

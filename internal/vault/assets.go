@@ -85,9 +85,9 @@ func (v *Vault) SaveBookmarkImage(name string, data []byte, ext string) (string,
 	return v.saveAssetContentAddressed("Bookmarks", data, ext)
 }
 
-// SaveFaviconImage stores a site favicon under a human-readable, host-based name
-// (e.g. Assets/Bookmarks/github.com.png) so every mention/bookmark of the same
-// site reuses one file. If a file with that name already exists it is reused.
+// SaveFaviconImage stores a site favicon under a content-addressed name in
+// Assets/Bookmarks so every mention/bookmark with identical favicon bytes reuses
+// one file.
 func (v *Vault) SaveFaviconImage(host string, data []byte, ext string) (string, error) {
 	if len(data) == 0 || len(data) > maxImageBytes {
 		return "", fmt.Errorf("image must be between 1 byte and %d MB", maxImageBytes>>20)
@@ -102,11 +102,8 @@ func (v *Vault) SaveFaviconImage(host string, data []byte, ext string) (string, 
 	if ext == ".jpeg" {
 		ext = ".jpg"
 	}
-	base := sanitize(strings.TrimSpace(host))
-	if base == "" || base == "Untitled" {
-		base = "favicon"
-	}
-	return v.saveAssetNamed("Bookmarks", base, data, ext)
+	_ = host
+	return v.saveAssetContentAddressed("Bookmarks", data, ext)
 }
 
 func downloadableImageBytesMatch(data []byte, ext string) bool {
@@ -162,6 +159,74 @@ func (v *Vault) DeleteAsset(rel string) error {
 	}
 	_ = clean
 	return nil
+}
+
+func (v *Vault) DeleteUnusedBookmarkAssets(paths []string) ([]string, error) {
+	seen := make(map[string]struct{})
+	var candidates []string
+	for _, path := range paths {
+		clean := filepath.ToSlash(filepath.Clean(strings.TrimSpace(path)))
+		if !strings.HasPrefix(clean, "Assets/Bookmarks/") {
+			return nil, errors.New("bookmark cleanup only accepts Assets/Bookmarks assets")
+		}
+		if _, ok := seen[clean]; ok {
+			continue
+		}
+		if _, _, err := v.resolveAssetPath(clean); err != nil {
+			return nil, err
+		}
+		seen[clean] = struct{}{}
+		candidates = append(candidates, clean)
+	}
+	if len(candidates) == 0 {
+		return nil, nil
+	}
+
+	referenced := make(map[string]bool)
+	err := filepath.WalkDir(v.Root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			name := entry.Name()
+			if name == ".git" || name == ".rockion" || name == "node_modules" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.EqualFold(filepath.Ext(entry.Name()), ".md") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		text := string(data)
+		for _, candidate := range candidates {
+			if strings.Contains(text, candidate) {
+				referenced[candidate] = true
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var deleted []string
+	for _, candidate := range candidates {
+		if referenced[candidate] {
+			continue
+		}
+		if err := v.DeleteAsset(candidate); err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return deleted, err
+		}
+		deleted = append(deleted, candidate)
+	}
+	return deleted, nil
 }
 
 func (v *Vault) AssetFullPath(rel string) (string, error) {
@@ -238,7 +303,7 @@ func (v *Vault) saveAssetContentAddressed(kind string, data []byte, ext string) 
 
 // saveAssetNamed writes data to a fixed, readable filename (base+ext) and reuses
 // an existing file of that name rather than creating a timestamped duplicate.
-// Used for content that is one-per-name, like host-based favicons.
+// Used for content that is one-per-name.
 func (v *Vault) saveAssetNamed(kind, base string, data []byte, ext string) (string, error) {
 	dirRel := filepath.ToSlash(filepath.Join(assetRootDir, kind))
 	dir, err := v.resolve(dirRel, true)

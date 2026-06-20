@@ -61,7 +61,9 @@ export const SlashMenu = forwardRef<SlashMenuRef, Props>((props, ref) => {
       {props.items.map((item, i) => (
         <button
           key={item.title}
-          ref={(el) => (itemRefs.current[i] = el)}
+          ref={(el) => {
+            itemRefs.current[i] = el;
+          }}
           className={`slash-item ${i === selected ? "is-selected" : ""}`}
           onMouseEnter={() => setSelected(i)}
           onClick={() => pick(i)}

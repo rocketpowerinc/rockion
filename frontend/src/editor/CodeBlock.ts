@@ -67,7 +67,8 @@ export const CodeBlock = CodeBlockLowlight.extend({
       // Current code text (read live from the document).
       const codeText = (): string => {
         if (typeof getPos === "function") {
-          const n = editor.state.doc.nodeAt(getPos());
+          const pos = getPos();
+          const n = typeof pos === "number" ? editor.state.doc.nodeAt(pos) : null;
           if (n) return n.textContent;
         }
         return current.textContent;

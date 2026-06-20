@@ -35,6 +35,9 @@ All notable changes to Rockion are documented here. This project adheres to
   menu for opening the file location or deleting the asset.
 
 ### Changed
+- Update Go and frontend dependencies from the open Dependabot PRs, including
+  Tiptap 3, React 19, TypeScript 6, `golang.org/x/crypto` 0.53.0, and
+  `modernc.org/sqlite` 1.52.0, with compatibility fixes for the newer APIs.
 - Include bookmark card title/description text in the vault search index so
   pasted bookmarks can be found by their preview descriptions.
 - Throttle autosave-created version-history snapshots to one checkpoint per page

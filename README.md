@@ -86,13 +86,28 @@ rm -rf /Applications/Rockion.app
 
 - TipTap editor that reads/writes GitHub-Flavored Markdown directly to disk, with debounced autosave (no save button).
 - **Title = filename** — edit a note's first `# Heading` and the `.md` file is renamed to match once you pause typing (clashes get a ` 2`, ` 3` suffix; links that point to the page are rewritten).
-- Notion-style `/` slash menu: headings, lists, to-dos, table, quote, **callout**, **link to page**, **video upload**, code block, divider.
+- Notion-style `/` slash menu: headings, lists, to-dos, table, quote, **callout**, **link to page**, **image / video / audio upload**, code block, divider.
 - **Block handles** — hover any block for a drag grip (reorder via drag) and a `+` button (insert a block below). Nested blocks (incl. callouts inside callouts) can be dragged out.
 - Click the empty area below the content to start a new block.
-- Tables, checklists, image paste/drop, and MP4 video paste/drop (media saved into the vault's `Assets/Images` and `Assets/Videos` folders).
+- Tables, checklists, and media via paste, drag-and-drop, or `/` upload for images, video, and audio (saved into the vault's `Assets/Images`, `Assets/Videos`, and `Assets/Audio` folders).
 - Uploaded page/project cover images are saved separately in `Assets/Covers`, while custom icon images are saved in `Assets/Icons`.
 
-**Callouts** — a single `/Callout` block; click its icon to cycle three cyberpunk gradient styles (green / red / yellow). On disk it's a portable `> [!GREEN]` alert blockquote.
+**Supported media files**
+
+Uploaded media is stored as a plain file in the vault's `Assets/` folders and embedded with portable markup, so it also renders wherever your Markdown goes (as far as that viewer supports the format).
+
+- **Images** (`Assets/Images`) — PNG, JPEG, GIF, WebP, AVIF
+- **Video** (`Assets/Videos`) — MP4 (H.264/AAC)
+- **Audio** (`Assets/Audio`) — MP3, M4A/AAC, WAV, OGG, Opus, FLAC, WebM audio (`.weba`)
+
+MP3, M4A, and WAV audio are the most universally compatible; OGG/Opus/FLAC/WebM play on Windows and Linux but may not on macOS.
+
+**Not supported (and why)**
+
+- **HEIC/HEIF** (iPhone photos) — Rockion renders pages in a system browser engine (Chromium/WebView2 on Windows), which cannot display `.heic` in a page. Supporting it would mean converting every upload to JPEG with a bundled HEIC decoder; that dependency wasn't worth the weight. Convert HEIC to JPEG or PNG first.
+- **AVI** — no browser engine can play `.avi` in an HTML5 `<video>` element on any platform; it isn't a supported container. Supporting it would require transcoding to MP4 with ffmpeg, which Rockion does not bundle. Convert AVI to MP4 first.
+
+**Callouts** — a single `/Callout` block; click its icon to cycle seven neon gradient styles (📌 pin, ♻️ recycle, 🛑 stop, ⚠️ warning, ℹ️ info, ❓ question, ✅ success). On disk it's a portable `> [!PIN]` alert blockquote.
 
 **Code blocks** — syntax highlighting (highlight.js) with a hover toolbar in the top-right: a language dropdown (Plain text, PowerShell, Bash, Python, Go, Markdown), a **Copy** button, and a **Download** button that opens a native Save dialog and writes the script with the right extension. Defaults to plain text; stays a portable fenced block on disk.
 

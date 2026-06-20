@@ -7,6 +7,8 @@
 !/frontend/dist/.gitkeep
 /frontend/wailsjs/
 /frontend/node_modules/
+# Wails dependency-install cache (auto-generated hash of package.json)
+/frontend/package.json.md5
 
 # Vault index (per-vault, never committed)
 .rockion/

@@ -73,6 +73,9 @@ All notable changes to Rockion are documented here. This project adheres to
   chunks, removing Vite's large dictionary chunk warning from release builds.
 
 ### Fixed
+- Keep Windows development and Go test module caches inside the repository-local
+  `.codex-tmp` folder so fresh Go installs do not need write access to the
+  default user `GOPATH`.
 - Insert pasted bookmark cards and mention chips immediately, then enrich link
   previews and local assets in the background so slow networks do not block the
   editor.

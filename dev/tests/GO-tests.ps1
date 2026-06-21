@@ -7,6 +7,7 @@ $ErrorActionPreference = 'Stop'
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot = Split-Path -Parent (Split-Path -Parent $ScriptDir)
 $GoCache = Join-Path $RepoRoot '.codex-tmp\release-go-cache'
+$GoPath = Join-Path $RepoRoot '.codex-tmp\release-go-path'
 $Failures = [System.Collections.Generic.List[string]]::new()
 
 function Invoke-CheckedCommand {
@@ -33,12 +34,17 @@ foreach ($command in @('go', 'gofmt')) {
 }
 
 New-Item -ItemType Directory -Path $GoCache -Force | Out-Null
+New-Item -ItemType Directory -Path $GoPath -Force | Out-Null
 $env:GOCACHE = $GoCache
+$env:GOPATH = $GoPath
+$env:GOMODCACHE = Join-Path $GoPath 'pkg\mod'
 
 Push-Location $RepoRoot
 try {
     Write-Host "Rockion Go checks - $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
     Write-Host (& go version)
+    Write-Host "Go build cache: $env:GOCACHE" -ForegroundColor DarkGray
+    Write-Host "Go module cache: $env:GOMODCACHE" -ForegroundColor DarkGray
     Write-Host
 
     $goFiles = @(

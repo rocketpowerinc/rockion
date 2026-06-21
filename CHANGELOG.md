@@ -6,6 +6,9 @@ All notable changes to Rockion are documented here. This project adheres to
 ## [Unreleased]
 
 ### Added
+- Add targeted frontend regression coverage for paste-as enrichment, media
+  round-tripping, tab restore/reorder, in-page find, locked-page protections,
+  and title-based renames.
 - Image and audio uploads alongside video: new `/Image` and `/Audio` slash
   commands plus paste and drag-and-drop. Images are stored in `Assets/Images`
   and audio in `Assets/Audio`; audio embeds as a portable
@@ -75,7 +78,8 @@ All notable changes to Rockion are documented here. This project adheres to
 ### Fixed
 - Keep Windows development and Go test module caches inside the repository-local
   `.codex-tmp` folder so fresh Go installs do not need write access to the
-  default user `GOPATH`.
+  default user `GOPATH`, and add Windows bootstrap and doctor scripts for setup
+  checks.
 - Insert pasted bookmark cards and mention chips immediately, then enrich link
   previews and local assets in the background so slow networks do not block the
   editor.

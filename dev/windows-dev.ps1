@@ -10,6 +10,24 @@ $GoCache = Join-Path $RepoRoot '.codex-tmp\wails-go-cache'
 $GoPath = Join-Path $RepoRoot '.codex-tmp\wails-go-path'
 $RockionDevPath = Join-Path $RepoRoot 'build\bin\rockion-dev.exe'
 
+function Resolve-Tool {
+    param(
+        [string]$Name,
+        [string[]]$Fallbacks = @()
+    )
+
+    $command = Get-Command $Name -ErrorAction SilentlyContinue
+    if ($command) {
+        return $command.Source
+    }
+    foreach ($fallback in $Fallbacks) {
+        if ($fallback -and (Test-Path -LiteralPath $fallback)) {
+            return $fallback
+        }
+    }
+    return $null
+}
+
 function Stop-RockionDevelopmentProcesses {
     $repoPattern = [regex]::Escape($RepoRoot)
     $processes = @(
@@ -35,10 +53,31 @@ function Stop-RockionDevelopmentProcesses {
     Start-Sleep -Milliseconds 500
 }
 
-foreach ($command in @('go', 'node', 'npm', 'wails')) {
-    if (-not (Get-Command $command -ErrorAction SilentlyContinue)) {
-        Write-Host "[ERROR] $command was not found on PATH." -ForegroundColor Red
-        exit 1
+$GoCommand = Resolve-Tool 'go' @(
+    'C:\Program Files\Go\bin\go.exe',
+    'C:\Program Files (x86)\Go\bin\go.exe'
+)
+$NodeCommand = Resolve-Tool 'node' @('C:\Program Files\nodejs\node.exe')
+$NpmCommand = Resolve-Tool 'npm' @('C:\Program Files\nodejs\npm.cmd')
+$WailsCommand = Resolve-Tool 'wails' @(
+    (Join-Path $env:USERPROFILE 'go\bin\wails.exe')
+)
+
+$missing = @()
+if (-not $GoCommand) { $missing += 'go' }
+if (-not $NodeCommand) { $missing += 'node' }
+if (-not $NpmCommand) { $missing += 'npm' }
+if (-not $WailsCommand) { $missing += 'wails' }
+if ($missing.Count -gt 0) {
+    Write-Host "[ERROR] Missing required tool(s): $($missing -join ', ')." -ForegroundColor Red
+    Write-Host '        Run .\dev\windows-doctor.ps1 for setup details.' -ForegroundColor DarkGray
+    exit 1
+}
+
+foreach ($toolPath in @($GoCommand, $NodeCommand, $NpmCommand, $WailsCommand)) {
+    $toolDir = Split-Path -Parent $toolPath
+    if ($toolDir -and $env:Path -notlike "*$toolDir*") {
+        $env:Path = "$toolDir;$env:Path"
     }
 }
 
@@ -57,7 +96,7 @@ try {
     Write-Host 'Starting Rockion development mode...' -ForegroundColor Cyan
     Write-Host "Go build cache: $env:GOCACHE" -ForegroundColor DarkGray
     Write-Host "Go module cache: $env:GOMODCACHE" -ForegroundColor DarkGray
-    & wails dev
+    & $WailsCommand dev
     if ($LASTEXITCODE -ne 0) {
         Write-Host "[ERROR] wails dev exited with code $LASTEXITCODE." -ForegroundColor Red
         exit $LASTEXITCODE

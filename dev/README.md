@@ -10,9 +10,30 @@ directory.
 .\dev\windows-dev.ps1
 ```
 
-The launcher stops stale Rockion Wails/Vite processes, sets a writable local Go
-build cache, and starts `wails dev` in the foreground. Pass `-KeepExisting` only
-when intentionally running another development session.
+The launcher stops stale Rockion Wails/Vite processes, sets writable local Go
+build and module caches, and starts `wails dev` in the foreground. Pass
+`-KeepExisting` only when intentionally running another development session.
+
+## Bootstrap Windows dependencies
+
+```powershell
+.\dev\windows-bootstrap.ps1
+```
+
+The bootstrap script shows the exact setup commands for the pinned Node.js, npm,
+and Wails versions. Re-run it with `-Install` to execute them. If it installs
+nvm-windows or changes the active Node.js version, close and reopen PowerShell
+before running the doctor.
+
+## Check your Windows setup
+
+```powershell
+.\dev\windows-doctor.ps1
+```
+
+The doctor checks Go, Node.js, npm, Wails, repository-local cache writability,
+Go file line endings, and Go module network access. Warnings do not fail the
+doctor because an already-populated module cache can still support offline work.
 
 ## Run all release checks
 

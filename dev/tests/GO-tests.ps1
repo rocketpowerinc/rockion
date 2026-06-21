@@ -10,6 +10,24 @@ $GoCache = Join-Path $RepoRoot '.codex-tmp\release-go-cache'
 $GoPath = Join-Path $RepoRoot '.codex-tmp\release-go-path'
 $Failures = [System.Collections.Generic.List[string]]::new()
 
+function Resolve-Tool {
+    param(
+        [string]$Name,
+        [string[]]$Fallbacks = @()
+    )
+
+    $command = Get-Command $Name -ErrorAction SilentlyContinue
+    if ($command) {
+        return $command.Source
+    }
+    foreach ($fallback in $Fallbacks) {
+        if ($fallback -and (Test-Path -LiteralPath $fallback)) {
+            return $fallback
+        }
+    }
+    return $null
+}
+
 function Invoke-CheckedCommand {
     param(
         [string]$Name,
@@ -26,11 +44,28 @@ function Invoke-CheckedCommand {
     }
 }
 
-foreach ($command in @('go', 'gofmt')) {
-    if (-not (Get-Command $command -ErrorAction SilentlyContinue)) {
-        Write-Host "[ERROR] $command was not found on PATH." -ForegroundColor Red
-        exit 1
-    }
+$GoCommand = Resolve-Tool 'go' @(
+    'C:\Program Files\Go\bin\go.exe',
+    'C:\Program Files (x86)\Go\bin\go.exe'
+)
+$GofmtCommand = Resolve-Tool 'gofmt' @(
+    'C:\Program Files\Go\bin\gofmt.exe',
+    'C:\Program Files (x86)\Go\bin\gofmt.exe'
+)
+
+if (-not $GoCommand) {
+    Write-Host '[ERROR] go was not found on PATH or in the standard Windows install location.' -ForegroundColor Red
+    Write-Host '        Install Go, then reopen PowerShell or rerun this script.' -ForegroundColor DarkGray
+    exit 1
+}
+if (-not $GofmtCommand) {
+    Write-Host '[ERROR] gofmt was not found on PATH or in the standard Windows install location.' -ForegroundColor Red
+    exit 1
+}
+
+$goBin = Split-Path -Parent $GoCommand
+if ($env:Path -notlike "*$goBin*") {
+    $env:Path = "$goBin;$env:Path"
 }
 
 New-Item -ItemType Directory -Path $GoCache -Force | Out-Null
@@ -42,9 +77,10 @@ $env:GOMODCACHE = Join-Path $GoPath 'pkg\mod'
 Push-Location $RepoRoot
 try {
     Write-Host "Rockion Go checks - $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
-    Write-Host (& go version)
+    Write-Host (& $GoCommand version)
     Write-Host "Go build cache: $env:GOCACHE" -ForegroundColor DarkGray
     Write-Host "Go module cache: $env:GOMODCACHE" -ForegroundColor DarkGray
+    Write-Host 'First run may download Go modules into the repository-local cache.' -ForegroundColor DarkGray
     Write-Host
 
     $goFiles = @(
@@ -56,7 +92,7 @@ try {
     )
 
     Write-Host '[CHECK] Go formatting' -ForegroundColor Gray
-    $unformatted = @(& gofmt -l $goFiles)
+    $unformatted = @(& $GofmtCommand -l $goFiles)
     if ($unformatted.Count -gt 0) {
         $Failures.Add('Go formatting')
         Write-Host '[FAIL] These files need gofmt:' -ForegroundColor Red
@@ -65,15 +101,15 @@ try {
         Write-Host '[OK] Go formatting' -ForegroundColor Green
     }
 
-    Invoke-CheckedCommand 'Go module verification' { & go mod verify }
-    Invoke-CheckedCommand 'Go tests' { & go test ./... }
-    Invoke-CheckedCommand 'Go vet' { & go vet ./... }
+    Invoke-CheckedCommand 'Go module verification' { & $GoCommand mod verify }
+    Invoke-CheckedCommand 'Go tests' { & $GoCommand test ./... }
+    Invoke-CheckedCommand 'Go vet' { & $GoCommand vet ./... }
 
     if ($SkipVulnerabilityScan) {
         Write-Host '[SKIP] Go vulnerability scan' -ForegroundColor Yellow
     } else {
         Invoke-CheckedCommand 'Go vulnerability scan' {
-            & go run golang.org/x/vuln/cmd/govulncheck@v1.3.0 ./...
+            & $GoCommand run golang.org/x/vuln/cmd/govulncheck@v1.3.0 ./...
         }
     }
 } finally {

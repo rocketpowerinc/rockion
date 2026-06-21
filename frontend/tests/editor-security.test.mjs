@@ -506,7 +506,7 @@ test("video, bookmark, and mention markup round-trip through portable HTML", () 
     favicon: "Assets/Bookmarks/example.com.ico",
     siteName: "Example",
   });
-  assert.match(bookmarkNode, /bookmark-menu-button/);
+  assert.match(bookmarkNode, /bookmark-delete/);
   assert.match(bookmarkNode, /Delete bookmark/);
   assert.match(bookmarkNode, /rockion:bookmark-action/);
   assert.match(bookmarkNode, /\[a\.image,\s*a\.favicon\]/);
@@ -582,7 +582,7 @@ test("uploaded image icons are stored as vault icon assets", () => {
   assert.match(imageIcons, /return `\/\$\{value\}`/);
   assert.match(editor, /api\.saveImage\(currentPageAssetName\(\),\s*Array\.from\(buf\)\)/);
   assert.match(editor, /api\.saveCoverImage\(currentPageAssetName\(\),\s*Array\.from\(data\)\)/);
-  assert.match(imageIcons, /Images\|Icons\|Covers\|Videos\|Bookmarks/);
+  assert.match(imageIcons, /Images\|Icons\|Covers\|Videos\|Audio\|Bookmarks/);
   assert.match(editor, /assetName=\{currentPageAssetName\(\)\}/);
   assert.match(dashboard, /assetName=\{note\.title \|\| "project-icon"\}/);
   assert.match(sidebar, /assetName=\{node\.name \|\| "project-icon"\}/);
